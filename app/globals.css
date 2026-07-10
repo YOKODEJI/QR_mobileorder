@@ -1,0 +1,132 @@
+@import "tailwindcss";
+
+/* ============================================================
+   デザイントークン（_planning/01-design-tokens.md 準拠）
+   ============================================================ */
+:root {
+  /* サーフェス */
+  --app-bg: #f2f2f7;
+  --surface: #ffffff;
+  --header-bg: rgba(248, 248, 250, 0.82);
+  --inset: #f0f0f2;
+
+  /* テキスト */
+  --text: #1c1c1e;
+  --text-2: #6b6b70;
+  --text-3: #8e8e93;
+  --text-4: #a0a0a5;
+
+  /* 罫線 */
+  --hairline: #f0f0f2;
+  --hairline-2: #f4f4f6;
+
+  /* コントロール */
+  --control-tint: rgba(118, 118, 128, 0.12);
+  --chip-tint: rgba(118, 118, 128, 0.1);
+
+  /* 意味色 */
+  --blue: #007aff;
+  --green: #34c759;
+  --green-dark: #248a3d;
+  --green-bg: #e3f7ea;
+  --red: #ff3b30;
+  --red-dark: #d70015;
+  --red-bg: #ffe5e3;
+  --red-bg-2: #fff0ef;
+  --soldout-bg: #d1d1d6;
+  --soldout-text: #6b6b70;
+
+  /* テーマアクセント（設定で上書き。既定 red-orange） */
+  --accent: #cf4b2c;
+  --accent-ink: #ffffff;
+}
+
+/* ============================================================
+   ベース
+   ============================================================ */
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+a {
+  color: var(--accent);
+}
+a:hover {
+  color: #a53b20;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.16);
+  border-radius: 8px;
+}
+
+/* number入力のスピナー非表示 */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* ============================================================
+   キーフレーム
+   ============================================================ */
+@keyframes kpulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px rgba(255, 59, 48, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(255, 59, 48, 0.03);
+  }
+}
+@keyframes pop {
+  0% {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes sheetup {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ============================================================
+   レスポンシブ（管理画面は狭幅で段組を解除）
+   ============================================================ */
+.staff-grid {
+  display: grid;
+  grid-template-columns: 330px 1fr;
+  gap: 18px;
+}
+@media (max-width: 820px) {
+  .staff-grid {
+    grid-template-columns: 1fr;
+  }
+}
+/* メニュー管理: 狭幅では行を横スクロール（列を潰さない） */
+.menu-rows {
+  overflow-x: auto;
+}
