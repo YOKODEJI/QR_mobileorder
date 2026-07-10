@@ -46,38 +46,38 @@ export const itemCardStyle = (soldOut: boolean): CSSProperties => ({
 });
 
 export const addBtnStyle = (accent: string): CSSProperties => ({
-  padding: "10px 18px",
+  padding: "12px 22px",
   borderRadius: "12px",
   border: "none",
   background: accent,
   color: "#fff",
   fontFamily: "inherit",
   fontWeight: 700,
-  fontSize: "14px",
+  fontSize: "15px",
   cursor: "pointer",
 });
 
 export const stepAddStyle = (accent: string): CSSProperties => ({
-  width: "38px",
-  height: "38px",
+  width: "44px",
+  height: "44px",
   borderRadius: "12px",
   border: "none",
   background: accent,
   color: "#fff",
-  fontSize: "22px",
+  fontSize: "24px",
   fontWeight: 600,
   cursor: "pointer",
   lineHeight: 1,
 });
 
 export const stepSubStyle = (accent: string): CSSProperties => ({
-  width: "38px",
-  height: "38px",
+  width: "44px",
+  height: "44px",
   borderRadius: "12px",
   border: "none",
   background: "#f0f0f2",
   color: accent,
-  fontSize: "22px",
+  fontSize: "24px",
   fontWeight: 600,
   cursor: "pointer",
   lineHeight: 1,

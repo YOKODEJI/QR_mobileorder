@@ -7,9 +7,9 @@ import { proxyCardStyle, proxyAddStyle, proxySubStyle, addBtnStyle } from "@/lib
 export default function StaffCheckout() {
   const s = useAppStore();
   const accent = s.settings.theme;
-  const photoByName: Record<string, string> = {};
+  const photoById: Record<string, string> = {};
   s.menu.forEach((m) => {
-    if (m.photo) photoByName[m.name] = m.photo;
+    if (m.photo) photoById[m.id] = m.photo;
   });
 
   const tableTotal = (id: number) =>
@@ -24,12 +24,16 @@ export default function StaffCheckout() {
   const sel = s.selectedStaffTable;
   const selOrders = sel != null ? s.orders.filter((o) => o.table === sel) : [];
 
-  // 明細を品目名で集約
-  const agg: Record<string, { name: string; price: number; qty: number; proxy: boolean }> = {};
+  // 明細を商品ID＋単価で集約（名前一致に依存しない。会期中の値変更にも安全）
+  const agg: Record<
+    string,
+    { menuItemId: string; name: string; price: number; qty: number; proxy: boolean }
+  > = {};
   selOrders.forEach((o) => {
     o.items.forEach((it) => {
-      const k = it.name;
-      if (!agg[k]) agg[k] = { name: it.name, price: it.price, qty: 0, proxy: false };
+      const k = it.menuItemId + ":" + it.price;
+      if (!agg[k])
+        agg[k] = { menuItemId: it.menuItemId, name: it.name, price: it.price, qty: 0, proxy: false };
       agg[k].qty += it.qty;
       if (o.proxy) agg[k].proxy = true;
     });
@@ -161,26 +165,48 @@ export default function StaffCheckout() {
                         </div>
                       </div>
                       {s.tableEditMode ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            s.startEditTable(t.id);
-                          }}
-                          style={{
-                            flexShrink: 0,
-                            border: `1px solid ${accent}`,
-                            background: "#fff",
-                            color: accent,
-                            fontSize: "13px",
-                            fontWeight: 700,
-                            fontFamily: "inherit",
-                            borderRadius: "999px",
-                            padding: "8px 16px",
-                            cursor: "pointer",
-                          }}
-                        >
-                          名前変更
-                        </button>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              s.startEditTable(t.id);
+                            }}
+                            style={{
+                              border: `1px solid ${accent}`,
+                              background: "#fff",
+                              color: accent,
+                              fontSize: "13px",
+                              fontWeight: 700,
+                              fontFamily: "inherit",
+                              borderRadius: "999px",
+                              padding: "8px 16px",
+                              cursor: "pointer",
+                            }}
+                          >
+                            名前変更
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              s.confirmDeleteTable(t.id);
+                            }}
+                            aria-label="テーブルを削除"
+                            style={{
+                              width: "32px",
+                              height: "32px",
+                              borderRadius: "50%",
+                              border: "1px solid #ffd4d1",
+                              background: "#fff",
+                              color: "#ff3b30",
+                              fontSize: "14px",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              lineHeight: 1,
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
                       ) : (
                         <span
                           style={{
@@ -232,7 +258,7 @@ export default function StaffCheckout() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   {aggList.map((it) => (
                     <div
-                      key={it.name}
+                      key={it.menuItemId + ":" + it.price}
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -242,10 +268,10 @@ export default function StaffCheckout() {
                         padding: "10px 12px",
                       }}
                     >
-                      {photoByName[it.name] && (
+                      {photoById[it.menuItemId] && (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={photoByName[it.name]}
+                          src={photoById[it.menuItemId]}
                           alt=""
                           style={{ width: "40px", height: "40px", borderRadius: "10px", objectFit: "cover" }}
                         />
@@ -262,7 +288,7 @@ export default function StaffCheckout() {
                       </span>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         <button
-                          onClick={() => s.cancelUnit(it.name)}
+                          onClick={() => s.cancelUnit(it.menuItemId)}
                           style={{
                             width: "34px",
                             height: "34px",
@@ -288,7 +314,7 @@ export default function StaffCheckout() {
               )}
 
               <button
-                onClick={s.checkout}
+                onClick={s.confirmCheckout}
                 style={{
                   width: "100%",
                   marginTop: "16px",
@@ -331,10 +357,10 @@ export default function StaffCheckout() {
                     const orderable = s.avail(m);
                     return (
                       <div key={m.id} style={proxyCardStyle(!orderable)}>
-                        {photoByName[m.name] && (
+                        {photoById[m.id] && (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={photoByName[m.name]}
+                            src={photoById[m.id]}
                             alt=""
                             style={{ width: "38px", height: "38px", borderRadius: "9px", objectFit: "cover" }}
                           />

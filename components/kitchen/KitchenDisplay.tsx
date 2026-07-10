@@ -1,13 +1,36 @@
 "use client";
 
 import { useAppStore } from "@/store/useAppStore";
+import { hm, elapsedMin, useNow } from "@/lib/time";
+
+/** 提供前伝票の経過時間による色エスカレーション */
+function ticketHeaderColor(
+  status: "cooking" | "served",
+  elapsed: number | null
+): string {
+  if (status === "served") return "#34c759"; // 提供済み: 緑
+  if (elapsed == null) return "#2c2c2e"; // 未計測: 落ち着いた黒
+  if (elapsed >= 15) return "#ff3b30"; // 15分超: 赤（急げ）
+  if (elapsed >= 8) return "#e0902a"; // 8分超: 琥珀
+  return "#2c2c2e"; // それ未満: 落ち着いた黒
+}
 
 export default function KitchenDisplay() {
   const s = useAppStore();
   const accent = s.settings.theme;
-  const photoByName: Record<string, string> = {};
+  const now = useNow();
+
+  const photoById: Record<string, string> = {};
   s.menu.forEach((m) => {
-    if (m.photo) photoByName[m.name] = m.photo;
+    if (m.photo) photoById[m.id] = m.photo;
+  });
+
+  // FIFO: 提供前を先に、各グループ内は古い順（先に入った注文を先に作る）
+  const sorted = [...s.orders].sort((a, b) => {
+    const sa = a.status === "cooking" ? 0 : 1;
+    const sb = b.status === "cooking" ? 0 : 1;
+    if (sa !== sb) return sa - sb;
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
 
   const pill: React.CSSProperties = {
@@ -80,6 +103,46 @@ export default function KitchenDisplay() {
           </div>
         </div>
 
+        {/* スタッフ呼び出しバナー */}
+        {s.calls.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "16px" }}>
+            {[...s.calls]
+              .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+              .map((c) => (
+                <div
+                  key={c.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    background: "#fff8e6",
+                    border: "1px solid #ffe2a8",
+                    borderRadius: "14px",
+                    padding: "12px 16px",
+                  }}
+                >
+                  <span style={{ fontSize: "20px" }}>🔔</span>
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontWeight: 800, fontSize: "15px" }}>
+                      {s.tableName(c.table)} が呼び出し中
+                    </span>
+                    {now > 0 && (
+                      <span style={{ fontSize: "12px", color: "#a8791a", marginLeft: "8px" }}>
+                        {elapsedMin(c.createdAt, now)}分前
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => s.clearCall(c.id)}
+                    style={{ ...pill, cursor: "pointer", background: "#a8791a", color: "#fff" }}
+                  >
+                    対応済み
+                  </button>
+                </div>
+              ))}
+          </div>
+        )}
+
         {/* オフラインバナー */}
         {!s.connected && (
           <div
@@ -107,7 +170,7 @@ export default function KitchenDisplay() {
         )}
 
         {/* 伝票グリッド */}
-        {s.orders.length === 0 ? (
+        {sorted.length === 0 ? (
           <div style={{ textAlign: "center", color: "#8e8e93", padding: "60px 0", fontSize: "15px" }}>
             新しい注文を待っています…
           </div>
@@ -119,9 +182,12 @@ export default function KitchenDisplay() {
               gap: "14px",
             }}
           >
-            {s.orders.map((o) => {
+            {sorted.map((o) => {
               const cooking = o.status === "cooking";
               const highlight = s.highlightId === o.id;
+              const elapsed = now > 0 ? elapsedMin(o.createdAt, now) : null;
+              const headerBg = ticketHeaderColor(o.status, elapsed);
+              const urgent = cooking && elapsed != null && elapsed >= 15;
               return (
                 <div
                   key={o.id}
@@ -134,10 +200,10 @@ export default function KitchenDisplay() {
                     animation: highlight ? "kpulse 1s ease-out 2" : undefined,
                   }}
                 >
-                  {/* カラーヘッダーバー */}
+                  {/* カラーヘッダーバー（経過時間で色が変化） */}
                   <div
                     style={{
-                      background: cooking ? "#ff3b30" : "#34c759",
+                      background: headerBg,
                       color: "#fff",
                       padding: "10px 14px",
                       display: "flex",
@@ -148,22 +214,32 @@ export default function KitchenDisplay() {
                     <span style={{ fontSize: "19px", fontWeight: 800 }}>
                       {s.tableName(o.table)}
                     </span>
-                    <span
-                      style={{
-                        background: "rgba(255,255,255,.25)",
-                        borderRadius: "999px",
-                        padding: "3px 10px",
-                        fontSize: "12px",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {cooking ? "提供前" : "提供済み"}
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      {elapsed != null && cooking && (
+                        <span style={{ fontSize: "14px", fontWeight: 800 }}>
+                          {urgent ? "⚠ " : ""}
+                          {elapsed}分
+                        </span>
+                      )}
+                      <span
+                        style={{
+                          background: "rgba(255,255,255,.25)",
+                          borderRadius: "999px",
+                          padding: "3px 10px",
+                          fontSize: "12px",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {cooking ? "提供前" : "提供済み"}
+                      </span>
+                    </div>
                   </div>
 
                   <div style={{ padding: "12px 14px" }}>
                     <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
-                      <span style={{ fontSize: "12px", color: "#8e8e93" }}>{o.time}</span>
+                      <span style={{ fontSize: "12px", color: "#8e8e93" }}>
+                        {now > 0 ? hm(o.createdAt) : "—"}
+                      </span>
                       {o.proxy && (
                         <span
                           style={{
@@ -189,10 +265,10 @@ export default function KitchenDisplay() {
                           padding: "6px 0",
                         }}
                       >
-                        {photoByName[it.name] && (
+                        {photoById[it.menuItemId] && (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={photoByName[it.name]}
+                            src={photoById[it.menuItemId]}
                             alt=""
                             style={{ width: "34px", height: "34px", borderRadius: "9px", objectFit: "cover" }}
                           />

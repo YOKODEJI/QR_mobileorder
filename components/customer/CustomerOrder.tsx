@@ -3,6 +3,7 @@
 import { useAppStore } from "@/store/useAppStore";
 import ChipRow from "@/components/ui/ChipRow";
 import PhotoSlot from "@/components/ui/PhotoSlot";
+import { hm, useNow } from "@/lib/time";
 import {
   itemCardStyle,
   addBtnStyle,
@@ -13,6 +14,8 @@ import {
 export default function CustomerOrder() {
   const s = useAppStore();
   const accent = s.settings.theme;
+  const now = useNow();
+  const called = s.calls.some((c) => c.table === s.customerTableId);
 
   const filtered = s.menu.filter(
     (m) => s.customerCat === "すべて" || m.cat === s.customerCat
@@ -64,23 +67,43 @@ export default function CustomerOrder() {
                 {s.tableName(s.customerTableId)}
               </div>
             </div>
-            <button
-              onClick={() => s.toggleHistory(true)}
-              style={{
-                border: "none",
-                background: "rgba(255,255,255,.22)",
-                color: "#fff",
-                borderRadius: "999px",
-                padding: "8px 13px",
-                fontSize: "13px",
-                fontWeight: 700,
-                fontFamily: "inherit",
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-              }}
-            >
-              履歴 {s.yen(historyTotal)}
-            </button>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", alignItems: "flex-end" }}>
+              <button
+                onClick={() => s.toggleHistory(true)}
+                style={{
+                  border: "none",
+                  background: "rgba(255,255,255,.22)",
+                  color: "#fff",
+                  borderRadius: "999px",
+                  padding: "8px 13px",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  fontFamily: "inherit",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                履歴 {s.yen(historyTotal)}
+              </button>
+              <button
+                onClick={s.callStaff}
+                disabled={called}
+                style={{
+                  border: called ? "none" : "1px solid rgba(255,255,255,.6)",
+                  background: called ? "rgba(255,255,255,.9)" : "transparent",
+                  color: called ? accent : "#fff",
+                  borderRadius: "999px",
+                  padding: "8px 13px",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  fontFamily: "inherit",
+                  cursor: called ? "default" : "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {called ? "✓ 呼び出し中" : "🔔 スタッフ呼出"}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -343,9 +366,24 @@ export default function CustomerOrder() {
                         }}
                       >
                         <div>
-                          <div style={{ fontSize: "15px", fontWeight: 700 }}>{it.name}</div>
-                          <div style={{ fontSize: "12px", color: "#8e8e93" }}>
-                            ×{it.qty} · {o.time}
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ fontSize: "15px", fontWeight: 700 }}>{it.name}</span>
+                            <span
+                              style={{
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                padding: "2px 8px",
+                                borderRadius: "999px",
+                                background: o.status === "served" ? "#e3f7ea" : "#fff3d6",
+                                color: o.status === "served" ? "#248a3d" : "#a8791a",
+                              }}
+                            >
+                              {o.status === "served" ? "提供済み" : "調理中"}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px" }}>
+                            ×{it.qty}
+                            {now > 0 ? " · " + hm(o.createdAt) : ""}
                           </div>
                         </div>
                         <div style={{ fontSize: "15px", fontWeight: 700 }}>
