@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import { useAppStore, CATS } from "@/store/useAppStore";
+import { useShallow } from "zustand/react/shallow";
 import type { MenuItem } from "@/store/useAppStore";
 import ChipRow from "@/components/ui/ChipRow";
 
@@ -101,7 +102,35 @@ function PhotoCell({ item }: { item: MenuItem }) {
 }
 
 export default function MenuManagement() {
-  const s = useAppStore();
+  const s = useAppStore(
+    useShallow((st) => ({
+      addItem: st.addItem,
+      adminCat: st.adminCat,
+      bumpStock: st.bumpStock,
+      cancelDeleteMode: st.cancelDeleteMode,
+      deleteMode: st.deleteMode,
+      dragEnd: st.dragEnd,
+      dragId: st.dragId,
+      dragStart: st.dragStart,
+      dropOn: st.dropOn,
+      enterDeleteMode: st.enterDeleteMode,
+      menu: st.menu,
+      newCat: st.newCat,
+      newName: st.newName,
+      newPrice: st.newPrice,
+      newStock: st.newStock,
+      requestDelete: st.requestDelete,
+      selectedIds: st.selectedIds,
+      setAdminCat: st.setAdminCat,
+      setNewCat: st.setNewCat,
+      setNewField: st.setNewField,
+      setPrice: st.setPrice,
+      setStock: st.setStock,
+      settings: st.settings,
+      toggleSelect: st.toggleSelect,
+      toggleSoldOut: st.toggleSoldOut,
+    }))
+  );
   const accent = s.settings.theme;
 
   const filtered = s.menu.filter(

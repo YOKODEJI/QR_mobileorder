@@ -1,6 +1,7 @@
 "use client";
 
 import { useAppStore } from "@/store/useAppStore";
+import { useShallow } from "zustand/react/shallow";
 import ChipRow from "@/components/ui/ChipRow";
 import PhotoSlot from "@/components/ui/PhotoSlot";
 import { hm, useNow } from "@/lib/time";
@@ -12,7 +13,30 @@ import {
 } from "@/lib/styles";
 
 export default function CustomerOrder() {
-  const s = useAppStore();
+  const s = useAppStore(
+    useShallow((st) => ({
+      addCart: st.addCart,
+      avail: st.avail,
+      callStaff: st.callStaff,
+      calls: st.calls,
+      cart: st.cart,
+      confirmOrder: st.confirmOrder,
+      customerCat: st.customerCat,
+      customerTableId: st.customerTableId,
+      dismissSuccess: st.dismissSuccess,
+      justOrdered: st.justOrdered,
+      menu: st.menu,
+      orders: st.orders,
+      removeCart: st.removeCart,
+      setCustomerCat: st.setCustomerCat,
+      settings: st.settings,
+      showHistory: st.showHistory,
+      submitting: st.submitting,
+      tableName: st.tableName,
+      toggleHistory: st.toggleHistory,
+      yen: st.yen,
+    }))
+  );
   const accent = s.settings.theme;
   const now = useNow();
   const called = s.calls.some((c) => c.table === s.customerTableId);

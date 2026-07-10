@@ -1,6 +1,7 @@
 "use client";
 
 import { useAppStore } from "@/store/useAppStore";
+import { useShallow } from "zustand/react/shallow";
 import { hm, elapsedMin, useNow } from "@/lib/time";
 
 /** 提供前伝票の経過時間による色エスカレーション */
@@ -16,7 +17,22 @@ function ticketHeaderColor(
 }
 
 export default function KitchenDisplay() {
-  const s = useAppStore();
+  const s = useAppStore(
+    useShallow((st) => ({
+      calls: st.calls,
+      clearCall: st.clearCall,
+      confirmStatus: st.confirmStatus,
+      connected: st.connected,
+      highlightId: st.highlightId,
+      menu: st.menu,
+      orders: st.orders,
+      settings: st.settings,
+      soundOn: st.soundOn,
+      tableName: st.tableName,
+      toggleConnection: st.toggleConnection,
+      toggleSound: st.toggleSound,
+    }))
+  );
   const accent = s.settings.theme;
   const now = useNow();
 

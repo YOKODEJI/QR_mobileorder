@@ -1,11 +1,41 @@
 "use client";
 
 import { useAppStore } from "@/store/useAppStore";
+import { useShallow } from "zustand/react/shallow";
 import ChipRow from "@/components/ui/ChipRow";
 import { proxyCardStyle, proxyAddStyle, proxySubStyle, addBtnStyle } from "@/lib/styles";
 
 export default function StaffCheckout() {
-  const s = useAppStore();
+  const s = useAppStore(
+    useShallow((st) => ({
+      addStaff: st.addStaff,
+      addTable: st.addTable,
+      avail: st.avail,
+      cancelUnit: st.cancelUnit,
+      confirmCheckout: st.confirmCheckout,
+      confirmDeleteTable: st.confirmDeleteTable,
+      editTableName: st.editTableName,
+      editingTableId: st.editingTableId,
+      menu: st.menu,
+      orders: st.orders,
+      proxyCat: st.proxyCat,
+      removeStaff: st.removeStaff,
+      saveEditTable: st.saveEditTable,
+      selectStaffTable: st.selectStaffTable,
+      selectedStaffTable: st.selectedStaffTable,
+      setEditTableName: st.setEditTableName,
+      setProxyCat: st.setProxyCat,
+      setTableEditMode: st.setTableEditMode,
+      settings: st.settings,
+      staffCart: st.staffCart,
+      startEditTable: st.startEditTable,
+      submitProxy: st.submitProxy,
+      tableEditMode: st.tableEditMode,
+      tableName: st.tableName,
+      tables: st.tables,
+      yen: st.yen,
+    }))
+  );
   const accent = s.settings.theme;
   const photoById: Record<string, string> = {};
   s.menu.forEach((m) => {
