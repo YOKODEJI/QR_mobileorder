@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useAppStore } from "@/store/useAppStore";
-import { isSupabaseConfigured } from "@/lib/supabase";
+import { isSupabaseConfigured, getSupabase } from "@/lib/supabase";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 import SettingsSheet from "@/components/settings/SettingsSheet";
 import AlertDialog from "@/components/ui/AlertDialog";
@@ -72,7 +72,25 @@ export default function AdminShell() {
             onChange={setMgmt}
           />
         </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", padding: "0 22px 12px" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", padding: "0 22px 12px" }}>
+          {isSupabaseConfigured() && (
+            <button
+              onClick={() => getSupabase()?.auth.signOut()}
+              style={{
+                padding: "8px 14px",
+                borderRadius: "999px",
+                border: "none",
+                background: "rgba(120,120,128,.12)",
+                color: "#6b6b70",
+                fontFamily: "inherit",
+                fontSize: "13px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              ログアウト
+            </button>
+          )}
           <button
             onClick={openSettings}
             style={{

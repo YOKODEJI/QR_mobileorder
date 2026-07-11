@@ -1,6 +1,11 @@
 import AdminShell from "@/components/AdminShell";
+import AdminAuthGate from "@/components/auth/AdminAuthGate";
 
-// 管理ツールの独立ページ（後でログイン必須にする）。
+// 管理ツールの独立ページ。Supabase設定時はログイン必須。
 export default function AdminPage() {
-  return <AdminShell />;
+  return (
+    <AdminAuthGate>
+      <AdminShell />
+    </AdminAuthGate>
+  );
 }
