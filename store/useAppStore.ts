@@ -150,6 +150,7 @@ interface AppState {
     checkouts: CheckoutRecord[];
   }) => void;
   setConnected: (v: boolean) => void;
+  setCustomerTable: (id: string) => void;
 
   // ---- ヘルパー ----
   yen: (n: number) => string;
@@ -419,6 +420,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     }),
   setConnected: (v) => set({ connected: v }),
+  setCustomerTable: (id) => set({ customerTableId: id }),
 
   // ---- ヘルパー ----
   yen: (n) => "¥" + Number(n).toLocaleString("ja-JP"),
