@@ -133,13 +133,25 @@ create trigger trg_orders_updated before update on orders
 
 -- ============================================================
 -- Realtime: 変更をブロードキャストするテーブルを publication に追加
+-- 既に登録済みならスキップ（再実行しても安全）
 -- ============================================================
-alter publication supabase_realtime add table orders;
-alter publication supabase_realtime add table order_items;
-alter publication supabase_realtime add table menu_items;
-alter publication supabase_realtime add table tables;
-alter publication supabase_realtime add table staff_calls;
-alter publication supabase_realtime add table checkouts;
+do $$
+declare t text;
+begin
+  foreach t in array array[
+    'orders','order_items','menu_items','tables','staff_calls','checkouts'
+  ]
+  loop
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public'
+        and tablename = t
+    ) then
+      execute format('alter publication supabase_realtime add table %I;', t);
+    end if;
+  end loop;
+end $$;
 
 -- ============================================================
 -- RLS（行レベルセキュリティ）
