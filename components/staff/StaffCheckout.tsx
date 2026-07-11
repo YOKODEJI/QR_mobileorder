@@ -14,8 +14,13 @@ export default function StaffCheckout() {
       cancelUnit: st.cancelUnit,
       confirmCheckout: st.confirmCheckout,
       confirmDeleteTable: st.confirmDeleteTable,
+      dragEndTable: st.dragEndTable,
+      dragStartTable: st.dragStartTable,
+      dragTableId: st.dragTableId,
+      dropOnTable: st.dropOnTable,
       editTableName: st.editTableName,
       editingTableId: st.editingTableId,
+      justAddedTableId: st.justAddedTableId,
       menu: st.menu,
       orders: st.orders,
       proxyCat: st.proxyCat,
@@ -76,11 +81,20 @@ export default function StaffCheckout() {
   );
   const proxyCount = Object.values(s.staffCart).reduce((a, b) => a + b, 0);
 
+  // 追加直後の卓は視認性のため先頭にピン留め（確定すると本来の並び＝末尾へ）
+  const orderedTables = (() => {
+    const pinnedId = s.justAddedTableId;
+    if (pinnedId == null) return s.tables;
+    const pinned = s.tables.find((t) => t.id === pinnedId);
+    if (!pinned) return s.tables;
+    return [pinned, ...s.tables.filter((t) => t.id !== pinnedId)];
+  })();
+
   return (
     <div style={{ padding: "24px 18px 40px", maxWidth: "1140px", margin: "0 auto", width: "100%" }}>
-      <div className="staff-grid">
-        {/* 左: テーブル一覧 */}
-        <div style={{ background: "#fff", borderRadius: "22px", padding: "16px", boxShadow: "0 12px 34px rgba(0,0,0,.06)", alignSelf: "start" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+        {/* テーブル一覧（3列グリッド） */}
+        <div style={{ background: "#fff", borderRadius: "22px", padding: "16px 18px", boxShadow: "0 12px 34px rgba(0,0,0,.06)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", gap: "6px" }}>
             <span style={{ fontSize: "16px", fontWeight: 800 }}>テーブル一覧</span>
             {s.tableEditMode ? (
@@ -138,23 +152,31 @@ export default function StaffCheckout() {
               </button>
             )}
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            {s.tables.map((t) => {
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "10px" }}>
+            {orderedTables.map((t) => {
               const total = tableTotal(t.id);
               const count = tableCount(t.id);
               const active = count > 0;
               const selected = sel === t.id;
               const editing = s.editingTableId === t.id;
+              const canDrag = s.tableEditMode && !editing;
+              const dragging = s.dragTableId === t.id;
               return (
                 <div
                   key={t.id}
-                  onClick={() => !editing && s.selectStaffTable(t.id)}
+                  onClick={() => !editing && !s.tableEditMode && s.selectStaffTable(t.id)}
+                  draggable={canDrag}
+                  onDragStart={() => canDrag && s.dragStartTable(t.id)}
+                  onDragEnd={s.dragEndTable}
+                  onDragOver={(e) => canDrag && e.preventDefault()}
+                  onDrop={() => canDrag && s.dropOnTable(t.id)}
                   style={{
                     textAlign: "left",
                     width: "100%",
-                    cursor: "pointer",
+                    cursor: s.tableEditMode ? (canDrag ? "grab" : "default") : "pointer",
                     borderRadius: "14px",
                     padding: "12px 14px",
+                    opacity: dragging ? 0.5 : 1,
                     background: selected ? "#fff" : active ? "#f7f7f9" : "#fbfbfd",
                     border: selected
                       ? `2px solid ${accent}`
@@ -163,6 +185,24 @@ export default function StaffCheckout() {
                         : "1px solid #f0f0f2",
                   }}
                 >
+                  {s.tableEditMode && !editing && (
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "center",
+                        gap: "3px",
+                        marginBottom: "8px",
+                      }}
+                      aria-hidden
+                    >
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <span
+                          key={i}
+                          style={{ width: "3px", height: "3px", borderRadius: "50%", background: "#c7c7cc" }}
+                        />
+                      ))}
+                    </div>
+                  )}
                   {editing ? (
                     <div style={{ display: "flex", gap: "6px" }} onClick={(e) => e.stopPropagation()}>
                       <input
@@ -187,21 +227,20 @@ export default function StaffCheckout() {
                       </button>
                     </div>
                   ) : (
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: "15px", fontWeight: 700 }}>{t.name}</div>
-                        <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "3px" }}>
-                          {active ? `${count}点 · 注文あり` : "空席"}
-                        </div>
+                    <div>
+                      <div style={{ fontSize: "15px", fontWeight: 700 }}>{t.name}</div>
+                      <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "3px" }}>
+                        {active ? `${count}点 · 注文あり` : "空席"}
                       </div>
                       {s.tableEditMode ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "10px" }}>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               s.startEditTable(t.id);
                             }}
                             style={{
+                              flex: 1,
                               border: `1px solid ${accent}`,
                               background: "#fff",
                               color: accent,
@@ -209,7 +248,7 @@ export default function StaffCheckout() {
                               fontWeight: 700,
                               fontFamily: "inherit",
                               borderRadius: "999px",
-                              padding: "8px 16px",
+                              padding: "8px 0",
                               cursor: "pointer",
                             }}
                           >
@@ -224,6 +263,7 @@ export default function StaffCheckout() {
                             style={{
                               width: "32px",
                               height: "32px",
+                              flexShrink: 0,
                               borderRadius: "50%",
                               border: "1px solid #ffd4d1",
                               background: "#fff",
@@ -238,16 +278,16 @@ export default function StaffCheckout() {
                           </button>
                         </div>
                       ) : (
-                        <span
+                        <div
                           style={{
-                            flexShrink: 0,
-                            fontSize: "20px",
+                            marginTop: "8px",
+                            fontSize: "22px",
                             fontWeight: 800,
                             color: accent,
                           }}
                         >
                           {s.yen(total)}
-                        </span>
+                        </div>
                       )}
                     </div>
                   )}
@@ -257,11 +297,11 @@ export default function StaffCheckout() {
           </div>
         </div>
 
-        {/* 右: テーブル詳細 */}
-        <div style={{ background: "#fff", borderRadius: "22px", padding: "20px 22px", boxShadow: "0 12px 34px rgba(0,0,0,.06)", minHeight: "640px" }}>
+        {/* テーブル詳細（下に全幅表示） */}
+        <div style={{ background: "#fff", borderRadius: "22px", padding: "20px 22px", boxShadow: "0 12px 34px rgba(0,0,0,.06)", minHeight: "300px" }}>
           {sel == null ? (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#8e8e93", fontSize: "15px" }}>
-              左のテーブルを選択してください
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "260px", color: "#8e8e93", fontSize: "15px" }}>
+              上のテーブルを選択してください
             </div>
           ) : (
             <>

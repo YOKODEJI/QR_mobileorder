@@ -113,19 +113,6 @@ input[type="number"] {
   }
 }
 
-/* ============================================================
-   レスポンシブ（管理画面は狭幅で段組を解除）
-   ============================================================ */
-.staff-grid {
-  display: grid;
-  grid-template-columns: 330px 1fr;
-  gap: 18px;
-}
-@media (max-width: 820px) {
-  .staff-grid {
-    grid-template-columns: 1fr;
-  }
-}
 /* メニュー管理: 狭幅では行を横スクロール（列を潰さない） */
 .menu-rows {
   overflow-x: auto;

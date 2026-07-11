@@ -29,3 +29,24 @@ export function hm(iso: string): string {
 export function elapsedMin(iso: string, now: number = Date.now()): number {
   return Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60000));
 }
+
+/** 「M/D HH:MM」形式（会計履歴などの日時表示用） */
+export function dateTimeLabel(iso: string): string {
+  const d = new Date(iso);
+  return (
+    d.getMonth() +
+    1 +
+    "/" +
+    d.getDate() +
+    " " +
+    String(d.getHours()).padStart(2, "0") +
+    ":" +
+    String(d.getMinutes()).padStart(2, "0")
+  );
+}
+
+/** 「M/D」形式（日付見出し用） */
+export function dateLabel(iso: string): string {
+  const d = new Date(iso);
+  return d.getMonth() + 1 + "/" + d.getDate();
+}

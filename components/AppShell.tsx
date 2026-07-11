@@ -9,6 +9,7 @@ import CustomerOrder from "@/components/customer/CustomerOrder";
 import KitchenDisplay from "@/components/kitchen/KitchenDisplay";
 import StaffCheckout from "@/components/staff/StaffCheckout";
 import MenuManagement from "@/components/menu/MenuManagement";
+import CheckoutHistory from "@/components/history/CheckoutHistory";
 
 export default function AppShell() {
   const storeName = useAppStore((s) => s.settings.storeName);
@@ -86,6 +87,7 @@ export default function AppShell() {
                   { value: "kitchen", label: "厨房" },
                   { value: "staff", label: "テーブル / 会計" },
                   { value: "menu", label: "メニュー管理" },
+                  { value: "history", label: "会計履歴" },
                 ]}
                 value={mgmtTab}
                 onChange={setMgmt}
@@ -127,6 +129,7 @@ export default function AppShell() {
         {topTab === "mgmt" && mgmtTab === "kitchen" && <KitchenDisplay />}
         {topTab === "mgmt" && mgmtTab === "staff" && <StaffCheckout />}
         {topTab === "mgmt" && mgmtTab === "menu" && <MenuManagement />}
+        {topTab === "mgmt" && mgmtTab === "history" && <CheckoutHistory />}
       </main>
 
       <SettingsSheet />

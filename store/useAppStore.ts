@@ -46,6 +46,17 @@ export interface StaffCall {
   createdAt: string;
 }
 
+/** 会計履歴（セッション締め時のスナップショット。永続的に閲覧可能） */
+export interface CheckoutRecord {
+  id: number;
+  tableId: number;
+  tableName: string; // 会計時点の卓名スナップショット（後で改名/削除されても残す）
+  items: OrderItem[]; // 品目名で集約済みのスナップショット
+  count: number;
+  total: number;
+  closedAt: string; // ISO
+}
+
 export interface Settings {
   storeName: string;
   theme: string;
@@ -70,7 +81,7 @@ export const CAT_FILTERS: CatFilter[] = ["すべて", ...CATS];
 interface AppState {
   // ナビ
   topTab: "customer" | "mgmt";
-  mgmtTab: "kitchen" | "staff" | "menu";
+  mgmtTab: "kitchen" | "staff" | "menu" | "history";
   // 設定
   settings: Settings;
   showSettings: boolean;
@@ -87,10 +98,13 @@ interface AppState {
   tableEditMode: boolean;
   editingTableId: number | null;
   editTableName: string;
+  justAddedTableId: number | null; // 追加直後、視認性のため先頭に表示する卓
+  dragTableId: number | null; // テーブル並び替えのドラッグ中ID
   // 業務データ
   orders: Order[];
   menu: MenuItem[];
   calls: StaffCall[];
+  checkouts: CheckoutRecord[]; // 会計履歴（永続）
   // 厨房 / 接続
   connected: boolean;
   soundOn: boolean;
@@ -140,7 +154,9 @@ interface AppState {
   dismissSuccess: () => void;
 
   // ---- スタッフ呼び出し ----
+  confirmCallStaff: () => void;
   callStaff: () => void;
+  confirmClearCall: (id: number) => void;
   clearCall: (id: number) => void;
 
   // ---- 厨房 ----
@@ -159,6 +175,10 @@ interface AppState {
   setEditTableName: (v: string) => void;
   saveEditTable: () => void;
   confirmDeleteTable: (id: number) => void;
+  // テーブル並び替え
+  dragStartTable: (id: number) => void;
+  dragEndTable: () => void;
+  dropOnTable: (targetId: number) => void;
 
   // ---- メニュー管理 ----
   setPrice: (id: string, val: string) => void;
@@ -268,6 +288,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   tableEditMode: false,
   editingTableId: null,
   editTableName: "",
+  justAddedTableId: null,
+  dragTableId: null,
   orders: [
     {
       id: 1,
@@ -304,6 +326,33 @@ export const useAppStore = create<AppState>((set, get) => ({
     { id: "ramen", name: "締めのラーメン", cat: "〆", price: 780, soldOut: false, stock: 20, photo: null },
   ],
   calls: [],
+  checkouts: [
+    {
+      id: 9001,
+      tableId: 2,
+      tableName: "テーブル 2",
+      items: [
+        { menuItemId: "beer", name: "生ビール", qty: 3, price: 550 },
+        { menuItemId: "karaage", name: "鶏の唐揚げ", qty: 2, price: 580 },
+        { menuItemId: "edamame", name: "枝豆", qty: 1, price: 380 },
+      ],
+      count: 6,
+      total: 3190,
+      closedAt: new Date(Date.now() - 95 * 60000).toISOString(),
+    },
+    {
+      id: 9002,
+      tableId: 6,
+      tableName: "テーブル 6",
+      items: [
+        { menuItemId: "high", name: "ハイボール", qty: 2, price: 450 },
+        { menuItemId: "ramen", name: "締めのラーメン", qty: 2, price: 780 },
+      ],
+      count: 4,
+      total: 2460,
+      closedAt: new Date(Date.now() - 40 * 60000).toISOString(),
+    },
+  ],
   connected: true,
   soundOn: false,
   highlightId: null,
@@ -456,6 +505,23 @@ export const useAppStore = create<AppState>((set, get) => ({
   dismissSuccess: () => set({ justOrdered: false }),
 
   // ---- スタッフ呼び出し ----
+  confirmCallStaff: () => {
+    const s = get();
+    // 既に未対応の呼び出しがあれば何もしない（ボタンは無効化済み）
+    if (s.calls.some((c) => c.table === s.customerTableId)) return;
+    set({
+      dialog: {
+        title: "スタッフの呼び出し",
+        body: "スタッフを呼び出します。よろしいですか？",
+        confirmText: "呼び出す",
+        danger: false,
+        onConfirm: () => {
+          get().callStaff();
+          get().closeDialog();
+        },
+      },
+    });
+  },
   callStaff: () =>
     set((st) => {
       // 同一テーブルの未対応呼び出しが既にあれば重複させない
@@ -470,6 +536,23 @@ export const useAppStore = create<AppState>((set, get) => ({
         nextId: st.nextId + 1,
       };
     }),
+  confirmClearCall: (id) => {
+    const s = get();
+    const call = s.calls.find((c) => c.id === id);
+    if (!call) return;
+    set({
+      dialog: {
+        title: s.tableName(call.table) + " の呼び出し",
+        body: "この呼び出しを「対応済み」にしますか？",
+        confirmText: "対応済みにする",
+        danger: false,
+        onConfirm: () => {
+          get().clearCall(id);
+          get().closeDialog();
+        },
+      },
+    });
+  },
   clearCall: (id) => set((st) => ({ calls: st.calls.filter((c) => c.id !== id) })),
 
   // ---- 厨房 ----
@@ -527,11 +610,40 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   checkout: () => {
     const t = get().selectedStaffTable;
-    set((s) => ({
-      orders: s.orders.filter((o) => o.table !== t),
-      calls: s.calls.filter((c) => c.table !== t),
-      selectedStaffTable: null,
-    }));
+    if (t == null) return;
+    set((s) => {
+      const tableOrders = s.orders.filter((o) => o.table === t);
+      if (tableOrders.length === 0) return { selectedStaffTable: null };
+      // 品目を menuItemId+価格で集約してスナップショット化
+      const agg: Record<string, OrderItem> = {};
+      let total = 0;
+      let count = 0;
+      tableOrders.forEach((o) =>
+        o.items.forEach((it) => {
+          const k = it.menuItemId + ":" + it.price;
+          if (!agg[k]) agg[k] = { ...it, qty: 0 };
+          agg[k].qty += it.qty;
+          total += it.price * it.qty;
+          count += it.qty;
+        })
+      );
+      const record: CheckoutRecord = {
+        id: s.nextId,
+        tableId: t,
+        tableName: s.tableName(t),
+        items: Object.values(agg),
+        count,
+        total,
+        closedAt: new Date().toISOString(),
+      };
+      return {
+        checkouts: [record, ...s.checkouts],
+        orders: s.orders.filter((o) => o.table !== t),
+        calls: s.calls.filter((c) => c.table !== t),
+        selectedStaffTable: null,
+        nextId: s.nextId + 1,
+      };
+    });
   },
   cancelUnit: (menuItemId) => {
     const t = get().selectedStaffTable;
@@ -559,18 +671,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
   setTableEditMode: (v) =>
-    set({ tableEditMode: v, editingTableId: null, editTableName: "" }),
+    set({
+      tableEditMode: v,
+      editingTableId: null,
+      editTableName: "",
+      justAddedTableId: null,
+    }),
   addTable: () =>
     set((s) => {
       const id = s.nextTableId;
       const name = "テーブル " + id;
-      // 追加した行はそのまま名前編集状態にする
+      // 並びは末尾に追加（データ順）。ただし追加直後は視認性のため先頭にピン留めし、そのまま名前編集状態にする
       return {
         tables: [...s.tables, { id, name }],
         nextTableId: s.nextTableId + 1,
         tableEditMode: true,
         editingTableId: id,
         editTableName: name,
+        justAddedTableId: id,
       };
     }),
   startEditTable: (id) => {
@@ -584,7 +702,26 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({
       tables: s.tables.map((t) => (t.id === id ? { ...t, name } : t)),
       editingTableId: null,
+      justAddedTableId: null, // 確定したらピン留め解除→末尾の並びに落ち着く
     }));
+  },
+  // テーブル並び替え（メニュー管理と同じD&D）
+  dragStartTable: (id) => set({ dragTableId: id }),
+  dragEndTable: () => set({ dragTableId: null }),
+  dropOnTable: (targetId) => {
+    const dragId = get().dragTableId;
+    if (dragId == null || dragId === targetId) {
+      set({ dragTableId: null });
+      return;
+    }
+    set((s) => {
+      const arr = [...s.tables];
+      const from = arr.findIndex((t) => t.id === dragId);
+      const to = arr.findIndex((t) => t.id === targetId);
+      if (from < 0 || to < 0) return { dragTableId: null };
+      arr.splice(to, 0, arr.splice(from, 1)[0]);
+      return { tables: arr, dragTableId: null };
+    });
   },
   confirmDeleteTable: (id) => {
     const s = get();
@@ -607,6 +744,8 @@ export const useAppStore = create<AppState>((set, get) => ({
             selectedStaffTable:
               st.selectedStaffTable === id ? null : st.selectedStaffTable,
             editingTableId: null,
+            justAddedTableId:
+              st.justAddedTableId === id ? null : st.justAddedTableId,
             dialog: null,
           })),
       },

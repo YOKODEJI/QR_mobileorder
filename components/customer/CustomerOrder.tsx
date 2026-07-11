@@ -17,7 +17,7 @@ export default function CustomerOrder() {
     useShallow((st) => ({
       addCart: st.addCart,
       avail: st.avail,
-      callStaff: st.callStaff,
+      confirmCallStaff: st.confirmCallStaff,
       calls: st.calls,
       cart: st.cart,
       confirmOrder: st.confirmOrder,
@@ -110,7 +110,7 @@ export default function CustomerOrder() {
                 履歴 {s.yen(historyTotal)}
               </button>
               <button
-                onClick={s.callStaff}
+                onClick={s.confirmCallStaff}
                 disabled={called}
                 style={{
                   border: called ? "none" : "1px solid rgba(255,255,255,.6)",

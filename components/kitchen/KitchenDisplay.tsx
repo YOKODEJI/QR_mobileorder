@@ -20,7 +20,7 @@ export default function KitchenDisplay() {
   const s = useAppStore(
     useShallow((st) => ({
       calls: st.calls,
-      clearCall: st.clearCall,
+      confirmClearCall: st.confirmClearCall,
       confirmStatus: st.confirmStatus,
       connected: st.connected,
       highlightId: st.highlightId,
@@ -149,7 +149,7 @@ export default function KitchenDisplay() {
                     )}
                   </div>
                   <button
-                    onClick={() => s.clearCall(c.id)}
+                    onClick={() => s.confirmClearCall(c.id)}
                     style={{ ...pill, cursor: "pointer", background: "#a8791a", color: "#fff" }}
                   >
                     対応済み
