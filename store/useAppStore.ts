@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import * as db from "@/lib/data";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 /** 新規エンティティのID: 未設定uuid。Supabase書き込みが返すidがあればそちらを優先 */
 function newId(): string {
@@ -495,14 +496,36 @@ export const useAppStore = create<AppState>((set, get) => ({
     const items = buildItems(s.cart, s.menu);
     if (items.length === 0) return;
     const tableId = s.customerTableId;
+    const configured = isSupabaseConfigured();
     set({ submitting: true });
     setTimeout(async () => {
       const menu = get().menu;
-      // DBへ書き込み（未設定ならnull→ローカルidを採番）
-      const id = (await db.dbInsertOrder(tableId, items, false, menu)) ?? newId();
+      let id: string | null = null;
+      if (configured) {
+        id = await db.dbInsertOrder(tableId, items, false, menu);
+        if (!id) {
+          // 送信失敗: 成功演出を出さず、カートを保持して再試行を促す
+          set({
+            submitting: false,
+            dialog: {
+              title: "送信できませんでした",
+              body: "注文を送信できませんでした。通信環境を確認して、もう一度お試しください。",
+              confirmText: "再試行",
+              danger: false,
+              onConfirm: () => {
+                get().closeDialog();
+                get().submitOrder();
+              },
+            },
+          });
+          return;
+        }
+      } else {
+        id = newId();
+      }
       set((st) => ({
         orders: [
-          { id, table: tableId, createdAt: new Date().toISOString(), status: "cooking", items },
+          { id: id!, table: tableId, createdAt: new Date().toISOString(), status: "cooking", items },
           ...st.orders,
         ],
         menu: decrementStock(st.menu, items),
@@ -524,10 +547,31 @@ export const useAppStore = create<AppState>((set, get) => ({
     const items = buildItems(s.staffCart, s.menu);
     if (items.length === 0) return;
     const menu = s.menu;
-    const id = (await db.dbInsertOrder(t, items, true, menu)) ?? newId();
+    const configured = isSupabaseConfigured();
+    let id: string | null = null;
+    if (configured) {
+      id = await db.dbInsertOrder(t, items, true, menu);
+      if (!id) {
+        set({
+          dialog: {
+            title: "送信できませんでした",
+            body: "代理注文を送信できませんでした。通信環境を確認して、もう一度お試しください。",
+            confirmText: "再試行",
+            danger: false,
+            onConfirm: () => {
+              get().closeDialog();
+              get().submitProxy();
+            },
+          },
+        });
+        return;
+      }
+    } else {
+      id = newId();
+    }
     set((st) => ({
       orders: [
-        { id, table: t, createdAt: new Date().toISOString(), status: "cooking", items, proxy: true },
+        { id: id!, table: t, createdAt: new Date().toISOString(), status: "cooking", items, proxy: true },
         ...st.orders,
       ],
       menu: decrementStock(st.menu, items),

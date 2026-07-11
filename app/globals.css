@@ -112,6 +112,11 @@ input[type="number"] {
     opacity: 1;
   }
 }
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 /* メニュー管理: 狭幅では行を横スクロール（列を潰さない） */
 .menu-rows {

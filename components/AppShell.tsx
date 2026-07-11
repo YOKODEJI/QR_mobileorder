@@ -11,6 +11,8 @@ import StaffCheckout from "@/components/staff/StaffCheckout";
 import MenuManagement from "@/components/menu/MenuManagement";
 import CheckoutHistory from "@/components/history/CheckoutHistory";
 import SupabaseSync from "@/components/SupabaseSync";
+import LoadingScreen from "@/components/ui/LoadingScreen";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 export default function AppShell() {
   const storeName = useAppStore((s) => s.settings.storeName);
@@ -20,6 +22,9 @@ export default function AppShell() {
   const setTop = useAppStore((s) => s.setTop);
   const setMgmt = useAppStore((s) => s.setMgmt);
   const openSettings = useAppStore((s) => s.openSettings);
+  const loaded = useAppStore((s) => s.loaded);
+  // Supabase設定時は、DB読込完了までダミーデータで操作させない
+  const loading = isSupabaseConfigured() && !loaded;
 
   // テーマアクセントを CSS変数に反映
   useEffect(() => {
@@ -126,11 +131,17 @@ export default function AppShell() {
       </header>
 
       <main style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        {topTab === "customer" && <CustomerOrder />}
-        {topTab === "mgmt" && mgmtTab === "kitchen" && <KitchenDisplay />}
-        {topTab === "mgmt" && mgmtTab === "staff" && <StaffCheckout />}
-        {topTab === "mgmt" && mgmtTab === "menu" && <MenuManagement />}
-        {topTab === "mgmt" && mgmtTab === "history" && <CheckoutHistory />}
+        {loading ? (
+          <LoadingScreen />
+        ) : (
+          <>
+            {topTab === "customer" && <CustomerOrder />}
+            {topTab === "mgmt" && mgmtTab === "kitchen" && <KitchenDisplay />}
+            {topTab === "mgmt" && mgmtTab === "staff" && <StaffCheckout />}
+            {topTab === "mgmt" && mgmtTab === "menu" && <MenuManagement />}
+            {topTab === "mgmt" && mgmtTab === "history" && <CheckoutHistory />}
+          </>
+        )}
       </main>
 
       <SupabaseSync />
