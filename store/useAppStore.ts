@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import * as db from "@/lib/data";
-import { isSupabaseConfigured } from "@/lib/supabase";
+import { isSupabaseConfigured, ORDER_VIA_FUNCTION } from "@/lib/supabase";
 
 /** 新規エンティティのID: 未設定uuid。Supabase書き込みが返すidがあればそちらを優先 */
 function newId(): string {
@@ -172,8 +172,8 @@ interface AppState {
 
   // ---- 注文 ----
   confirmOrder: () => void;
-  submitOrder: () => void;
-  submitProxy: () => void;
+  submitOrder: (idem?: string) => void;
+  submitProxy: (idem?: string) => void;
   dismissSuccess: () => void;
 
   // ---- スタッフ呼び出し ----
@@ -280,6 +280,45 @@ function decrementStock(menu: MenuItem[], items: OrderItem[]): MenuItem[] {
   return menu.map((m) =>
     dec[m.id] ? { ...m, stock: Math.max(0, m.stock - dec[m.id]) } : m
   );
+}
+
+type PlaceResult =
+  | { ok: true; id: string }
+  | { ok: false; code: "out_of_stock" | "error"; message: string };
+
+/** 注文の書き込み経路: フラグONならEdge Function、OFFなら直接insert */
+async function placeOrder(
+  tableId: string,
+  items: OrderItem[],
+  proxy: boolean,
+  idem: string,
+  menu: MenuItem[]
+): Promise<PlaceResult> {
+  if (ORDER_VIA_FUNCTION) {
+    const res = await db.dbSubmitOrderViaFunction(tableId, items, proxy, idem);
+    return res.ok
+      ? { ok: true, id: res.orderId }
+      : { ok: false, code: res.code, message: res.message };
+  }
+  const id = await db.dbInsertOrder(tableId, items, proxy, menu);
+  return id ? { ok: true, id } : { ok: false, code: "error", message: "insert failed" };
+}
+
+/** 注文エラーのダイアログ（売切れ / 通信失敗）。onConfirmで再試行 */
+function orderErrorDialog(
+  res: { code: "out_of_stock" | "error"; message: string },
+  onRetry: () => void
+): DialogSpec {
+  const oos = res.code === "out_of_stock";
+  return {
+    title: oos ? "売り切れです" : "送信できませんでした",
+    body: oos
+      ? "申し訳ありません。ご注文の商品が売り切れになりました。内容を確認して、もう一度お試しください。"
+      : "注文を送信できませんでした。通信環境を確認して、もう一度お試しください。",
+    confirmText: "再試行",
+    danger: false,
+    onConfirm: onRetry,
+  };
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -493,35 +532,29 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
     });
   },
-  submitOrder: () => {
+  submitOrder: (idem) => {
     const s = get();
     const items = buildItems(s.cart, s.menu);
     if (items.length === 0) return;
     const tableId = s.customerTableId;
     const configured = isSupabaseConfigured();
+    const key = idem ?? newId(); // 再試行時は同じキーを使い二重注文を防ぐ
     set({ submitting: true });
     setTimeout(async () => {
-      const menu = get().menu;
       let id: string | null = null;
       if (configured) {
-        id = await db.dbInsertOrder(tableId, items, false, menu);
-        if (!id) {
-          // 送信失敗: 成功演出を出さず、カートを保持して再試行を促す
+        const res = await placeOrder(tableId, items, false, key, get().menu);
+        if (!res.ok) {
           set({
             submitting: false,
-            dialog: {
-              title: "送信できませんでした",
-              body: "注文を送信できませんでした。通信環境を確認して、もう一度お試しください。",
-              confirmText: "再試行",
-              danger: false,
-              onConfirm: () => {
-                get().closeDialog();
-                get().submitOrder();
-              },
-            },
+            dialog: orderErrorDialog(res, () => {
+              get().closeDialog();
+              get().submitOrder(key);
+            }),
           });
           return;
         }
+        id = res.id;
       } else {
         id = newId();
       }
@@ -542,32 +575,27 @@ export const useAppStore = create<AppState>((set, get) => ({
       }, 2600);
     }, 800);
   },
-  submitProxy: async () => {
+  submitProxy: async (idem) => {
     const s = get();
     const t = s.selectedStaffTable;
     if (t == null) return;
     const items = buildItems(s.staffCart, s.menu);
     if (items.length === 0) return;
-    const menu = s.menu;
     const configured = isSupabaseConfigured();
+    const key = idem ?? newId();
     let id: string | null = null;
     if (configured) {
-      id = await db.dbInsertOrder(t, items, true, menu);
-      if (!id) {
+      const res = await placeOrder(t, items, true, key, s.menu);
+      if (!res.ok) {
         set({
-          dialog: {
-            title: "送信できませんでした",
-            body: "代理注文を送信できませんでした。通信環境を確認して、もう一度お試しください。",
-            confirmText: "再試行",
-            danger: false,
-            onConfirm: () => {
-              get().closeDialog();
-              get().submitProxy();
-            },
-          },
+          dialog: orderErrorDialog(res, () => {
+            get().closeDialog();
+            get().submitProxy(key);
+          }),
         });
         return;
       }
+      id = res.id;
     } else {
       id = newId();
     }
@@ -714,7 +742,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     const items = Object.values(agg);
     const tableName = s.tableName(t);
     // DBへ: 会計履歴を記録し、その卓の注文を削除
-    db.dbCheckout({ tableId: t, tableName, items, count, total });
+    if (ORDER_VIA_FUNCTION) {
+      db.dbCloseTable(t); // 1トランザクション（履歴INSERT+注文DELETE+呼出クリア）
+    } else {
+      db.dbCheckout({ tableId: t, tableName, items, count, total });
+    }
     const record: CheckoutRecord = {
       id: newId(),
       tableId: t,

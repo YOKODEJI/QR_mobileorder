@@ -466,7 +466,7 @@ export default function StaffCheckout() {
                   })}
                 </div>
                 <button
-                  onClick={s.submitProxy}
+                  onClick={() => s.submitProxy()}
                   disabled={proxyCount === 0}
                   style={{
                     width: "100%",

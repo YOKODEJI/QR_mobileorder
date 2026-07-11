@@ -170,6 +170,49 @@ export async function dbInsertOrder(
   return orderId;
 }
 
+export type SubmitResult =
+  | { ok: true; orderId: string }
+  | { ok: false; code: "out_of_stock" | "error"; message: string };
+
+/** Edge Function `submit_order` 経由で注文（冪等・在庫の原子的減算・スナップショットをサーバで保証） */
+export async function dbSubmitOrderViaFunction(
+  tableId: string,
+  items: OrderItem[],
+  proxy: boolean,
+  idempotencyKey: string
+): Promise<SubmitResult> {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return { ok: false, code: "error", message: "not configured" };
+  const payload = items.map((it) => ({ menuItemId: it.menuItemId, qty: it.qty }));
+  const { data, error } = await sb.functions.invoke("submit_order", {
+    body: { storeId: STORE_ID, tableId, proxy, idempotencyKey, items: payload },
+  });
+  if (error) {
+    let msg = error.message;
+    try {
+      const ctx = (error as { context?: Response }).context;
+      const b = ctx ? await ctx.json() : null;
+      if (b?.error) msg = b.error as string;
+    } catch {
+      /* ignore */
+    }
+    return { ok: false, code: /out of stock/i.test(msg) ? "out_of_stock" : "error", message: msg };
+  }
+  return { ok: true, orderId: (data?.orderId as string) ?? "" };
+}
+
+/** 会計を RPC `close_table` で1トランザクション確定（履歴INSERT+注文DELETE+呼出クリア） */
+export async function dbCloseTable(tableId: string): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return false;
+  const { error } = await sb.rpc("close_table", { p_store: STORE_ID, p_table: tableId });
+  if (error) {
+    console.error("dbCloseTable:", error.message);
+    return false;
+  }
+  return true;
+}
+
 export async function dbSetOrderStatus(orderId: string, status: "cooking" | "served") {
   const sb = getSupabase();
   if (!sb) return;
