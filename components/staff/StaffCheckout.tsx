@@ -47,11 +47,11 @@ export default function StaffCheckout() {
     if (m.photo) photoById[m.id] = m.photo;
   });
 
-  const tableTotal = (id: number) =>
+  const tableTotal = (id: string) =>
     s.orders
       .filter((o) => o.table === id)
       .reduce((sum, o) => sum + o.items.reduce((t, it) => t + it.price * it.qty, 0), 0);
-  const tableCount = (id: number) =>
+  const tableCount = (id: string) =>
     s.orders
       .filter((o) => o.table === id)
       .reduce((c, o) => c + o.items.reduce((t, it) => t + it.qty, 0), 0);

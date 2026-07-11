@@ -10,6 +10,7 @@ import KitchenDisplay from "@/components/kitchen/KitchenDisplay";
 import StaffCheckout from "@/components/staff/StaffCheckout";
 import MenuManagement from "@/components/menu/MenuManagement";
 import CheckoutHistory from "@/components/history/CheckoutHistory";
+import SupabaseSync from "@/components/SupabaseSync";
 
 export default function AppShell() {
   const storeName = useAppStore((s) => s.settings.storeName);
@@ -132,6 +133,7 @@ export default function AppShell() {
         {topTab === "mgmt" && mgmtTab === "history" && <CheckoutHistory />}
       </main>
 
+      <SupabaseSync />
       <SettingsSheet />
       <AlertDialog />
     </div>

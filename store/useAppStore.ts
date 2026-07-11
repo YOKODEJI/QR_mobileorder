@@ -1,6 +1,14 @@
 "use client";
 
 import { create } from "zustand";
+import * as db from "@/lib/data";
+
+/** 新規エンティティのID: 未設定uuid。Supabase書き込みが返すidがあればそちらを優先 */
+function newId(): string {
+  return typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : "local-" + Math.random().toString(36).slice(2);
+}
 
 /* ============================================================
    型定義（_planning/02-data-model.md 準拠。M1はローカル状態）
@@ -27,8 +35,8 @@ export interface OrderItem {
 }
 
 export interface Order {
-  id: number;
-  table: number;
+  id: string; // uuid（Supabase）またはローカル生成uuid
+  table: string; // table id
   createdAt: string; // ISO文字列（表示はhm()で整形、経過はelapsedMin()）
   status: Status;
   items: OrderItem[];
@@ -36,20 +44,20 @@ export interface Order {
 }
 
 export interface TableRec {
-  id: number;
+  id: string;
   name: string;
 }
 
 export interface StaffCall {
-  id: number;
-  table: number;
+  id: string;
+  table: string;
   createdAt: string;
 }
 
 /** 会計履歴（セッション締め時のスナップショット。永続的に閲覧可能） */
 export interface CheckoutRecord {
-  id: number;
-  tableId: number;
+  id: string;
+  tableId: string;
   tableName: string; // 会計時点の卓名スナップショット（後で改名/削除されても残す）
   items: OrderItem[]; // 品目名で集約済みのスナップショット
   count: number;
@@ -93,13 +101,13 @@ interface AppState {
   cart: Record<string, number>;
   staffCart: Record<string, number>;
   // テーブル
-  customerTableId: number;
+  customerTableId: string;
   tables: TableRec[];
   tableEditMode: boolean;
-  editingTableId: number | null;
+  editingTableId: string | null;
   editTableName: string;
-  justAddedTableId: number | null; // 追加直後、視認性のため先頭に表示する卓
-  dragTableId: number | null; // テーブル並び替えのドラッグ中ID
+  justAddedTableId: string | null; // 追加直後、視認性のため先頭に表示する卓
+  dragTableId: string | null; // テーブル並び替えのドラッグ中ID
   // 業務データ
   orders: Order[];
   menu: MenuItem[];
@@ -108,12 +116,14 @@ interface AppState {
   // 厨房 / 接続
   connected: boolean;
   soundOn: boolean;
-  highlightId: number | null;
+  highlightId: string | null;
+  // データ層
+  loaded: boolean; // Supabaseからの初回読込が完了したか
   // UI一時状態
   submitting: boolean;
   justOrdered: boolean;
   showHistory: boolean;
-  selectedStaffTable: number | null;
+  selectedStaffTable: string | null;
   // メニュー管理
   deleteMode: boolean;
   selectedIds: string[];
@@ -125,13 +135,24 @@ interface AppState {
   newStock: string;
   // 汎用ダイアログ
   dialog: DialogSpec | null;
-  // カウンタ
-  nextId: number;
-  nextTableId: number;
+
+  // ---- データ層（Supabase） ----
+  hydrate: (snap: {
+    storeName: string | null;
+    theme: string | null;
+    showHeaderPhoto: boolean;
+    showFooterPhoto: boolean;
+    tables: TableRec[];
+    menu: MenuItem[];
+    orders: Order[];
+    calls: StaffCall[];
+    checkouts: CheckoutRecord[];
+  }) => void;
+  setConnected: (v: boolean) => void;
 
   // ---- ヘルパー ----
   yen: (n: number) => string;
-  tableName: (id: number) => string;
+  tableName: (id: string) => string;
   avail: (m: MenuItem) => boolean;
 
   // ---- ナビ ----
@@ -156,8 +177,8 @@ interface AppState {
   // ---- スタッフ呼び出し ----
   confirmCallStaff: () => void;
   callStaff: () => void;
-  confirmClearCall: (id: number) => void;
-  clearCall: (id: number) => void;
+  confirmClearCall: (id: string) => void;
+  clearCall: (id: string) => void;
 
   // ---- 厨房 ----
   confirmStatus: (o: Order) => void;
@@ -165,20 +186,20 @@ interface AppState {
   toggleConnection: () => void;
 
   // ---- 会計 / テーブル ----
-  selectStaffTable: (id: number) => void;
+  selectStaffTable: (id: string) => void;
   confirmCheckout: () => void;
   checkout: () => void;
   cancelUnit: (menuItemId: string) => void;
   setTableEditMode: (v: boolean) => void;
   addTable: () => void;
-  startEditTable: (id: number) => void;
+  startEditTable: (id: string) => void;
   setEditTableName: (v: string) => void;
   saveEditTable: () => void;
-  confirmDeleteTable: (id: number) => void;
+  confirmDeleteTable: (id: string) => void;
   // テーブル並び替え
-  dragStartTable: (id: number) => void;
+  dragStartTable: (id: string) => void;
   dragEndTable: () => void;
-  dropOnTable: (targetId: number) => void;
+  dropOnTable: (targetId: string) => void;
 
   // ---- メニュー管理 ----
   setPrice: (id: string, val: string) => void;
@@ -274,16 +295,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   adminCat: "すべて",
   cart: {},
   staffCart: {},
-  customerTableId: 5,
+  customerTableId: "t5",
   tables: [
-    { id: 1, name: "テーブル 1" },
-    { id: 2, name: "テーブル 2" },
-    { id: 3, name: "テーブル 3" },
-    { id: 4, name: "テーブル 4" },
-    { id: 5, name: "テーブル 5" },
-    { id: 6, name: "テーブル 6" },
-    { id: 7, name: "カウンター A" },
-    { id: 8, name: "個室 松" },
+    { id: "t1", name: "テーブル 1" },
+    { id: "t2", name: "テーブル 2" },
+    { id: "t3", name: "テーブル 3" },
+    { id: "t4", name: "テーブル 4" },
+    { id: "t5", name: "テーブル 5" },
+    { id: "t6", name: "テーブル 6" },
+    { id: "t7", name: "カウンター A" },
+    { id: "t8", name: "個室 松" },
   ],
   tableEditMode: false,
   editingTableId: null,
@@ -292,8 +313,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   dragTableId: null,
   orders: [
     {
-      id: 1,
-      table: 3,
+      id: "o1",
+      table: "t3",
       createdAt: new Date(Date.now() - 18 * 60000).toISOString(),
       status: "cooking",
       items: [
@@ -303,8 +324,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       ],
     },
     {
-      id: 2,
-      table: 7,
+      id: "o2",
+      table: "t7",
       createdAt: new Date(Date.now() - 6 * 60000).toISOString(),
       status: "served",
       items: [
@@ -328,8 +349,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   calls: [],
   checkouts: [
     {
-      id: 9001,
-      tableId: 2,
+      id: "c1",
+      tableId: "t2",
       tableName: "テーブル 2",
       items: [
         { menuItemId: "beer", name: "生ビール", qty: 3, price: 550 },
@@ -341,8 +362,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       closedAt: new Date(Date.now() - 95 * 60000).toISOString(),
     },
     {
-      id: 9002,
-      tableId: 6,
+      id: "c2",
+      tableId: "t6",
       tableName: "テーブル 6",
       items: [
         { menuItemId: "high", name: "ハイボール", qty: 2, price: 450 },
@@ -368,14 +389,41 @@ export const useAppStore = create<AppState>((set, get) => ({
   newPrice: "",
   newStock: "",
   dialog: null,
-  nextId: 3,
-  nextTableId: 9,
+  loaded: false,
+
+  // ---- データ層（Supabase） ----
+  hydrate: (snap) =>
+    set((s) => {
+      // customerTableId をロードした卓に合わせる（QR未実装のデモは「テーブル 5」→先頭の順で選択）
+      const preferred =
+        snap.tables.find((t) => t.name === "テーブル 5") ?? snap.tables[0];
+      const customerTableId =
+        snap.tables.some((t) => t.id === s.customerTableId)
+          ? s.customerTableId
+          : preferred?.id ?? s.customerTableId;
+      return {
+        settings: {
+          storeName: snap.storeName ?? s.settings.storeName,
+          theme: snap.theme ?? s.settings.theme,
+          showHeaderPhoto: snap.showHeaderPhoto,
+          showFooterPhoto: snap.showFooterPhoto,
+        },
+        tables: snap.tables,
+        menu: snap.menu,
+        orders: snap.orders,
+        calls: snap.calls,
+        checkouts: snap.checkouts,
+        customerTableId,
+        loaded: true,
+      };
+    }),
+  setConnected: (v) => set({ connected: v }),
 
   // ---- ヘルパー ----
   yen: (n) => "¥" + Number(n).toLocaleString("ja-JP"),
   tableName: (id) => {
     const t = get().tables.find((x) => x.id === id);
-    return t ? t.name : "テーブル " + id;
+    return t ? t.name : "テーブル";
   },
   avail: (m) => !m.soldOut && m.stock > 0,
 
@@ -446,18 +494,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     const s = get();
     const items = buildItems(s.cart, s.menu);
     if (items.length === 0) return;
+    const tableId = s.customerTableId;
     set({ submitting: true });
-    setTimeout(() => {
-      const id = get().nextId;
+    setTimeout(async () => {
+      const menu = get().menu;
+      // DBへ書き込み（未設定ならnull→ローカルidを採番）
+      const id = (await db.dbInsertOrder(tableId, items, false, menu)) ?? newId();
       set((st) => ({
         orders: [
-          {
-            id,
-            table: st.customerTableId,
-            createdAt: new Date().toISOString(),
-            status: "cooking",
-            items,
-          },
+          { id, table: tableId, createdAt: new Date().toISOString(), status: "cooking", items },
           ...st.orders,
         ],
         menu: decrementStock(st.menu, items),
@@ -465,7 +510,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         submitting: false,
         justOrdered: true,
         highlightId: id,
-        nextId: st.nextId + 1,
       }));
       playBeep(get().soundOn);
       setTimeout(() => {
@@ -473,28 +517,21 @@ export const useAppStore = create<AppState>((set, get) => ({
       }, 2600);
     }, 800);
   },
-  submitProxy: () => {
+  submitProxy: async () => {
     const s = get();
     const t = s.selectedStaffTable;
     if (t == null) return;
     const items = buildItems(s.staffCart, s.menu);
     if (items.length === 0) return;
-    const id = s.nextId;
+    const menu = s.menu;
+    const id = (await db.dbInsertOrder(t, items, true, menu)) ?? newId();
     set((st) => ({
       orders: [
-        {
-          id,
-          table: t,
-          createdAt: new Date().toISOString(),
-          status: "cooking",
-          items,
-          proxy: true,
-        },
+        { id, table: t, createdAt: new Date().toISOString(), status: "cooking", items, proxy: true },
         ...st.orders,
       ],
       menu: decrementStock(st.menu, items),
       staffCart: {},
-      nextId: st.nextId + 1,
       highlightId: id,
     }));
     playBeep(get().soundOn);
@@ -522,20 +559,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
     });
   },
-  callStaff: () =>
-    set((st) => {
-      // 同一テーブルの未対応呼び出しが既にあれば重複させない
-      if (st.calls.some((c) => c.table === st.customerTableId)) return {};
-      const id = st.nextId;
-      playBeep(st.soundOn);
-      return {
-        calls: [
-          ...st.calls,
-          { id, table: st.customerTableId, createdAt: new Date().toISOString() },
-        ],
-        nextId: st.nextId + 1,
-      };
-    }),
+  callStaff: () => {
+    const st = get();
+    // 同一テーブルの未対応呼び出しが既にあれば重複させない
+    if (st.calls.some((c) => c.table === st.customerTableId)) return;
+    const tableId = st.customerTableId;
+    db.dbInsertCall(tableId);
+    playBeep(st.soundOn);
+    set((s) => ({
+      calls: [...s.calls, { id: newId(), table: tableId, createdAt: new Date().toISOString() }],
+    }));
+  },
   confirmClearCall: (id) => {
     const s = get();
     const call = s.calls.find((c) => c.id === id);
@@ -553,7 +587,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
     });
   },
-  clearCall: (id) => set((st) => ({ calls: st.calls.filter((c) => c.id !== id) })),
+  clearCall: (id) => {
+    db.dbResolveCall(id);
+    set((st) => ({ calls: st.calls.filter((c) => c.id !== id) }));
+  },
 
   // ---- 厨房 ----
   confirmStatus: (o) => {
@@ -565,12 +602,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         confirmText: to + "にする",
         danger: false,
         onConfirm: () => {
+          const next: Status = o.status === "cooking" ? "served" : "cooking";
+          db.dbSetOrderStatus(o.id, next);
           set((s) => ({
-            orders: s.orders.map((x) =>
-              x.id === o.id
-                ? { ...x, status: x.status === "cooking" ? "served" : "cooking" }
-                : x
-            ),
+            orders: s.orders.map((x) => (x.id === o.id ? { ...x, status: next } : x)),
           }));
           get().closeDialog();
         },
@@ -609,44 +644,51 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
   checkout: () => {
-    const t = get().selectedStaffTable;
+    const s = get();
+    const t = s.selectedStaffTable;
     if (t == null) return;
-    set((s) => {
-      const tableOrders = s.orders.filter((o) => o.table === t);
-      if (tableOrders.length === 0) return { selectedStaffTable: null };
-      // 品目を menuItemId+価格で集約してスナップショット化
-      const agg: Record<string, OrderItem> = {};
-      let total = 0;
-      let count = 0;
-      tableOrders.forEach((o) =>
-        o.items.forEach((it) => {
-          const k = it.menuItemId + ":" + it.price;
-          if (!agg[k]) agg[k] = { ...it, qty: 0 };
-          agg[k].qty += it.qty;
-          total += it.price * it.qty;
-          count += it.qty;
-        })
-      );
-      const record: CheckoutRecord = {
-        id: s.nextId,
-        tableId: t,
-        tableName: s.tableName(t),
-        items: Object.values(agg),
-        count,
-        total,
-        closedAt: new Date().toISOString(),
-      };
-      return {
-        checkouts: [record, ...s.checkouts],
-        orders: s.orders.filter((o) => o.table !== t),
-        calls: s.calls.filter((c) => c.table !== t),
-        selectedStaffTable: null,
-        nextId: s.nextId + 1,
-      };
-    });
+    const tableOrders = s.orders.filter((o) => o.table === t);
+    if (tableOrders.length === 0) {
+      set({ selectedStaffTable: null });
+      return;
+    }
+    // 品目を menuItemId+価格で集約してスナップショット化
+    const agg: Record<string, OrderItem> = {};
+    let total = 0;
+    let count = 0;
+    tableOrders.forEach((o) =>
+      o.items.forEach((it) => {
+        const k = it.menuItemId + ":" + it.price;
+        if (!agg[k]) agg[k] = { ...it, qty: 0 };
+        agg[k].qty += it.qty;
+        total += it.price * it.qty;
+        count += it.qty;
+      })
+    );
+    const items = Object.values(agg);
+    const tableName = s.tableName(t);
+    // DBへ: 会計履歴を記録し、その卓の注文を削除
+    db.dbCheckout({ tableId: t, tableName, items, count, total });
+    const record: CheckoutRecord = {
+      id: newId(),
+      tableId: t,
+      tableName,
+      items,
+      count,
+      total,
+      closedAt: new Date().toISOString(),
+    };
+    set((st) => ({
+      checkouts: [record, ...st.checkouts],
+      orders: st.orders.filter((o) => o.table !== t),
+      calls: st.calls.filter((c) => c.table !== t),
+      selectedStaffTable: null,
+    }));
   },
   cancelUnit: (menuItemId) => {
     const t = get().selectedStaffTable;
+    // DB用に取消前の orders/menu を渡す
+    db.dbCancelUnit(t ?? "", menuItemId, get().orders, get().menu);
     set((s) => {
       let done = false;
       const orders = s.orders
@@ -677,20 +719,20 @@ export const useAppStore = create<AppState>((set, get) => ({
       editTableName: "",
       justAddedTableId: null,
     }),
-  addTable: () =>
-    set((s) => {
-      const id = s.nextTableId;
-      const name = "テーブル " + id;
-      // 並びは末尾に追加（データ順）。ただし追加直後は視認性のため先頭にピン留めし、そのまま名前編集状態にする
-      return {
-        tables: [...s.tables, { id, name }],
-        nextTableId: s.nextTableId + 1,
-        tableEditMode: true,
-        editingTableId: id,
-        editTableName: name,
-        justAddedTableId: id,
-      };
-    }),
+  addTable: async () => {
+    const s = get();
+    const name = "テーブル " + (s.tables.length + 1);
+    const sort = s.tables.length;
+    // 並びは末尾に追加（データ順）。追加直後は視認性のため先頭にピン留めし、名前編集状態に。
+    const id = (await db.dbInsertTable(name, sort)) ?? newId();
+    set((st) => ({
+      tables: [...st.tables, { id, name }],
+      tableEditMode: true,
+      editingTableId: id,
+      editTableName: name,
+      justAddedTableId: id,
+    }));
+  },
   startEditTable: (id) => {
     const t = get().tables.find((x) => x.id === id);
     set({ editingTableId: id, editTableName: t ? t.name : "" });
@@ -698,7 +740,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   setEditTableName: (v) => set({ editTableName: v }),
   saveEditTable: () => {
     const id = get().editingTableId;
-    const name = get().editTableName.trim() || "テーブル " + id;
+    if (id == null) return;
+    const name = get().editTableName.trim() || "テーブル";
+    db.dbUpdateTableName(id, name);
     set((s) => ({
       tables: s.tables.map((t) => (t.id === id ? { ...t, name } : t)),
       editingTableId: null,
@@ -709,19 +753,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   dragStartTable: (id) => set({ dragTableId: id }),
   dragEndTable: () => set({ dragTableId: null }),
   dropOnTable: (targetId) => {
-    const dragId = get().dragTableId;
+    const s = get();
+    const dragId = s.dragTableId;
     if (dragId == null || dragId === targetId) {
       set({ dragTableId: null });
       return;
     }
-    set((s) => {
-      const arr = [...s.tables];
-      const from = arr.findIndex((t) => t.id === dragId);
-      const to = arr.findIndex((t) => t.id === targetId);
-      if (from < 0 || to < 0) return { dragTableId: null };
-      arr.splice(to, 0, arr.splice(from, 1)[0]);
-      return { tables: arr, dragTableId: null };
-    });
+    const arr = [...s.tables];
+    const from = arr.findIndex((t) => t.id === dragId);
+    const to = arr.findIndex((t) => t.id === targetId);
+    if (from < 0 || to < 0) {
+      set({ dragTableId: null });
+      return;
+    }
+    arr.splice(to, 0, arr.splice(from, 1)[0]);
+    db.dbReorderTables(arr.map((t) => t.id));
+    set({ tables: arr, dragTableId: null });
   },
   confirmDeleteTable: (id) => {
     const s = get();
@@ -736,7 +783,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           : "このテーブルを削除します。よろしいですか？",
         confirmText: "削除する",
         danger: true,
-        onConfirm: () =>
+        onConfirm: () => {
+          db.dbDeleteTable(id);
           set((st) => ({
             tables: st.tables.filter((x) => x.id !== id),
             orders: st.orders.filter((o) => o.table !== id),
@@ -747,7 +795,8 @@ export const useAppStore = create<AppState>((set, get) => ({
             justAddedTableId:
               st.justAddedTableId === id ? null : st.justAddedTableId,
             dialog: null,
-          })),
+          }));
+        },
       },
     });
   },
@@ -755,78 +804,89 @@ export const useAppStore = create<AppState>((set, get) => ({
   // ---- メニュー管理 ----
   setPrice: (id, val) => {
     const n = Math.max(0, parseInt(val, 10) || 0);
+    db.dbUpdateMenu(id, { price: n });
     set((s) => ({ menu: s.menu.map((m) => (m.id === id ? { ...m, price: n } : m)) }));
   },
   setStock: (id, val) => {
     const n = Math.max(0, parseInt(val, 10) || 0);
+    db.dbUpdateMenu(id, { stock: n });
     set((s) => ({ menu: s.menu.map((m) => (m.id === id ? { ...m, stock: n } : m)) }));
   },
-  bumpStock: (id, d) =>
+  bumpStock: (id, d) => {
+    const m0 = get().menu.find((m) => m.id === id);
+    if (!m0) return;
+    const n = Math.max(0, m0.stock + d);
+    db.dbUpdateMenu(id, { stock: n });
     set((s) => ({
-      menu: s.menu.map((m) =>
-        m.id === id ? { ...m, stock: Math.max(0, m.stock + d) } : m
-      ),
-    })),
-  toggleSoldOut: (id) =>
+      menu: s.menu.map((m) => (m.id === id ? { ...m, stock: n } : m)),
+    }));
+  },
+  toggleSoldOut: (id) => {
+    const m0 = get().menu.find((m) => m.id === id);
+    if (!m0) return;
+    db.dbUpdateMenu(id, { sold_out: !m0.soldOut });
     set((s) => ({
       menu: s.menu.map((m) => (m.id === id ? { ...m, soldOut: !m.soldOut } : m)),
-    })),
+    }));
+  },
   setNewField: (k, v) => set({ [k]: v } as Pick<AppState, typeof k>),
   setNewCat: (c) => set({ newCat: c }),
   addItem: () => {
     const s = get();
     const name = s.newName.trim();
     if (!name) return;
-    const id = "m" + Date.now();
+    const id = newId();
+    const price = Math.max(0, parseInt(s.newPrice, 10) || 0);
+    const stock = Math.max(0, parseInt(s.newStock, 10) || 0);
+    db.dbInsertMenu({ name, cat: s.newCat, price, stock, sort: s.menu.length });
     set((st) => ({
       menu: [
         ...st.menu,
-        {
-          id,
-          name,
-          cat: st.newCat,
-          price: Math.max(0, parseInt(st.newPrice, 10) || 0),
-          stock: Math.max(0, parseInt(st.newStock, 10) || 0),
-          soldOut: false,
-          photo: null,
-        },
+        { id, name, cat: st.newCat, price, stock, soldOut: false, photo: null },
       ],
       newName: "",
       newPrice: "",
       newStock: "",
     }));
   },
-  setPhoto: (id, url) =>
-    set((s) => ({ menu: s.menu.map((m) => (m.id === id ? { ...m, photo: url } : m)) })),
-  removePhoto: (id) =>
-    set((s) => ({ menu: s.menu.map((m) => (m.id === id ? { ...m, photo: null } : m)) })),
+  setPhoto: (id, url) => {
+    db.dbUpdateMenu(id, { photo_url: url });
+    set((s) => ({ menu: s.menu.map((m) => (m.id === id ? { ...m, photo: url } : m)) }));
+  },
+  removePhoto: (id) => {
+    db.dbUpdateMenu(id, { photo_url: null });
+    set((s) => ({ menu: s.menu.map((m) => (m.id === id ? { ...m, photo: null } : m)) }));
+  },
 
   // 並び替え
   dragStart: (id) => set({ dragId: id }),
   dragEnd: () => set({ dragId: null }),
   dropOn: (targetId) => {
-    const dragId = get().dragId;
+    const s = get();
+    const dragId = s.dragId;
     if (!dragId || dragId === targetId) {
       set({ dragId: null });
       return;
     }
-    set((s) => {
-      const cat = s.adminCat;
-      const filtered =
-        cat === "すべて"
-          ? s.menu.map((m) => m.id)
-          : s.menu.filter((m) => m.cat === cat).map((m) => m.id);
-      const from = filtered.indexOf(dragId);
-      const to = filtered.indexOf(targetId);
-      if (from < 0 || to < 0) return { dragId: null };
-      filtered.splice(to, 0, filtered.splice(from, 1)[0]);
-      let k = 0;
-      const byId = Object.fromEntries(s.menu.map((m) => [m.id, m]));
-      const menu = s.menu.map((m) =>
-        cat === "すべて" || m.cat === cat ? byId[filtered[k++]] : m
-      );
-      return { menu, dragId: null };
-    });
+    const cat = s.adminCat;
+    const filtered =
+      cat === "すべて"
+        ? s.menu.map((m) => m.id)
+        : s.menu.filter((m) => m.cat === cat).map((m) => m.id);
+    const from = filtered.indexOf(dragId);
+    const to = filtered.indexOf(targetId);
+    if (from < 0 || to < 0) {
+      set({ dragId: null });
+      return;
+    }
+    filtered.splice(to, 0, filtered.splice(from, 1)[0]);
+    let k = 0;
+    const byId = Object.fromEntries(s.menu.map((m) => [m.id, m]));
+    const menu = s.menu.map((m) =>
+      cat === "すべて" || m.cat === cat ? byId[filtered[k++]] : m
+    );
+    db.dbReorderMenu(menu.map((m) => m.id));
+    set({ menu, dragId: null });
   },
 
   // 削除
@@ -858,13 +918,15 @@ export const useAppStore = create<AppState>((set, get) => ({
               body: "この操作は取り消せません。本当に " + n2 + " 件を削除しますか？",
               confirmText: "完全に削除",
               danger: true,
-              onConfirm: () =>
+              onConfirm: () => {
+                db.dbDeleteMenu(get().selectedIds);
                 set((s) => ({
                   menu: s.menu.filter((m) => !s.selectedIds.includes(m.id)),
                   selectedIds: [],
                   deleteMode: false,
                   dialog: null,
-                })),
+                }));
+              },
             },
           });
         },
@@ -873,7 +935,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // ---- 設定 / ダイアログ ----
-  setSetting: (k, v) => set((s) => ({ settings: { ...s.settings, [k]: v } })),
+  setSetting: (k, v) => {
+    const col = {
+      storeName: "name",
+      theme: "theme",
+      showHeaderPhoto: "show_header_photo",
+      showFooterPhoto: "show_footer_photo",
+    }[k];
+    db.dbUpdateStore({ [col]: v });
+    set((s) => ({ settings: { ...s.settings, [k]: v } }));
+  },
   openSettings: () => set({ showSettings: true }),
   closeSettings: () => set({ showSettings: false }),
   toggleHistory: (v) => set({ showHistory: v }),
