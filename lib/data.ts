@@ -16,6 +16,8 @@ export interface Snapshot {
   theme: string | null;
   showHeaderPhoto: boolean;
   showFooterPhoto: boolean;
+  headerPhoto: string | null;
+  footerPhoto: string | null;
   tables: TableRec[];
   menu: MenuItem[];
   orders: Order[];
@@ -29,7 +31,7 @@ export async function loadSnapshot(): Promise<Snapshot | null> {
   if (!sb || !STORE_ID) return null;
 
   const [store, tables, menu, orders, calls, checkouts] = await Promise.all([
-    sb.from("stores").select("name,theme,show_header_photo,show_footer_photo").eq("id", STORE_ID).single(),
+    sb.from("stores").select("name,theme,show_header_photo,show_footer_photo,header_photo_url,footer_photo_url").eq("id", STORE_ID).single(),
     sb.from("tables").select("id,name,sort").eq("store_id", STORE_ID).order("sort"),
     sb.from("menu_items").select("id,name,cat,price,sold_out,stock,photo_url,sort").eq("store_id", STORE_ID).order("sort"),
     sb
@@ -52,6 +54,8 @@ export async function loadSnapshot(): Promise<Snapshot | null> {
     theme: store.data?.theme ?? null,
     showHeaderPhoto: store.data?.show_header_photo ?? false,
     showFooterPhoto: store.data?.show_footer_photo ?? false,
+    headerPhoto: (store.data?.header_photo_url as string | null) ?? null,
+    footerPhoto: (store.data?.footer_photo_url as string | null) ?? null,
     tables: (tables.data ?? []).map((t) => ({ id: t.id as string, name: t.name as string })),
     menu: (menu.data ?? []).map((m) => ({
       id: m.id as string,

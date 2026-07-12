@@ -2,6 +2,7 @@
 
 import { useAppStore } from "@/store/useAppStore";
 import Toggle from "@/components/ui/Toggle";
+import PhotoSlot from "@/components/ui/PhotoSlot";
 
 const SWATCHES = ["#cf4b2c", "#e0902a", "#248a3d", "#0a84ff", "#8a4fd0"];
 
@@ -130,16 +131,16 @@ export default function SettingsSheet() {
           })}
         </div>
 
-        {/* 写真表示 */}
+        {/* 写真表示（管理画面から設定。客用は表示のみ） */}
         <div style={labelStyle}>客用ページの写真</div>
         <div style={{ background: "#fff", borderRadius: "14px", overflow: "hidden" }}>
+          {/* ヘッダー */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
               padding: "14px 16px",
-              borderBottom: "1px solid #f0f0f2",
             }}
           >
             <span style={{ fontSize: "15px" }}>ヘッダー写真を表示</span>
@@ -148,12 +149,33 @@ export default function SettingsSheet() {
               onChange={(v) => setSetting("showHeaderPhoto", v)}
             />
           </div>
+          {settings.showHeaderPhoto && (
+            <div style={{ padding: "0 16px 14px" }}>
+              <PhotoSlot
+                height={110}
+                radius={12}
+                label="ヘッダー写真をタップ／ドロップで追加"
+                value={settings.headerPhoto}
+                onChange={(url) => setSetting("headerPhoto", url)}
+              />
+              {settings.headerPhoto && (
+                <button
+                  onClick={() => setSetting("headerPhoto", null)}
+                  style={removeBtn}
+                >
+                  写真を削除
+                </button>
+              )}
+            </div>
+          )}
+          {/* フッター */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
               padding: "14px 16px",
+              borderTop: "1px solid #f0f0f2",
             }}
           >
             <span style={{ fontSize: "15px" }}>フッター写真を表示</span>
@@ -162,6 +184,25 @@ export default function SettingsSheet() {
               onChange={(v) => setSetting("showFooterPhoto", v)}
             />
           </div>
+          {settings.showFooterPhoto && (
+            <div style={{ padding: "0 16px 14px" }}>
+              <PhotoSlot
+                height={110}
+                radius={12}
+                label="フッター写真をタップ／ドロップで追加"
+                value={settings.footerPhoto}
+                onChange={(url) => setSetting("footerPhoto", url)}
+              />
+              {settings.footerPhoto && (
+                <button
+                  onClick={() => setSetting("footerPhoto", null)}
+                  style={removeBtn}
+                >
+                  写真を削除
+                </button>
+              )}
+            </div>
+          )}
         </div>
         <div
           style={{
@@ -171,9 +212,21 @@ export default function SettingsSheet() {
             lineHeight: 1.5,
           }}
         >
-          ONにすると客用ページに写真枠が表示されます。写真枠をタップして画像を設定できます。
+          写真は管理画面から設定します。客用ページには表示だけされます。
         </div>
       </div>
     </div>
   );
 }
+
+const removeBtn: React.CSSProperties = {
+  marginTop: "8px",
+  border: "none",
+  background: "transparent",
+  color: "#ff3b30",
+  fontSize: "13px",
+  fontWeight: 600,
+  fontFamily: "inherit",
+  cursor: "pointer",
+  padding: 0,
+};

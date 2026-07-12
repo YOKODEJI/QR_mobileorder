@@ -118,6 +118,17 @@ input[type="number"] {
   }
 }
 
+/* 印刷時はアプリのヘッダー等を隠し、QRだけを出す */
+@media print {
+  html,
+  body {
+    background: #fff;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+
 /* メニュー管理: 狭幅では行を横スクロール（列を潰さない） */
 .menu-rows {
   overflow-x: auto;

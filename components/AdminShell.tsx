@@ -10,6 +10,7 @@ import KitchenDisplay from "@/components/kitchen/KitchenDisplay";
 import StaffCheckout from "@/components/staff/StaffCheckout";
 import MenuManagement from "@/components/menu/MenuManagement";
 import CheckoutHistory from "@/components/history/CheckoutHistory";
+import QrCodes from "@/components/qr/QrCodes";
 import SupabaseSync from "@/components/SupabaseSync";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 
@@ -44,6 +45,7 @@ export default function AdminShell() {
       }}
     >
       <header
+        className="no-print"
         style={{
           background: "rgba(248,248,250,.82)",
           backdropFilter: "saturate(180%) blur(20px)",
@@ -67,6 +69,7 @@ export default function AdminShell() {
               { value: "staff", label: "テーブル / 会計" },
               { value: "menu", label: "メニュー管理" },
               { value: "history", label: "会計履歴" },
+              { value: "qr", label: "QR発行" },
             ]}
             value={mgmtTab}
             onChange={setMgmt}
@@ -122,6 +125,7 @@ export default function AdminShell() {
             {mgmtTab === "staff" && <StaffCheckout />}
             {mgmtTab === "menu" && <MenuManagement />}
             {mgmtTab === "history" && <CheckoutHistory />}
+            {mgmtTab === "qr" && <QrCodes />}
           </>
         )}
       </main>

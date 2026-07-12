@@ -3,7 +3,6 @@
 import { useAppStore } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import ChipRow from "@/components/ui/ChipRow";
-import PhotoSlot from "@/components/ui/PhotoSlot";
 import { hm, useNow } from "@/lib/time";
 import {
   itemCardStyle,
@@ -133,8 +132,13 @@ export default function CustomerOrder() {
 
         {/* スクロール領域（縦スクロールは menu list のみ。チップ行は潰さない） */}
         <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
-          {s.settings.showHeaderPhoto && (
-            <PhotoSlot height={150} label="ヘッダー写真をタップで追加" />
+          {s.settings.showHeaderPhoto && s.settings.headerPhoto && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={s.settings.headerPhoto}
+              alt=""
+              style={{ width: "100%", height: "150px", objectFit: "cover", display: "block" }}
+            />
           )}
 
           <ChipRow
@@ -211,10 +215,13 @@ export default function CustomerOrder() {
               );
             })}
 
-            {s.settings.showFooterPhoto && (
-              <div style={{ marginTop: "6px" }}>
-                <PhotoSlot height={130} radius={18} label="フッター写真をタップで追加" />
-              </div>
+            {s.settings.showFooterPhoto && s.settings.footerPhoto && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={s.settings.footerPhoto}
+                alt=""
+                style={{ width: "100%", height: "130px", objectFit: "cover", borderRadius: "18px", marginTop: "6px", display: "block" }}
+              />
             )}
           </div>
         </div>

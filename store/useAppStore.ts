@@ -71,6 +71,8 @@ export interface Settings {
   theme: string;
   showHeaderPhoto: boolean;
   showFooterPhoto: boolean;
+  headerPhoto: string | null;
+  footerPhoto: string | null;
 }
 
 export interface DialogSpec {
@@ -90,7 +92,7 @@ export const CAT_FILTERS: CatFilter[] = ["すべて", ...CATS];
 interface AppState {
   // ナビ
   topTab: "customer" | "mgmt";
-  mgmtTab: "kitchen" | "staff" | "menu" | "history";
+  mgmtTab: "kitchen" | "staff" | "menu" | "history" | "qr";
   // 設定
   settings: Settings;
   showSettings: boolean;
@@ -143,6 +145,8 @@ interface AppState {
     theme: string | null;
     showHeaderPhoto: boolean;
     showFooterPhoto: boolean;
+    headerPhoto: string | null;
+    footerPhoto: string | null;
     tables: TableRec[];
     menu: MenuItem[];
     orders: Order[];
@@ -329,6 +333,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     theme: "#cf4b2c",
     showHeaderPhoto: false,
     showFooterPhoto: false,
+    headerPhoto: null,
+    footerPhoto: null,
   },
   showSettings: false,
   customerCat: "すべて",
@@ -448,6 +454,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           theme: snap.theme ?? s.settings.theme,
           showHeaderPhoto: snap.showHeaderPhoto,
           showFooterPhoto: snap.showFooterPhoto,
+          headerPhoto: snap.headerPhoto,
+          footerPhoto: snap.footerPhoto,
         },
         tables: snap.tables,
         menu: snap.menu,
@@ -853,27 +861,44 @@ export const useAppStore = create<AppState>((set, get) => ({
     const t = s.tables.find((x) => x.id === id);
     if (!t) return;
     const hasOrders = s.orders.some((o) => o.table === id);
+    // 削除はQRを無効化する重い操作なので「2段階」で確認する
+    const doDelete = () => {
+      db.dbDeleteTable(id);
+      set((st) => ({
+        tables: st.tables.filter((x) => x.id !== id),
+        orders: st.orders.filter((o) => o.table !== id),
+        calls: st.calls.filter((c) => c.table !== id),
+        selectedStaffTable:
+          st.selectedStaffTable === id ? null : st.selectedStaffTable,
+        editingTableId: null,
+        justAddedTableId:
+          st.justAddedTableId === id ? null : st.justAddedTableId,
+        dialog: null,
+      }));
+    };
     set({
       dialog: {
         title: t.name + " を削除",
-        body: hasOrders
-          ? "このテーブルには未会計の注文が残っています。削除すると注文も消えます。よろしいですか？"
-          : "このテーブルを削除します。よろしいですか？",
-        confirmText: "削除する",
+        body:
+          "このテーブルを削除すると、印刷済みのQRコードが使えなくなります（作り直しても別のQRになります）。" +
+          (hasOrders ? "\n\n未会計の注文も一緒に消えます。" : "") +
+          "\n\n本当に削除しますか？",
+        confirmText: "削除に進む",
         danger: true,
         onConfirm: () => {
-          db.dbDeleteTable(id);
-          set((st) => ({
-            tables: st.tables.filter((x) => x.id !== id),
-            orders: st.orders.filter((o) => o.table !== id),
-            calls: st.calls.filter((c) => c.table !== id),
-            selectedStaffTable:
-              st.selectedStaffTable === id ? null : st.selectedStaffTable,
-            editingTableId: null,
-            justAddedTableId:
-              st.justAddedTableId === id ? null : st.justAddedTableId,
-            dialog: null,
-          }));
+          // 2段階目（最終確認）
+          set({
+            dialog: {
+              title: "最終確認",
+              body:
+                "この操作は取り消せません。\n「" +
+                t.name +
+                "」を完全に削除します。よろしいですか？",
+              confirmText: "完全に削除",
+              danger: true,
+              onConfirm: doDelete,
+            },
+          });
         },
       },
     });
@@ -1019,6 +1044,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       theme: "theme",
       showHeaderPhoto: "show_header_photo",
       showFooterPhoto: "show_footer_photo",
+      headerPhoto: "header_photo_url",
+      footerPhoto: "footer_photo_url",
     }[k];
     db.dbUpdateStore({ [col]: v });
     set((s) => ({ settings: { ...s.settings, [k]: v } }));
