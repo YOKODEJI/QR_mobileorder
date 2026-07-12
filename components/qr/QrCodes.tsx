@@ -1,16 +1,30 @@
 "use client";
 
+import { useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { useAppStore } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 /** 各卓のQRコードを発行・印刷する画面（管理ツール） */
 export default function QrCodes() {
   const s = useAppStore(
-    useShallow((st) => ({ tables: st.tables, settings: st.settings }))
+    useShallow((st) => ({
+      tables: st.tables,
+      settings: st.settings,
+      tableTokens: st.tableTokens,
+    }))
   );
+  const loadTableTokens = useAppStore((st) => st.loadTableTokens);
+  const regenerateToken = useAppStore((st) => st.regenerateToken);
   const accent = s.settings.theme;
   const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const configured = isSupabaseConfigured();
+
+  // 各卓の qr_token を取得（QRのURLに ?k= として埋め込む）
+  useEffect(() => {
+    loadTableTokens();
+  }, [loadTableTokens]);
 
   return (
     <div style={{ padding: "24px 18px 40px", maxWidth: "980px", margin: "0 auto", width: "100%" }}>
@@ -22,7 +36,7 @@ export default function QrCodes() {
             <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px", lineHeight: 1.5 }}>
               各卓に置くQRです。読み取ると、その卓の注文ページが開きます。
               <br />
-              ⚠️ テーブルを削除して作り直すと<strong>別のQR</strong>になります（印刷済みQRが無効化）。削除は慎重に。
+              ⚠️ 「再発行」すると印刷済みの古いQRは<strong>使えなくなります</strong>（作り直すと別のQRに）。
             </div>
           </div>
           <button
@@ -58,7 +72,11 @@ export default function QrCodes() {
             }}
           >
             {s.tables.map((t) => {
-              const url = `${origin}/order/${t.id}`;
+              const token = s.tableTokens[t.id];
+              // 合言葉つきURL（未取得＝ローカル/未設定時は素のURLにフォールバック）
+              const url = token
+                ? `${origin}/order/${t.id}?k=${token}`
+                : `${origin}/order/${t.id}`;
               return (
                 <div
                   key={t.id}
@@ -80,6 +98,27 @@ export default function QrCodes() {
                   <div style={{ fontSize: "11px", color: "#a0a0a5", marginTop: "8px" }}>
                     スマホのカメラで読み取り
                   </div>
+                  {/* 再発行（印刷しない）。Supabase設定時のみ */}
+                  {configured && (
+                    <button
+                      className="no-print"
+                      onClick={() => regenerateToken(t.id)}
+                      style={{
+                        marginTop: "10px",
+                        border: "1px solid #ececee",
+                        background: "transparent",
+                        color: "#8e8e93",
+                        borderRadius: "999px",
+                        padding: "6px 14px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        fontFamily: "inherit",
+                        cursor: "pointer",
+                      }}
+                    >
+                      ♻︎ QRを再発行
+                    </button>
+                  )}
                 </div>
               );
             })}

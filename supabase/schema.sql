@@ -33,11 +33,17 @@ create table if not exists staff (
 );
 
 -- ---- 客席 --------------------------------------------------
+--   qr_token      : QRに埋め込む固定トークン（印刷用。/order/[id]?k=qr_token）。
+--                   再発行ボタンでのみ変わる＝印刷QRを無効化する重い操作。
+--   session_token : 来店セッション単位のトークン。会計(close_table)で自動更新し、
+--                   退店した客の端末からの再注文を封じる。open_session で客に配る。
 create table if not exists tables (
-  id        uuid primary key default gen_random_uuid(),
-  store_id  uuid not null references stores(id) on delete cascade,
-  name      text not null,
-  sort      int not null default 0
+  id            uuid primary key default gen_random_uuid(),
+  store_id      uuid not null references stores(id) on delete cascade,
+  name          text not null,
+  sort          int not null default 0,
+  qr_token      text not null default encode(gen_random_bytes(12), 'hex'),
+  session_token text not null default encode(gen_random_bytes(12), 'hex')
 );
 
 -- ---- 来店セッション（QR悪用対策の核。M2後半で本格利用） ----

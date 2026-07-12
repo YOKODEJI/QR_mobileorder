@@ -176,20 +176,21 @@ export async function dbInsertOrder(
 
 export type SubmitResult =
   | { ok: true; orderId: string }
-  | { ok: false; code: "out_of_stock" | "error"; message: string };
+  | { ok: false; code: "out_of_stock" | "session" | "rate_limited" | "error"; message: string };
 
 /** Edge Function `submit_order` 経由で注文（冪等・在庫の原子的減算・スナップショットをサーバで保証） */
 export async function dbSubmitOrderViaFunction(
   tableId: string,
   items: OrderItem[],
   proxy: boolean,
-  idempotencyKey: string
+  idempotencyKey: string,
+  token: string | null
 ): Promise<SubmitResult> {
   const sb = getSupabase();
   if (!sb || !STORE_ID) return { ok: false, code: "error", message: "not configured" };
   const payload = items.map((it) => ({ menuItemId: it.menuItemId, qty: it.qty }));
   const { data, error } = await sb.functions.invoke("submit_order", {
-    body: { storeId: STORE_ID, tableId, proxy, idempotencyKey, items: payload },
+    body: { storeId: STORE_ID, tableId, proxy, idempotencyKey, token, items: payload },
   });
   if (error) {
     let msg = error.message;
@@ -200,9 +201,62 @@ export async function dbSubmitOrderViaFunction(
     } catch {
       /* ignore */
     }
-    return { ok: false, code: /out of stock/i.test(msg) ? "out_of_stock" : "error", message: msg };
+    const code = /out of stock/i.test(msg)
+      ? "out_of_stock"
+      : /session expired|invalid token/i.test(msg)
+        ? "session"
+        : /too many requests/i.test(msg)
+          ? "rate_limited"
+          : "error";
+    return { ok: false, code, message: msg };
   }
   return { ok: true, orderId: (data?.orderId as string) ?? "" };
+}
+
+/** 来店セッション開始: QRの k(=qr_token) を照合し、今の session_token を受け取る。
+ *  未設定/失敗時は null（＝ローカルのままM1動作、または照合失敗）。 */
+export async function dbOpenSession(tableId: string, k: string): Promise<string | null> {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return null;
+  const { data, error } = await sb.rpc("open_session", {
+    p_store: STORE_ID,
+    p_table: tableId,
+    p_k: k,
+  });
+  if (error) {
+    console.error("dbOpenSession:", error.message);
+    return null;
+  }
+  return (data as string) ?? null;
+}
+
+/** 管理QR画面用: 各卓の qr_token を取得（QRのURL生成に使う）。id→qr_token のマップ。 */
+export async function dbFetchTableTokens(): Promise<Record<string, string>> {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return {};
+  const { data, error } = await sb
+    .from("tables")
+    .select("id,qr_token")
+    .eq("store_id", STORE_ID);
+  if (error || !data) return {};
+  const map: Record<string, string> = {};
+  for (const row of data) map[row.id as string] = (row.qr_token as string) ?? "";
+  return map;
+}
+
+/** QRトークン再発行（印刷QRを無効化）。新しい qr_token を返す。 */
+export async function dbRegenerateToken(tableId: string): Promise<string | null> {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return null;
+  const { data, error } = await sb.rpc("regenerate_table_token", {
+    p_store: STORE_ID,
+    p_table: tableId,
+  });
+  if (error) {
+    console.error("dbRegenerateToken:", error.message);
+    return null;
+  }
+  return (data as string) ?? null;
 }
 
 /** 会計を RPC `close_table` で1トランザクション確定（履歴INSERT+注文DELETE+呼出クリア） */

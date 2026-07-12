@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { storeId, tableId, proxy, idempotencyKey, items } = body ?? {};
+    const { storeId, tableId, proxy, idempotencyKey, items, token } = body ?? {};
 
     if (!storeId || !tableId || !Array.isArray(items) || items.length === 0) {
       return json({ error: "invalid payload" }, 400);
@@ -37,11 +37,16 @@ Deno.serve(async (req) => {
       p_proxy: !!proxy,
       p_idem: idempotencyKey ?? null,
       p_items: items,
+      p_token: token ?? null,   // 客の session_token（proxy注文では未使用）
     });
 
     if (error) {
-      // 在庫切れ等の業務エラーは 409 で返す
-      const status = /out of stock/i.test(error.message) ? 409 : 400;
+      // 在庫切れは 409、セッション/トークン不正は 403、その他は 400
+      const status = /out of stock/i.test(error.message)
+        ? 409
+        : /session expired|invalid token|too many requests/i.test(error.message)
+          ? 403
+          : 400;
       return json({ error: error.message }, status);
     }
     return json({ orderId: data }, 200);

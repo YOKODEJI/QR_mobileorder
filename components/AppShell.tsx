@@ -24,6 +24,7 @@ export default function AppShell() {
   const setMgmt = useAppStore((s) => s.setMgmt);
   const openSettings = useAppStore((s) => s.openSettings);
   const loaded = useAppStore((s) => s.loaded);
+  const loadTableTokens = useAppStore((s) => s.loadTableTokens);
   // Supabase設定時は、DB読込完了までダミーデータで操作させない
   const loading = isSupabaseConfigured() && !loaded;
 
@@ -31,6 +32,11 @@ export default function AppShell() {
   useEffect(() => {
     document.documentElement.style.setProperty("--accent", theme);
   }, [theme]);
+
+  // デモページの客タブ注文もセッション検証を通せるよう、qr_token を取得しておく
+  useEffect(() => {
+    loadTableTokens();
+  }, [loadTableTokens]);
 
   return (
     <div

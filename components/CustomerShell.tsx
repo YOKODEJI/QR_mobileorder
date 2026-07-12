@@ -17,11 +17,21 @@ export default function CustomerShell({ table }: { table?: string }) {
   const loaded = useAppStore((s) => s.loaded);
   const tables = useAppStore((s) => s.tables);
   const setCustomerTable = useAppStore((s) => s.setCustomerTable);
+  const setCustomerToken = useAppStore((s) => s.setCustomerToken);
+  const openSession = useAppStore((s) => s.openSession);
+  const customerToken = useAppStore((s) => s.customerToken);
+  const customerTableId = useAppStore((s) => s.customerTableId);
   const loading = isSupabaseConfigured() && !loaded;
 
   useEffect(() => {
     document.documentElement.style.setProperty("--accent", theme);
   }, [theme]);
+
+  // QRに埋め込んだ合言葉 ?k= を取り込む（=その卓の qr_token）
+  useEffect(() => {
+    const k = new URLSearchParams(window.location.search).get("k");
+    setCustomerToken(k);
+  }, [setCustomerToken]);
 
   // URLの [table] を実際の卓に解決（id一致 / 「テーブル N」/ 名前一致 / N番目）
   useEffect(() => {
@@ -33,6 +43,12 @@ export default function CustomerShell({ table }: { table?: string }) {
       tables[Number(table) - 1];
     if (t) setCustomerTable(t.id);
   }, [loading, table, tables, setCustomerTable]);
+
+  // 卓が決まり合言葉があれば来店セッションを開始（session_token 取得）
+  useEffect(() => {
+    if (loading || !customerToken || !customerTableId) return;
+    openSession();
+  }, [loading, customerToken, customerTableId, openSession]);
 
   return (
     <div

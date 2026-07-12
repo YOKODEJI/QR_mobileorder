@@ -105,6 +105,9 @@ interface AppState {
   staffCart: Record<string, number>;
   // テーブル
   customerTableId: string;
+  customerToken: string | null; // 客ページURLの ?k=（=その卓の qr_token）
+  sessionToken: string | null; // open_session で受け取った現在の席トークン
+  tableTokens: Record<string, string>; // 管理QR画面用: 卓id→qr_token
   tables: TableRec[];
   tableEditMode: boolean;
   editingTableId: string | null;
@@ -155,6 +158,10 @@ interface AppState {
   }) => void;
   setConnected: (v: boolean) => void;
   setCustomerTable: (id: string) => void;
+  setCustomerToken: (k: string | null) => void;
+  openSession: () => Promise<void>; // 現在の卓の session_token を取得
+  loadTableTokens: () => Promise<void>; // 管理QR画面用に qr_token 群を取得
+  regenerateToken: (id: string) => void; // QR再発行（印刷QR無効化）
 
   // ---- ヘルパー ----
   yen: (n: number) => string;
@@ -288,18 +295,20 @@ function decrementStock(menu: MenuItem[], items: OrderItem[]): MenuItem[] {
 
 type PlaceResult =
   | { ok: true; id: string }
-  | { ok: false; code: "out_of_stock" | "error"; message: string };
+  | { ok: false; code: "out_of_stock" | "session" | "rate_limited" | "error"; message: string };
 
-/** 注文の書き込み経路: フラグONならEdge Function、OFFなら直接insert */
+/** 注文の書き込み経路: フラグONならEdge Function、OFFなら直接insert。
+ *  token は客の session_token（proxy注文では null）。 */
 async function placeOrder(
   tableId: string,
   items: OrderItem[],
   proxy: boolean,
   idem: string,
-  menu: MenuItem[]
+  menu: MenuItem[],
+  token: string | null
 ): Promise<PlaceResult> {
   if (ORDER_VIA_FUNCTION) {
-    const res = await db.dbSubmitOrderViaFunction(tableId, items, proxy, idem);
+    const res = await db.dbSubmitOrderViaFunction(tableId, items, proxy, idem, token);
     return res.ok
       ? { ok: true, id: res.orderId }
       : { ok: false, code: res.code, message: res.message };
@@ -308,18 +317,34 @@ async function placeOrder(
   return id ? { ok: true, id } : { ok: false, code: "error", message: "insert failed" };
 }
 
-/** 注文エラーのダイアログ（売切れ / 通信失敗）。onConfirmで再試行 */
+/** 注文エラーのダイアログ（売切れ / セッション切れ / レート制限 / 通信失敗）。onConfirmで再試行 */
 function orderErrorDialog(
-  res: { code: "out_of_stock" | "error"; message: string },
+  res: { code: "out_of_stock" | "session" | "rate_limited" | "error"; message: string },
   onRetry: () => void
 ): DialogSpec {
-  const oos = res.code === "out_of_stock";
+  const map = {
+    out_of_stock: {
+      title: "売り切れです",
+      body: "申し訳ありません。ご注文の商品が売り切れになりました。内容を確認して、もう一度お試しください。",
+    },
+    session: {
+      title: "お手数ですが読み直してください",
+      body: "ご注文の受付が新しくなりました。恐れ入りますが、テーブルのQRコードをもう一度読み取ってからご注文ください。",
+    },
+    rate_limited: {
+      title: "少し時間をおいてください",
+      body: "短時間に注文が集中しました。数秒おいてから、もう一度お試しください。",
+    },
+    error: {
+      title: "送信できませんでした",
+      body: "注文を送信できませんでした。通信環境を確認して、もう一度お試しください。",
+    },
+  } as const;
+  const m = map[res.code] ?? map.error;
   return {
-    title: oos ? "売り切れです" : "送信できませんでした",
-    body: oos
-      ? "申し訳ありません。ご注文の商品が売り切れになりました。内容を確認して、もう一度お試しください。"
-      : "注文を送信できませんでした。通信環境を確認して、もう一度お試しください。",
-    confirmText: "再試行",
+    title: m.title,
+    body: m.body,
+    confirmText: "もう一度",
     danger: false,
     onConfirm: onRetry,
   };
@@ -343,6 +368,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   cart: {},
   staffCart: {},
   customerTableId: "t5",
+  customerToken: null,
+  sessionToken: null,
+  tableTokens: {},
   tables: [
     { id: "t1", name: "テーブル 1" },
     { id: "t2", name: "テーブル 2" },
@@ -468,6 +496,43 @@ export const useAppStore = create<AppState>((set, get) => ({
     }),
   setConnected: (v) => set({ connected: v }),
   setCustomerTable: (id) => set({ customerTableId: id }),
+  setCustomerToken: (k) => set({ customerToken: k }),
+
+  // 現在の卓の session_token を取得（客ページ=URLのk / 管理・デモ=取得済みqr_token）
+  openSession: async () => {
+    if (!isSupabaseConfigured()) return;
+    const s = get();
+    const tableId = s.customerTableId;
+    const k = s.customerToken ?? s.tableTokens[tableId];
+    if (!tableId || !k) return;
+    const token = await db.dbOpenSession(tableId, k);
+    if (token) set({ sessionToken: token });
+  },
+
+  // 管理QR画面用に各卓の qr_token を取得（QRのURL生成に使う）
+  loadTableTokens: async () => {
+    if (!isSupabaseConfigured()) return;
+    const map = await db.dbFetchTableTokens();
+    set({ tableTokens: map });
+  },
+
+  // QR再発行: qr_token/session_token を作り直し（印刷済みQRを無効化）
+  regenerateToken: (id) => {
+    set((s) => ({
+      dialog: {
+        title: (s.tableName(id) || "この卓") + " のQRを再発行",
+        body:
+          "新しいQRコードを発行します。印刷済みの古いQRはすべて使えなくなります。\n\n発行後、新しいQRを印刷して各卓に置き直してください。よろしいですか？",
+        confirmText: "再発行する",
+        danger: true,
+        onConfirm: async () => {
+          get().closeDialog();
+          const nw = await db.dbRegenerateToken(id);
+          if (nw) set((st) => ({ tableTokens: { ...st.tableTokens, [id]: nw } }));
+        },
+      },
+    }));
+  },
 
   // ---- ヘルパー ----
   yen: (n) => "¥" + Number(n).toLocaleString("ja-JP"),
@@ -551,8 +616,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     setTimeout(async () => {
       let id: string | null = null;
       if (configured) {
-        const res = await placeOrder(tableId, items, false, key, get().menu);
+        // セッション未取得なら開始（客ページ=URLのk / デモ=取得済みqr_token）
+        if (!get().sessionToken) await get().openSession();
+        const res = await placeOrder(tableId, items, false, key, get().menu, get().sessionToken);
         if (!res.ok) {
+          // セッション切れ（会計後 等）は次回に再取得できるようクリア
+          if (res.code === "session") set({ sessionToken: null });
           set({
             submitting: false,
             dialog: orderErrorDialog(res, () => {
@@ -593,7 +662,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const key = idem ?? newId();
     let id: string | null = null;
     if (configured) {
-      const res = await placeOrder(t, items, true, key, s.menu);
+      // スタッフ代理注文は認証済み経路。session_token 不要（proxy=true でサーバがスキップ）
+      const res = await placeOrder(t, items, true, key, s.menu, null);
       if (!res.ok) {
         set({
           dialog: orderErrorDialog(res, () => {
