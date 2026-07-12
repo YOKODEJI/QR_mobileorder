@@ -101,7 +101,7 @@ create or replace function close_table(
 ) returns uuid
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions  -- gen_random_bytes は extensions スキーマ
 as $$
 declare
   v_checkout uuid;
@@ -182,7 +182,7 @@ create or replace function regenerate_table_token(
 ) returns text
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions  -- gen_random_bytes は extensions スキーマ
 as $$
 declare
   v_new text;
