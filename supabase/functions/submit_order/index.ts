@@ -30,17 +30,26 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // proxy(スタッフ代理注文)は、本当にログイン済みスタッフからの呼び出しかを検証する。
-    // ここを信用してそのまま渡すと、anonキーだけで proxy:true を送りつけて
-    // 客注文のセッション検証/レート制限を丸ごとスキップできてしまう。
-    // 呼び出し元のAuthorizationヘッダを実際に検証し、ログイン済みでなければ強制的に false にする。
+    // proxy(スタッフ代理注文)は、本当にログイン済み"かつその店舗の"スタッフからの
+    // 呼び出しかを検証する。「ログイン済みなら誰でもOK」にすると、A店スタッフの
+    // 資格情報のままstoreIdだけB店に差し替えて代理注文を送りつけられてしまう
+    // （B店の客セッション検証/レート制限を丸ごとスキップできる抜け道）。
+    // 呼び出し元のAuthorizationヘッダを実際に検証し、そのユーザーのstaff.store_idが
+    // 今回のstoreIdと一致する場合のみ true にする。
     let effectiveProxy = false;
     if (proxy) {
       const authHeader = req.headers.get("Authorization") ?? "";
       const jwt = authHeader.replace(/^Bearer\s+/i, "");
       if (jwt) {
         const { data: userData } = await supabase.auth.getUser(jwt);
-        effectiveProxy = !!userData?.user;
+        if (userData?.user) {
+          const { data: staffRow } = await supabase
+            .from("staff")
+            .select("store_id")
+            .eq("user_id", userData.user.id)
+            .maybeSingle();
+          effectiveProxy = staffRow?.store_id === storeId;
+        }
       }
     }
 

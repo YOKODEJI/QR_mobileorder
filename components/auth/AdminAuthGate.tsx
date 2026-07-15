@@ -1,16 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
+import { getSupabase, isSupabaseConfigured, STORE_ID } from "@/lib/supabase";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 
-type AuthState = "loading" | "in" | "out";
+type AuthState = "loading" | "in" | "out" | "wrong-store";
 
 /**
  * /admin を保護する認証ゲート。
  * - Supabase未設定（ローカル開発）なら素通し。
  * - 設定済みならセッションを確認。未ログインならログインフォームを表示。
- * ※ これはUI層の保護。DBレベルの最終的な制御は RLS 厳格化（ステップ5）で行う。
+ * - ログイン済みでも、そのアカウントが「この店舗(STORE_ID)のスタッフ」でなければ
+ *   強制サインアウトしてアクセス拒否する（staff.user_id→store_id紐付け、
+ *   staff_store_id() RPC経由。1つのSupabaseプロジェクトを複数店舗で共有しても、
+ *   他店のスタッフ資格情報でこの店舗の管理画面に入れないようにするための多層防御）。
+ * ※ これはUI層の保護。DBレベルの最終的な制御はRLS（staff_store_id()ベース）で行う。
  */
 export default function AdminAuthGate({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>(
@@ -24,11 +28,25 @@ export default function AdminAuthGate({ children }: { children: React.ReactNode 
       return;
     }
     let mounted = true;
-    sb.auth.getSession().then(({ data }) => {
-      if (mounted) setState(data.session ? "in" : "out");
-    });
+
+    const checkStoreMatch = async (hasSession: boolean) => {
+      if (!hasSession) {
+        if (mounted) setState("out");
+        return;
+      }
+      const { data: storeId, error } = await sb.rpc("staff_store_id");
+      if (!mounted) return;
+      if (error || !storeId || storeId !== STORE_ID) {
+        await sb.auth.signOut();
+        if (mounted) setState("wrong-store");
+        return;
+      }
+      setState("in");
+    };
+
+    sb.auth.getSession().then(({ data }) => checkStoreMatch(!!data.session));
     const { data: sub } = sb.auth.onAuthStateChange((_e, session) => {
-      setState(session ? "in" : "out");
+      checkStoreMatch(!!session);
     });
     return () => {
       mounted = false;
@@ -37,14 +55,16 @@ export default function AdminAuthGate({ children }: { children: React.ReactNode 
   }, []);
 
   if (state === "loading") return <LoadingScreen label="認証を確認中…" />;
+  if (state === "wrong-store")
+    return <LoginForm initialError="このアカウントはこの店舗のスタッフとして登録されていません。" />;
   if (state === "out") return <LoginForm />;
   return <>{children}</>;
 }
 
-function LoginForm() {
+function LoginForm({ initialError }: { initialError?: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError ?? null);
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: React.FormEvent) => {

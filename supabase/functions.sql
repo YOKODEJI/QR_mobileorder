@@ -131,6 +131,10 @@ declare
   v_total int;
   v_result jsonb;
 begin
+  if p_store <> staff_store_id() then
+    raise exception 'forbidden: store mismatch';
+  end if;
+
   select * into v_store from stores where id = p_store;
   select name into v_name from tables where id = p_table and store_id = p_store;
 
@@ -238,6 +242,10 @@ as $$
 declare
   v_new text;
 begin
+  if p_store <> staff_store_id() then
+    raise exception 'forbidden: store mismatch';
+  end if;
+
   update tables
     set qr_token      = encode(gen_random_bytes(12), 'hex'),
         session_token = encode(gen_random_bytes(12), 'hex')
