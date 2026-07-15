@@ -100,16 +100,20 @@ end $$;
 -- 計算順序: 小計 → 割引 → チャージ料 → (外税なら)消費税。lib/pricing.ts と同じ式を維持すること。
 -- p_charge_enabled: チャージ料(stores.charge_rate)を今回の会計に適用するか。
 --   料率自体は設定に置いたまま、会計画面でその都度オンオフできるようにするための引数。
--- 旧シグネチャを破棄してから再定義（オーバーロード回避）。
+-- 戻り値: 確定した内訳をそのままjsonbで返す（checkoutsの行そのもの）。
+--   クライアントは自前で計算し直さず、この返り値をそのまま画面に表示すること
+--   （金額の唯一の正＝サーバー確定値。lib/pricing.tsの計算は「確定前のプレビュー」専用）。
+-- 旧シグネチャを破棄してから再定義（オーバーロード回避・戻り値の型変更も含む）。
 drop function if exists close_table(uuid, uuid);
 drop function if exists close_table(uuid, uuid, text, numeric);
+drop function if exists close_table(uuid, uuid, text, numeric, boolean);
 create or replace function close_table(
   p_store uuid,
   p_table uuid,
   p_discount_type text default null,
   p_discount_value numeric default 0,
   p_charge_enabled boolean default true
-) returns uuid
+) returns jsonb
 language plpgsql
 security definer
 set search_path = public, extensions  -- gen_random_bytes は extensions スキーマ
@@ -125,6 +129,7 @@ declare
   v_charge_amount int;
   v_tax_amount int;
   v_total int;
+  v_result jsonb;
 begin
   select * into v_store from stores where id = p_store;
   select name into v_name from tables where id = p_table and store_id = p_store;
@@ -179,6 +184,8 @@ begin
     )
     returning id into v_checkout;
 
+  select to_jsonb(c) into v_result from checkouts c where c.id = v_checkout;
+
   delete from orders where store_id = p_store and table_id = p_table;
   delete from staff_calls where store_id = p_store and table_id = p_table and resolved_at is null;
 
@@ -186,7 +193,7 @@ begin
   update tables set session_token = encode(gen_random_bytes(12), 'hex')
     where id = p_table and store_id = p_store;
 
-  return v_checkout;
+  return v_result;
 end $$;
 
 

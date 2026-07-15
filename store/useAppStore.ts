@@ -131,6 +131,8 @@ interface AppState {
   menu: MenuItem[];
   categories: string[]; // 動的カテゴリ一覧（並び順のまま）
   newCategoryName: string;
+  editingCategoryName: string | null; // リネーム中のカテゴリ（旧名で識別）
+  editCategoryNameValue: string;
   calls: StaffCall[];
   checkouts: CheckoutRecord[]; // 会計履歴（永続）
   // 厨房 / 接続
@@ -156,6 +158,8 @@ interface AppState {
   newStock: string;
   // 汎用ダイアログ
   dialog: DialogSpec | null;
+  // トースト通知（DB書込失敗など、モーダルにするほどではない非同期エラーの通知用）
+  toasts: { id: string; message: string }[];
 
   // ---- データ層（Supabase） ----
   hydrate: (snap: {
@@ -250,6 +254,9 @@ interface AppState {
   setNewCategoryName: (v: string) => void;
   addCategory: () => void;
   confirmDeleteCategory: (name: string) => void;
+  startEditCategory: (name: string) => void;
+  setEditCategoryNameValue: (v: string) => void;
+  saveEditCategory: () => void;
   // 並び替え
   dragStart: (id: string) => void;
   dragEnd: () => void;
@@ -266,6 +273,8 @@ interface AppState {
   closeSettings: () => void;
   toggleHistory: (v: boolean) => void;
   closeDialog: () => void;
+  pushToast: (message: string) => void;
+  dismissToast: (id: string) => void;
 }
 
 let audioCtx: AudioContext | null = null;
@@ -452,6 +461,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   ],
   categories: ["ドリンク", "一品料理", "刺身", "揚げ物", "〆", "その他"],
   newCategoryName: "",
+  editingCategoryName: null,
+  editCategoryNameValue: "",
   calls: [],
   checkouts: [
     {
@@ -508,6 +519,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   newPrice: "",
   newStock: "",
   dialog: null,
+  toasts: [],
   loaded: false,
 
   // ---- データ層（Supabase） ----
@@ -784,12 +796,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
     });
   },
-  callStaff: () => {
+  callStaff: async () => {
     const st = get();
     // 同一テーブルの未対応呼び出しが既にあれば重複させない
     if (st.calls.some((c) => c.table === st.customerTableId)) return;
     const tableId = st.customerTableId;
-    db.dbInsertCall(tableId);
+    const success = await db.dbInsertCall(tableId);
+    if (!success) {
+      get().pushToast("スタッフの呼び出しに失敗しました。もう一度お試しください。");
+      return;
+    }
     playBeep(st.soundOn);
     set((s) => ({
       calls: [...s.calls, { id: newId(), table: tableId, createdAt: new Date().toISOString() }],
@@ -812,9 +828,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
     });
   },
-  clearCall: (id) => {
-    db.dbResolveCall(id);
+  clearCall: async (id) => {
+    const prev = get().calls;
     set((st) => ({ calls: st.calls.filter((c) => c.id !== id) }));
+    const success = await db.dbResolveCall(id);
+    if (!success) {
+      set({ calls: prev });
+      get().pushToast("対応済みへの更新に失敗しました。もう一度お試しください。");
+    }
   },
 
   // ---- 厨房 ----
@@ -826,13 +847,20 @@ export const useAppStore = create<AppState>((set, get) => ({
         body: "この伝票を「" + to + "」に変更しますか？",
         confirmText: to + "にする",
         danger: false,
-        onConfirm: () => {
+        onConfirm: async () => {
           const next: Status = o.status === "cooking" ? "served" : "cooking";
-          db.dbSetOrderStatus(o.id, next);
+          const prevStatus = o.status;
           set((s) => ({
             orders: s.orders.map((x) => (x.id === o.id ? { ...x, status: next } : x)),
           }));
           get().closeDialog();
+          const success = await db.dbSetOrderStatus(o.id, next);
+          if (!success) {
+            set((s) => ({
+              orders: s.orders.map((x) => (x.id === o.id ? { ...x, status: prevStatus } : x)),
+            }));
+            get().pushToast("伝票の状態更新に失敗しました。もう一度お試しください。");
+          }
         },
       },
     });
@@ -895,7 +923,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
     });
   },
-  checkout: (discountType, discountValue, chargeEnabled) => {
+  checkout: async (discountType, discountValue, chargeEnabled) => {
     const s = get();
     const t = s.selectedStaffTable;
     if (t == null) return;
@@ -919,19 +947,40 @@ export const useAppStore = create<AppState>((set, get) => ({
     );
     const items = Object.values(agg);
     const tableName = s.tableName(t);
-    const b = computeCheckoutBreakdown(
-      subtotal,
-      discountType,
-      discountValue,
-      chargeEnabled ? s.settings.chargeRate : 0,
-      s.settings.taxMode,
-      s.settings.taxRate
-    );
-    // DBへ: 会計履歴を記録し、その卓の注文を削除
+    // 先にDBを確定させ、成功した場合のみローカル状態（会計履歴追加・注文削除）を反映する
+    // （金額が絡む操作のため、DB失敗時に会計済みに見えてしまう事態を避ける）。
+    // RPC経路(通常運用)ではサーバーが確定した内訳をそのまま使う。クライアントの
+    // computeCheckoutBreakdown は「確定前のプレビュー表示」専用で、ここでは再計算しない
+    // （金額の唯一の正はサーバー。丸め等が万一クライアントとズレても表示は必ずサーバー値になる）。
+    let record: CheckoutRecord | null;
     if (ORDER_VIA_FUNCTION) {
-      db.dbCloseTable(t, discountType, discountValue, chargeEnabled); // 1トランザクション（履歴INSERT+注文DELETE+呼出クリア）
+      record = await db.dbCloseTable(t, discountType, discountValue, chargeEnabled);
     } else {
-      db.dbCheckout({
+      // Edge Function/RPC未使用のローカル開発フォールバックのみ、ここで計算する
+      const b = computeCheckoutBreakdown(
+        subtotal,
+        discountType,
+        discountValue,
+        chargeEnabled ? s.settings.chargeRate : 0,
+        s.settings.taxMode,
+        s.settings.taxRate
+      );
+      const fallbackRecord: CheckoutRecord = {
+        id: newId(),
+        tableId: t,
+        tableName,
+        items,
+        count,
+        subtotal: b.subtotal,
+        discountType,
+        discountValue,
+        discountAmount: b.discountAmount,
+        chargeAmount: b.chargeAmount,
+        taxAmount: b.taxAmount,
+        total: b.total,
+        closedAt: new Date().toISOString(),
+      };
+      const dbOk = await db.dbCheckout({
         tableId: t,
         tableName,
         items,
@@ -944,22 +993,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         taxAmount: b.taxAmount,
         total: b.total,
       });
+      record = dbOk ? fallbackRecord : null;
     }
-    const record: CheckoutRecord = {
-      id: newId(),
-      tableId: t,
-      tableName,
-      items,
-      count,
-      subtotal: b.subtotal,
-      discountType,
-      discountValue,
-      discountAmount: b.discountAmount,
-      chargeAmount: b.chargeAmount,
-      taxAmount: b.taxAmount,
-      total: b.total,
-      closedAt: new Date().toISOString(),
-    };
+    if (!record) {
+      get().pushToast("お会計の確定に失敗しました。通信環境を確認し、もう一度お試しください。");
+      return;
+    }
     set((st) => ({
       checkouts: [record, ...st.checkouts],
       orders: st.orders.filter((o) => o.table !== t),
@@ -968,10 +1007,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       orderEditMode: false,
     }));
   },
-  cancelUnit: (menuItemId) => {
+  cancelUnit: async (menuItemId) => {
     const t = get().selectedStaffTable;
-    // DB用に取消前の orders/menu を渡す
-    db.dbCancelUnit(t ?? "", menuItemId, get().orders, get().menu);
+    // DB用に取消前の orders/menu を保持（失敗時の巻き戻しにも使う）
+    const prevOrders = get().orders;
+    const prevMenu = get().menu;
+    let changed = false;
     set((s) => {
       let done = false;
       const orders = s.orders
@@ -988,12 +1029,19 @@ export const useAppStore = create<AppState>((set, get) => ({
         })
         .filter((o) => o.items.length > 0);
       if (!done) return {};
+      changed = true;
       // 取消した1個ぶんは在庫を戻す（まだ提供前の想定）
       const menu = s.menu.map((m) =>
         m.id === menuItemId ? { ...m, stock: m.stock + 1 } : m
       );
       return { orders, menu };
     });
+    if (!changed) return;
+    const success = await db.dbCancelUnit(t ?? "", menuItemId, prevOrders, prevMenu);
+    if (!success) {
+      set({ orders: prevOrders, menu: prevMenu });
+      get().pushToast("取消の保存に失敗しました。もう一度お試しください。");
+    }
   },
   setTableEditMode: (v) =>
     set({
@@ -1007,7 +1055,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     const name = "テーブル " + (s.tables.length + 1);
     const sort = s.tables.length;
     // 並びは末尾に追加（データ順）。追加直後は視認性のため先頭にピン留めし、名前編集状態に。
-    const id = (await db.dbInsertTable(name, sort)) ?? newId();
+    const insertedId = await db.dbInsertTable(name, sort);
+    if (insertedId == null && isSupabaseConfigured()) {
+      get().pushToast("テーブルの追加に失敗しました。もう一度お試しください。");
+      return;
+    }
+    const id = insertedId ?? newId();
     set((st) => ({
       tables: [...st.tables, { id, name }],
       tableEditMode: true,
@@ -1021,27 +1074,33 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ editingTableId: id, editTableName: t ? t.name : "" });
   },
   setEditTableName: (v) => set({ editTableName: v }),
-  saveEditTable: () => {
+  saveEditTable: async () => {
     const id = get().editingTableId;
     if (id == null) return;
     const name = get().editTableName.trim() || "テーブル";
-    db.dbUpdateTableName(id, name);
+    const prevTables = get().tables;
     set((s) => ({
       tables: s.tables.map((t) => (t.id === id ? { ...t, name } : t)),
       editingTableId: null,
       justAddedTableId: null, // 確定したらピン留め解除→末尾の並びに落ち着く
     }));
+    const success = await db.dbUpdateTableName(id, name);
+    if (!success) {
+      set({ tables: prevTables });
+      get().pushToast("テーブル名の保存に失敗しました。もう一度お試しください。");
+    }
   },
   // テーブル並び替え（メニュー管理と同じD&D）
   dragStartTable: (id) => set({ dragTableId: id }),
   dragEndTable: () => set({ dragTableId: null }),
-  dropOnTable: (targetId) => {
+  dropOnTable: async (targetId) => {
     const s = get();
     const dragId = s.dragTableId;
     if (dragId == null || dragId === targetId) {
       set({ dragTableId: null });
       return;
     }
+    const prevTables = s.tables;
     const arr = [...s.tables];
     const from = arr.findIndex((t) => t.id === dragId);
     const to = arr.findIndex((t) => t.id === targetId);
@@ -1050,8 +1109,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
     arr.splice(to, 0, arr.splice(from, 1)[0]);
-    db.dbReorderTables(arr.map((t) => t.id));
     set({ tables: arr, dragTableId: null });
+    const success = await db.dbReorderTables(arr.map((t) => t.id));
+    if (!success) {
+      set({ tables: prevTables });
+      get().pushToast("テーブルの並び替えの保存に失敗しました。もう一度お試しください。");
+    }
   },
   confirmDeleteTable: (id) => {
     const s = get();
@@ -1059,8 +1122,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!t) return;
     const hasOrders = s.orders.some((o) => o.table === id);
     // 削除はQRを無効化する重い操作なので「2段階」で確認する
-    const doDelete = () => {
-      db.dbDeleteTable(id);
+    const doDelete = async () => {
+      set({ dialog: null });
+      const success = await db.dbDeleteTable(id);
+      if (!success) {
+        get().pushToast("テーブルの削除に失敗しました。もう一度お試しください。");
+        return;
+      }
       set((st) => ({
         tables: st.tables.filter((x) => x.id !== id),
         orders: st.orders.filter((o) => o.table !== id),
@@ -1070,7 +1138,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         editingTableId: null,
         justAddedTableId:
           st.justAddedTableId === id ? null : st.justAddedTableId,
-        dialog: null,
       }));
     };
     set({
@@ -1102,47 +1169,76 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // ---- メニュー管理 ----
-  setPrice: (id, val) => {
+  setPrice: async (id, val) => {
     const n = Math.max(0, parseInt(val, 10) || 0);
-    db.dbUpdateMenu(id, { price: n });
+    const prevMenu = get().menu;
     set((s) => ({ menu: s.menu.map((m) => (m.id === id ? { ...m, price: n } : m)) }));
+    const success = await db.dbUpdateMenu(id, { price: n });
+    if (!success) {
+      set({ menu: prevMenu });
+      get().pushToast("価格の保存に失敗しました。もう一度お試しください。");
+    }
   },
-  setStock: (id, val) => {
+  setStock: async (id, val) => {
     const n = Math.max(0, parseInt(val, 10) || 0);
-    db.dbUpdateMenu(id, { stock: n });
+    const prevMenu = get().menu;
     set((s) => ({ menu: s.menu.map((m) => (m.id === id ? { ...m, stock: n } : m)) }));
+    const success = await db.dbUpdateMenu(id, { stock: n });
+    if (!success) {
+      set({ menu: prevMenu });
+      get().pushToast("在庫の保存に失敗しました。もう一度お試しください。");
+    }
   },
-  bumpStock: (id, d) => {
+  bumpStock: async (id, d) => {
     const m0 = get().menu.find((m) => m.id === id);
     if (!m0) return;
     const n = Math.max(0, m0.stock + d);
-    db.dbUpdateMenu(id, { stock: n });
+    const prevMenu = get().menu;
     set((s) => ({
       menu: s.menu.map((m) => (m.id === id ? { ...m, stock: n } : m)),
     }));
+    const success = await db.dbUpdateMenu(id, { stock: n });
+    if (!success) {
+      set({ menu: prevMenu });
+      get().pushToast("在庫の保存に失敗しました。もう一度お試しください。");
+    }
   },
-  toggleSoldOut: (id) => {
+  toggleSoldOut: async (id) => {
     const m0 = get().menu.find((m) => m.id === id);
     if (!m0) return;
-    db.dbUpdateMenu(id, { sold_out: !m0.soldOut });
+    const prevMenu = get().menu;
     set((s) => ({
       menu: s.menu.map((m) => (m.id === id ? { ...m, soldOut: !m.soldOut } : m)),
     }));
+    const success = await db.dbUpdateMenu(id, { sold_out: !m0.soldOut });
+    if (!success) {
+      set({ menu: prevMenu });
+      get().pushToast("売切状態の保存に失敗しました。もう一度お試しください。");
+    }
   },
   setNewField: (k, v) => set({ [k]: v } as Pick<AppState, typeof k>),
   setNewCat: (c) => set({ newCat: c }),
-  setCat: (id, cat) => {
-    db.dbUpdateMenu(id, { cat });
+  setCat: async (id, cat) => {
+    const prevMenu = get().menu;
     set((s) => ({ menu: s.menu.map((m) => (m.id === id ? { ...m, cat } : m)) }));
+    const success = await db.dbUpdateMenu(id, { cat });
+    if (!success) {
+      set({ menu: prevMenu });
+      get().pushToast("カテゴリの保存に失敗しました。もう一度お試しください。");
+    }
   },
-  addItem: () => {
+  addItem: async () => {
     const s = get();
     const name = s.newName.trim();
     if (!name) return;
     const id = newId();
     const price = Math.max(0, parseInt(s.newPrice, 10) || 0);
     const stock = Math.max(0, parseInt(s.newStock, 10) || 0);
-    db.dbInsertMenu({ name, cat: s.newCat, price, stock, sort: s.menu.length });
+    const success = await db.dbInsertMenu({ name, cat: s.newCat, price, stock, sort: s.menu.length });
+    if (!success) {
+      get().pushToast("メニューの追加に失敗しました。もう一度お試しください。");
+      return;
+    }
     set((st) => ({
       menu: [
         ...st.menu,
@@ -1153,25 +1249,67 @@ export const useAppStore = create<AppState>((set, get) => ({
       newStock: "",
     }));
   },
-  setPhoto: (id, url) => {
-    db.dbUpdateMenu(id, { photo_url: url });
+  setPhoto: async (id, url) => {
+    const prevMenu = get().menu;
     set((s) => ({ menu: s.menu.map((m) => (m.id === id ? { ...m, photo: url } : m)) }));
+    const success = await db.dbUpdateMenu(id, { photo_url: url });
+    if (!success) {
+      set({ menu: prevMenu });
+      get().pushToast("写真の保存に失敗しました。もう一度お試しください。");
+    }
   },
-  removePhoto: (id) => {
-    db.dbUpdateMenu(id, { photo_url: null });
+  removePhoto: async (id) => {
+    const prevMenu = get().menu;
     set((s) => ({ menu: s.menu.map((m) => (m.id === id ? { ...m, photo: null } : m)) }));
+    const success = await db.dbUpdateMenu(id, { photo_url: null });
+    if (!success) {
+      set({ menu: prevMenu });
+      get().pushToast("写真の削除に失敗しました。もう一度お試しください。");
+    }
   },
 
   // ---- カテゴリ管理 ----
   setNewCategoryName: (v) => set({ newCategoryName: v }),
-  addCategory: () => {
+  addCategory: async () => {
     const s = get();
     const name = s.newCategoryName.trim();
     if (!name || s.categories.includes(name)) return;
-    db.dbInsertCategory(name, s.categories.length);
+    const success = await db.dbInsertCategory(name, s.categories.length);
+    if (!success) {
+      get().pushToast("カテゴリの追加に失敗しました。もう一度お試しください。");
+      return;
+    }
     set((st) => ({
       categories: [...st.categories, name],
       newCategoryName: "",
+    }));
+  },
+  startEditCategory: (name) => set({ editingCategoryName: name, editCategoryNameValue: name }),
+  setEditCategoryNameValue: (v) => set({ editCategoryNameValue: v }),
+  saveEditCategory: async () => {
+    const s = get();
+    const oldName = s.editingCategoryName;
+    if (oldName == null) return;
+    const newName = s.editCategoryNameValue.trim();
+    // 変更なし、空、他カテゴリと重複、または保護対象(その他)のリネームは何もしない
+    if (!newName || newName === oldName || s.categories.includes(newName) || oldName === "その他") {
+      set({ editingCategoryName: null, editCategoryNameValue: "" });
+      return;
+    }
+    set({ editingCategoryName: null, editCategoryNameValue: "" });
+    const success = await db.dbRenameCategory(oldName, newName);
+    if (!success) {
+      get().pushToast("カテゴリ名の変更に失敗しました。もう一度お試しください。");
+      return;
+    }
+    // DB側はFK(ON UPDATE CASCADE)でmenu_items.catを自動追従させる。ローカル状態も同様に更新する。
+    set((st) => ({
+      categories: st.categories.map((c) => (c === oldName ? newName : c)),
+      menu: st.menu.map((m) => (m.cat === oldName ? { ...m, cat: newName } : m)),
+      newCat: st.newCat === oldName ? newName : st.newCat,
+      adminCat: st.adminCat === oldName ? newName : st.adminCat,
+      customerCat: st.customerCat === oldName ? newName : st.customerCat,
+      proxyCat: st.proxyCat === oldName ? newName : st.proxyCat,
     }));
   },
   confirmDeleteCategory: (name) => {
@@ -1194,8 +1332,13 @@ export const useAppStore = create<AppState>((set, get) => ({
               body: "この操作は取り消せません。「" + name + "」を完全に削除しますか？",
               confirmText: "完全に削除",
               danger: true,
-              onConfirm: () => {
-                db.dbDeleteCategory(name);
+              onConfirm: async () => {
+                set({ dialog: null });
+                const success = await db.dbDeleteCategory(name);
+                if (!success) {
+                  get().pushToast("カテゴリの削除に失敗しました。もう一度お試しください。");
+                  return;
+                }
                 set((st) => ({
                   categories: st.categories.filter((c) => c !== name),
                   menu: st.menu.map((m) => (m.cat === name ? { ...m, cat: "その他" } : m)),
@@ -1203,7 +1346,6 @@ export const useAppStore = create<AppState>((set, get) => ({
                   adminCat: st.adminCat === name ? "すべて" : st.adminCat,
                   customerCat: st.customerCat === name ? "すべて" : st.customerCat,
                   proxyCat: st.proxyCat === name ? "すべて" : st.proxyCat,
-                  dialog: null,
                 }));
               },
             },
@@ -1216,7 +1358,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   // 並び替え
   dragStart: (id) => set({ dragId: id }),
   dragEnd: () => set({ dragId: null }),
-  dropOn: (targetId) => {
+  dropOn: async (targetId) => {
     const s = get();
     const dragId = s.dragId;
     if (!dragId || dragId === targetId) {
@@ -1240,8 +1382,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     const menu = s.menu.map((m) =>
       cat === "すべて" || m.cat === cat ? byId[filtered[k++]] : m
     );
-    db.dbReorderMenu(menu.map((m) => m.id));
+    const prevMenu = s.menu;
     set({ menu, dragId: null });
+    const success = await db.dbReorderMenu(menu.map((m) => m.id));
+    if (!success) {
+      set({ menu: prevMenu });
+      get().pushToast("並び替えの保存に失敗しました。もう一度お試しください。");
+    }
   },
 
   // 削除
@@ -1273,13 +1420,18 @@ export const useAppStore = create<AppState>((set, get) => ({
               body: "この操作は取り消せません。本当に " + n2 + " 件を削除しますか？",
               confirmText: "完全に削除",
               danger: true,
-              onConfirm: () => {
-                db.dbDeleteMenu(get().selectedIds);
+              onConfirm: async () => {
+                const ids = get().selectedIds;
+                set({ dialog: null });
+                const success = await db.dbDeleteMenu(ids);
+                if (!success) {
+                  get().pushToast("メニューの削除に失敗しました。もう一度お試しください。");
+                  return;
+                }
                 set((s) => ({
-                  menu: s.menu.filter((m) => !s.selectedIds.includes(m.id)),
+                  menu: s.menu.filter((m) => !ids.includes(m.id)),
                   selectedIds: [],
                   deleteMode: false,
-                  dialog: null,
                 }));
               },
             },
@@ -1290,7 +1442,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // ---- 設定 / ダイアログ ----
-  setSetting: (k, v) => {
+  setSetting: async (k, v) => {
     const col = {
       storeName: "name",
       theme: "theme",
@@ -1302,11 +1454,24 @@ export const useAppStore = create<AppState>((set, get) => ({
       taxRate: "tax_rate",
       chargeRate: "charge_rate",
     }[k];
-    db.dbUpdateStore({ [col]: v });
+    const prevSettings = get().settings;
     set((s) => ({ settings: { ...s.settings, [k]: v } }));
+    const success = await db.dbUpdateStore({ [col]: v });
+    if (!success) {
+      set({ settings: prevSettings });
+      get().pushToast("設定の保存に失敗しました。もう一度お試しください。");
+    }
   },
   openSettings: () => set({ showSettings: true }),
   closeSettings: () => set({ showSettings: false }),
   toggleHistory: (v) => set({ showHistory: v }),
   closeDialog: () => set({ dialog: null }),
+  pushToast: (message) => {
+    const id = newId();
+    set((s) => ({ toasts: [...s.toasts, { id, message }] }));
+    setTimeout(() => {
+      set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
+    }, 3500);
+  },
+  dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 }));

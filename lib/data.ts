@@ -151,6 +151,17 @@ export function subscribeConnection(onState: (connected: boolean) => void): () =
    書き込み
    ============================================================ */
 
+/** Supabaseクエリを実行し、エラーがあればログして false を返す（成功/未設定は true）。
+ *  呼び出し側(store)はこの戻り値で成否を判定し、失敗時はトースト表示や状態の巻き戻しを行う。 */
+async function ok(promise: PromiseLike<{ error: { message: string } | null }>, label: string): Promise<boolean> {
+  const { error } = await promise;
+  if (error) {
+    console.error(`${label}:`, error.message);
+    return false;
+  }
+  return true;
+}
+
 async function decrementStockDb(items: { menuItemId: string; qty: number }[], menu: MenuItem[]) {
   const sb = getSupabase();
   if (!sb) return;
@@ -282,16 +293,18 @@ export async function dbRegenerateToken(tableId: string): Promise<string | null>
 
 /** 会計を RPC `close_table` で1トランザクション確定（履歴INSERT+注文DELETE+呼出クリア）。
  *  割引はスタッフがその場で入力する値をそのまま渡す。チャージ料率はDB側のstores設定から
- *  計算するが、今回適用するかどうか(chargeEnabled)はその場で指定する。 */
+ *  計算するが、今回適用するかどうか(chargeEnabled)はその場で指定する。
+ *  金額の最終的な正はサーバーが計算するため、確定した内訳をそのまま返す
+ *  （呼び出し側はこれをそのまま表示し、自前で再計算しない）。 */
 export async function dbCloseTable(
   tableId: string,
   discountType: DiscountType,
   discountValue: number,
   chargeEnabled: boolean
-): Promise<boolean> {
+): Promise<CheckoutRecord | null> {
   const sb = getSupabase();
-  if (!sb || !STORE_ID) return false;
-  const { error } = await sb.rpc("close_table", {
+  if (!sb || !STORE_ID) return null;
+  const { data, error } = await sb.rpc("close_table", {
     p_store: STORE_ID,
     p_table: tableId,
     p_discount_type: discountType,
@@ -300,15 +313,31 @@ export async function dbCloseTable(
   });
   if (error) {
     console.error("dbCloseTable:", error.message);
-    return false;
+    return null;
   }
-  return true;
+  if (!data) return null; // 対象の注文が無かった場合（v_count=0）
+  const c = data as Record<string, unknown>;
+  return {
+    id: c.id as string,
+    tableId: (c.table_id as string) ?? "",
+    tableName: c.table_name as string,
+    items: (c.items as OrderItem[]) ?? [],
+    count: c.count as number,
+    subtotal: c.subtotal as number,
+    discountType: (c.discount_type as DiscountType) ?? null,
+    discountValue: (c.discount_value as number) ?? 0,
+    discountAmount: (c.discount_amount as number) ?? 0,
+    chargeAmount: (c.charge_amount as number) ?? 0,
+    taxAmount: (c.tax_amount as number) ?? 0,
+    total: c.total as number,
+    closedAt: c.closed_at as string,
+  };
 }
 
-export async function dbSetOrderStatus(orderId: string, status: "cooking" | "served") {
+export async function dbSetOrderStatus(orderId: string, status: "cooking" | "served"): Promise<boolean> {
   const sb = getSupabase();
-  if (!sb) return;
-  await sb.from("orders").update({ status }).eq("id", orderId);
+  if (!sb) return true;
+  return ok(sb.from("orders").update({ status }).eq("id", orderId), "dbSetOrderStatus");
 }
 
 /** 会計（Edge Function未使用時の直接書込フォールバック）: 会計履歴を記録し、その卓の注文を削除 */
@@ -324,118 +353,161 @@ export async function dbCheckout(record: {
   chargeAmount: number;
   taxAmount: number;
   total: number;
-}) {
+}): Promise<boolean> {
   const sb = getSupabase();
-  if (!sb || !STORE_ID) return;
-  await sb.from("checkouts").insert({
-    store_id: STORE_ID,
-    table_id: record.tableId,
-    table_name: record.tableName,
-    items: record.items,
-    count: record.count,
-    subtotal: record.subtotal,
-    discount_type: record.discountType,
-    discount_value: record.discountValue,
-    discount_amount: record.discountAmount,
-    charge_amount: record.chargeAmount,
-    tax_amount: record.taxAmount,
-    total: record.total,
-  });
-  await sb.from("orders").delete().eq("store_id", STORE_ID).eq("table_id", record.tableId);
-  await sb.from("staff_calls").delete().eq("store_id", STORE_ID).eq("table_id", record.tableId).is("resolved_at", null);
+  if (!sb || !STORE_ID) return true;
+  const r1 = await ok(
+    sb.from("checkouts").insert({
+      store_id: STORE_ID,
+      table_id: record.tableId,
+      table_name: record.tableName,
+      items: record.items,
+      count: record.count,
+      subtotal: record.subtotal,
+      discount_type: record.discountType,
+      discount_value: record.discountValue,
+      discount_amount: record.discountAmount,
+      charge_amount: record.chargeAmount,
+      tax_amount: record.taxAmount,
+      total: record.total,
+    }),
+    "dbCheckout(insert)"
+  );
+  const r2 = await ok(
+    sb.from("orders").delete().eq("store_id", STORE_ID).eq("table_id", record.tableId),
+    "dbCheckout(delete orders)"
+  );
+  const r3 = await ok(
+    sb.from("staff_calls").delete().eq("store_id", STORE_ID).eq("table_id", record.tableId).is("resolved_at", null),
+    "dbCheckout(delete calls)"
+  );
+  return r1 && r2 && r3;
 }
 
 /** 明細を1個取消（対象卓の最初の該当明細を減算/削除し、在庫を1戻す） */
-export async function dbCancelUnit(tableId: string, menuItemId: string, orders: Order[], menu: MenuItem[]) {
+export async function dbCancelUnit(tableId: string, menuItemId: string, orders: Order[], menu: MenuItem[]): Promise<boolean> {
   const sb = getSupabase();
-  if (!sb) return;
+  if (!sb) return true;
   // 対象卓の注文から、該当 menu_item の order_item を1件特定
   const target = orders
     .filter((o) => o.table === tableId)
     .flatMap((o) => o.items.map((it) => ({ orderId: o.id, it })))
     .find((x) => x.it.menuItemId === menuItemId);
-  if (!target) return;
+  if (!target) return true; // 対象なし＝ローカル状態と既に一致（失敗ではない）
   // order_items の該当行を取得（order_id + menu_item_id）
-  const { data } = await sb
+  const { data, error: selErr } = await sb
     .from("order_items")
     .select("id,qty")
     .eq("order_id", target.orderId)
     .eq("menu_item_id", menuItemId)
     .limit(1);
+  if (selErr) {
+    console.error("dbCancelUnit(select):", selErr.message);
+    return false;
+  }
   const row = data?.[0];
-  if (!row) return;
+  if (!row) return true;
+  let stepOk: boolean;
   if ((row.qty as number) > 1) {
-    await sb.from("order_items").update({ qty: (row.qty as number) - 1 }).eq("id", row.id as string);
+    stepOk = await ok(
+      sb.from("order_items").update({ qty: (row.qty as number) - 1 }).eq("id", row.id as string),
+      "dbCancelUnit(update qty)"
+    );
   } else {
-    await sb.from("order_items").delete().eq("id", row.id as string);
+    stepOk = await ok(sb.from("order_items").delete().eq("id", row.id as string), "dbCancelUnit(delete item)");
     // その注文に明細が残っていなければ注文ごと削除
     const { count } = await sb.from("order_items").select("*", { count: "exact", head: true }).eq("order_id", target.orderId);
-    if (!count) await sb.from("orders").delete().eq("id", target.orderId);
+    if (!count) stepOk = (await ok(sb.from("orders").delete().eq("id", target.orderId), "dbCancelUnit(delete order)")) && stepOk;
   }
   // 在庫を1戻す
   const m = menu.find((x) => x.id === menuItemId);
-  if (m) await sb.from("menu_items").update({ stock: m.stock + 1 }).eq("id", menuItemId);
+  const stockOk = m
+    ? await ok(sb.from("menu_items").update({ stock: m.stock + 1 }).eq("id", menuItemId), "dbCancelUnit(restock)")
+    : true;
+  return stepOk && stockOk;
 }
 
-export async function dbInsertCall(tableId: string) {
+export async function dbInsertCall(tableId: string): Promise<boolean> {
   const sb = getSupabase();
-  if (!sb || !STORE_ID) return;
-  await sb.from("staff_calls").insert({ store_id: STORE_ID, table_id: tableId });
+  if (!sb || !STORE_ID) return true;
+  return ok(sb.from("staff_calls").insert({ store_id: STORE_ID, table_id: tableId }), "dbInsertCall");
 }
 
-export async function dbResolveCall(callId: string) {
+export async function dbResolveCall(callId: string): Promise<boolean> {
   const sb = getSupabase();
-  if (!sb) return;
-  await sb.from("staff_calls").update({ resolved_at: new Date().toISOString() }).eq("id", callId);
+  if (!sb) return true;
+  return ok(sb.from("staff_calls").update({ resolved_at: new Date().toISOString() }).eq("id", callId), "dbResolveCall");
 }
 
 /* ---- 店舗設定 ---- */
-export async function dbUpdateStore(patch: Record<string, unknown>) {
+export async function dbUpdateStore(patch: Record<string, unknown>): Promise<boolean> {
   const sb = getSupabase();
-  if (!sb || !STORE_ID) return;
-  await sb.from("stores").update(patch).eq("id", STORE_ID);
+  if (!sb || !STORE_ID) return true;
+  return ok(sb.from("stores").update(patch).eq("id", STORE_ID), "dbUpdateStore");
 }
 
 /* ---- メニュー管理 ---- */
-export async function dbUpdateMenu(id: string, patch: Record<string, unknown>) {
+export async function dbUpdateMenu(id: string, patch: Record<string, unknown>): Promise<boolean> {
   const sb = getSupabase();
-  if (!sb) return;
-  await sb.from("menu_items").update(patch).eq("id", id);
+  if (!sb) return true;
+  return ok(sb.from("menu_items").update(patch).eq("id", id), "dbUpdateMenu");
 }
 
-export async function dbInsertMenu(item: { name: string; cat: string; price: number; stock: number; sort: number }) {
+export async function dbInsertMenu(item: { name: string; cat: string; price: number; stock: number; sort: number }): Promise<boolean> {
   const sb = getSupabase();
-  if (!sb || !STORE_ID) return;
-  await sb.from("menu_items").insert({ store_id: STORE_ID, sold_out: false, ...item });
+  if (!sb || !STORE_ID) return true;
+  return ok(sb.from("menu_items").insert({ store_id: STORE_ID, sold_out: false, ...item }), "dbInsertMenu");
 }
 
-export async function dbDeleteMenu(ids: string[]) {
+export async function dbDeleteMenu(ids: string[]): Promise<boolean> {
   const sb = getSupabase();
-  if (!sb) return;
-  await sb.from("menu_items").delete().in("id", ids);
+  if (!sb) return true;
+  return ok(sb.from("menu_items").delete().in("id", ids), "dbDeleteMenu");
 }
 
-export async function dbReorderMenu(idsInOrder: string[]) {
+export async function dbReorderMenu(idsInOrder: string[]): Promise<boolean> {
   const sb = getSupabase();
-  if (!sb) return;
-  await Promise.all(idsInOrder.map((id, i) => sb.from("menu_items").update({ sort: i }).eq("id", id)));
+  if (!sb) return true;
+  const results = await Promise.all(
+    idsInOrder.map((id, i) => ok(sb.from("menu_items").update({ sort: i }).eq("id", id), "dbReorderMenu"))
+  );
+  return results.every(Boolean);
 }
 
 /* ---- カテゴリ管理 ---- */
-export async function dbInsertCategory(name: string, sort: number) {
+export async function dbInsertCategory(name: string, sort: number): Promise<boolean> {
   const sb = getSupabase();
-  if (!sb || !STORE_ID) return;
-  await sb.from("categories").insert({ store_id: STORE_ID, name, sort });
+  if (!sb || !STORE_ID) return true;
+  return ok(sb.from("categories").insert({ store_id: STORE_ID, name, sort }), "dbInsertCategory");
+}
+
+/** カテゴリ名を変更。menu_items.cat への複合FK(ON UPDATE CASCADE)により、
+ *  紐づくメニューのカテゴリはDB側で自動的に追従する（アプリ側での付け替えは不要）。 */
+export async function dbRenameCategory(oldName: string, newName: string): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return true;
+  return ok(
+    sb.from("categories").update({ name: newName }).eq("store_id", STORE_ID).eq("name", oldName),
+    "dbRenameCategory"
+  );
 }
 
 /** カテゴリを削除。先にそのカテゴリのメニューを「その他」へ書き換えてから削除する */
-export async function dbDeleteCategory(name: string) {
+export async function dbDeleteCategory(name: string): Promise<boolean> {
   const sb = getSupabase();
-  if (!sb || !STORE_ID) return;
+  if (!sb || !STORE_ID) return true;
+  let reassignOk = true;
   if (name !== "その他") {
-    await sb.from("menu_items").update({ cat: "その他" }).eq("store_id", STORE_ID).eq("cat", name);
+    reassignOk = await ok(
+      sb.from("menu_items").update({ cat: "その他" }).eq("store_id", STORE_ID).eq("cat", name),
+      "dbDeleteCategory(reassign)"
+    );
   }
-  await sb.from("categories").delete().eq("store_id", STORE_ID).eq("name", name);
+  const deleteOk = await ok(
+    sb.from("categories").delete().eq("store_id", STORE_ID).eq("name", name),
+    "dbDeleteCategory(delete)"
+  );
+  return reassignOk && deleteOk;
 }
 
 /* ---- テーブル ---- */
@@ -447,20 +519,23 @@ export async function dbInsertTable(name: string, sort: number): Promise<string 
   return (data?.id as string) ?? null;
 }
 
-export async function dbUpdateTableName(id: string, name: string) {
+export async function dbUpdateTableName(id: string, name: string): Promise<boolean> {
   const sb = getSupabase();
-  if (!sb) return;
-  await sb.from("tables").update({ name }).eq("id", id);
+  if (!sb) return true;
+  return ok(sb.from("tables").update({ name }).eq("id", id), "dbUpdateTableName");
 }
 
-export async function dbDeleteTable(id: string) {
+export async function dbDeleteTable(id: string): Promise<boolean> {
   const sb = getSupabase();
-  if (!sb) return;
-  await sb.from("tables").delete().eq("id", id);
+  if (!sb) return true;
+  return ok(sb.from("tables").delete().eq("id", id), "dbDeleteTable");
 }
 
-export async function dbReorderTables(idsInOrder: string[]) {
+export async function dbReorderTables(idsInOrder: string[]): Promise<boolean> {
   const sb = getSupabase();
-  if (!sb) return;
-  await Promise.all(idsInOrder.map((id, i) => sb.from("tables").update({ sort: i }).eq("id", id)));
+  if (!sb) return true;
+  const results = await Promise.all(
+    idsInOrder.map((id, i) => ok(sb.from("tables").update({ sort: i }).eq("id", id), "dbReorderTables"))
+  );
+  return results.every(Boolean);
 }

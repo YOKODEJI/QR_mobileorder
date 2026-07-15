@@ -64,26 +64,33 @@ create table if not exists table_sessions (
 
 -- ---- カテゴリ（メニュー分類。店舗ごとに増減可能） -----------
 -- 「その他」は削除不可のフォールバック（UI側で保護。カテゴリ削除時、そのカテゴリの
--- menu_items.cat は「その他」へ書き換える）。
+-- menu_items.cat は「その他」へ書き換える。DB側もON DELETE RESTRICTで裏付ける）。
 create table if not exists categories (
   id       uuid primary key default gen_random_uuid(),
   store_id uuid not null references stores(id) on delete cascade,
   name     text not null,
-  sort     int not null default 0
+  sort     int not null default 0,
+  constraint categories_store_name_key unique (store_id, name)
 );
-create unique index if not exists idx_categories_store_name on categories(store_id, name);
 
 -- ---- メニュー ----------------------------------------------
+-- cat: categories(store_id, name) への複合FK。
+--   ON UPDATE CASCADE  … カテゴリ名を変更(rename)すると全メニューのcatが自動追従する
+--   ON DELETE RESTRICT … カテゴリ削除は、先にmenu_itemsの再割当て(→その他)が済んでいないと拒否される
 create table if not exists menu_items (
   id         uuid primary key default gen_random_uuid(),
   store_id   uuid not null references stores(id) on delete cascade,
   name       text not null,
-  cat        text not null,          -- categories.name を自由入力で参照（FK制約は無し）
+  cat        text not null default 'その他',
   price      int not null default 0, -- 1円単位
   sold_out   boolean not null default false,
   stock      int not null default 0,
   photo_url  text,
-  sort       int not null default 0
+  sort       int not null default 0,
+  constraint menu_items_cat_fkey foreign key (store_id, cat)
+    references categories(store_id, name)
+    on update cascade
+    on delete restrict
 );
 
 -- ---- 注文（伝票） ------------------------------------------

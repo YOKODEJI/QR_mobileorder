@@ -5,6 +5,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import CustomerOrder from "@/components/customer/CustomerOrder";
 import AlertDialog from "@/components/ui/AlertDialog";
+import Toast from "@/components/ui/Toast";
 import SupabaseSync from "@/components/SupabaseSync";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 
@@ -67,6 +68,7 @@ export default function CustomerShell({ table }: { table?: string }) {
       </main>
       <SupabaseSync />
       <AlertDialog />
+      <Toast />
     </div>
   );
 }

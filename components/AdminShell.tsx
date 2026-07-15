@@ -6,6 +6,7 @@ import { isSupabaseConfigured, getSupabase } from "@/lib/supabase";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 import SettingsSheet from "@/components/settings/SettingsSheet";
 import AlertDialog from "@/components/ui/AlertDialog";
+import Toast from "@/components/ui/Toast";
 import KitchenDisplay from "@/components/kitchen/KitchenDisplay";
 import StaffCheckout from "@/components/staff/StaffCheckout";
 import MenuManagement from "@/components/menu/MenuManagement";
@@ -40,7 +41,6 @@ export default function AdminShell() {
         display: "flex",
         flexDirection: "column",
         letterSpacing: ".01em",
-        zoom: 1.07,
       }}
     >
       <header
@@ -130,6 +130,7 @@ export default function AdminShell() {
       <SupabaseSync />
       <SettingsSheet />
       <AlertDialog />
+      <Toast />
     </div>
   );
 }
