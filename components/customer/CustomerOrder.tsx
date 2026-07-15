@@ -4,6 +4,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import ChipRow from "@/components/ui/ChipRow";
 import { hm, useNow } from "@/lib/time";
+import { priceWithTax } from "@/lib/pricing";
 import {
   itemCardStyle,
   addBtnStyle,
@@ -58,22 +59,18 @@ export default function CustomerOrder() {
   );
 
   return (
-    <div style={{ display: "flex", justifyContent: "center", padding: "26px 16px 40px" }}>
-      <div
-        style={{
-          width: "394px",
-          maxWidth: "100%",
-          height: "800px",
-          background: "#fff",
-          borderRadius: "44px",
-          boxShadow: "0 30px 70px rgba(0,0,0,.22), 0 0 0 1px rgba(0,0,0,.04)",
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column",
-          position: "relative",
-        }}
-      >
-        {/* ヘッダーバンド */}
+    <div
+      style={{
+        flex: 1,
+        width: "100%",
+        background: "#fff",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        position: "relative",
+      }}
+    >
+      {/* ヘッダーバンド */}
         <div style={{ background: accent, color: "#fff", padding: "22px 20px 18px", flexShrink: 0 }}>
           <div
             style={{
@@ -278,6 +275,11 @@ export default function CustomerOrder() {
           >
             {s.submitting ? "送信中…" : "注文する"}
           </button>
+          <div style={{ textAlign: "center", fontSize: "10px", color: "#a0a0a5", marginTop: "8px" }}>
+            {s.settings.taxMode === "exclusive"
+              ? `表示価格は税抜です（税込 ${s.yen(priceWithTax(cartTotal, "exclusive", s.settings.taxRate))}）`
+              : "表示価格は税込です"}
+          </div>
         </div>
 
         {/* 注文成功オーバーレイ */}
@@ -440,7 +442,6 @@ export default function CustomerOrder() {
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }

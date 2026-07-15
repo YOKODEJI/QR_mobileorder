@@ -35,6 +35,15 @@ begin
   insert into tables (store_id, name, sort) values
     (v_store,'個室 松',8) returning id into v_tk;
 
+  -- カテゴリ
+  insert into categories (store_id,name,sort) values
+    (v_store,'ドリンク',1),
+    (v_store,'一品料理',2),
+    (v_store,'刺身',3),
+    (v_store,'揚げ物',4),
+    (v_store,'〆',5),
+    (v_store,'その他',6);
+
   -- メニュー
   insert into menu_items (store_id,name,cat,price,sold_out,stock,sort) values
     (v_store,'生ビール','ドリンク',550,false,80,1) returning id into v_beer;

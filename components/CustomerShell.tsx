@@ -53,17 +53,16 @@ export default function CustomerShell({ table }: { table?: string }) {
   return (
     <div
       style={{
-        minHeight: "100vh",
+        minHeight: "100dvh",
         background: "#f2f2f7",
         fontFamily: FONT,
         color: "#1c1c1e",
         display: "flex",
         flexDirection: "column",
         letterSpacing: ".01em",
-        zoom: 1.07,
       }}
     >
-      <main style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+      <main style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
         {loading ? <LoadingScreen /> : <CustomerOrder />}
       </main>
       <SupabaseSync />

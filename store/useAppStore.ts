@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import * as db from "@/lib/data";
 import { isSupabaseConfigured, ORDER_VIA_FUNCTION } from "@/lib/supabase";
+import { computeCheckoutBreakdown } from "@/lib/pricing";
 
 /** 新規エンティティのID: 未設定uuid。Supabase書き込みが返すidがあればそちらを優先 */
 function newId(): string {
@@ -14,8 +15,9 @@ function newId(): string {
 /* ============================================================
    型定義（_planning/02-data-model.md 準拠。M1はローカル状態）
    ============================================================ */
-export type Cat = "ドリンク" | "一品料理" | "刺身" | "揚げ物" | "〆";
-export type CatFilter = "すべて" | Cat;
+// カテゴリは店舗ごとに増減可能な動的な値（DBの categories テーブルで管理）。
+export type Cat = string;
+export type CatFilter = string; // "すべて" | 実際のカテゴリ名
 export type Status = "cooking" | "served";
 
 export interface MenuItem {
@@ -55,6 +57,8 @@ export interface StaffCall {
   createdAt: string;
 }
 
+export type DiscountType = "percent" | "amount" | null;
+
 /** 会計履歴（セッション締め時のスナップショット。永続的に閲覧可能） */
 export interface CheckoutRecord {
   id: string;
@@ -62,9 +66,17 @@ export interface CheckoutRecord {
   tableName: string; // 会計時点の卓名スナップショット（後で改名/削除されても残す）
   items: OrderItem[]; // 品目名で集約済みのスナップショット
   count: number;
-  total: number;
+  subtotal: number; // 品目合計（割引/チャージ料/税を引く前）
+  discountType: DiscountType;
+  discountValue: number; // discountTypeが percent なら%、amount なら円
+  discountAmount: number; // 実際に引かれた円額
+  chargeAmount: number; // チャージ料（円）
+  taxAmount: number; // 消費税額（外税のときのみ0超）
+  total: number; // 最終合計
   closedAt: string; // ISO
 }
+
+export type TaxMode = "inclusive" | "exclusive"; // 内税 / 外税
 
 export interface Settings {
   storeName: string;
@@ -73,6 +85,9 @@ export interface Settings {
   showFooterPhoto: boolean;
   headerPhoto: string | null;
   footerPhoto: string | null;
+  taxMode: TaxMode;
+  taxRate: number; // 外税のときの消費税率（%）
+  chargeRate: number; // チャージ料（%）。0なら無し
 }
 
 export interface DialogSpec {
@@ -83,16 +98,13 @@ export interface DialogSpec {
   onConfirm: () => void;
 }
 
-export const CATS: Cat[] = ["ドリンク", "一品料理", "刺身", "揚げ物", "〆"];
-export const CAT_FILTERS: CatFilter[] = ["すべて", ...CATS];
-
 /* ============================================================
    状態 + アクション
    ============================================================ */
 interface AppState {
   // ナビ
   topTab: "customer" | "mgmt";
-  mgmtTab: "kitchen" | "staff" | "menu" | "history" | "qr";
+  mgmtTab: "kitchen" | "staff" | "menu" | "history";
   // 設定
   settings: Settings;
   showSettings: boolean;
@@ -117,6 +129,8 @@ interface AppState {
   // 業務データ
   orders: Order[];
   menu: MenuItem[];
+  categories: string[]; // 動的カテゴリ一覧（並び順のまま）
+  newCategoryName: string;
   calls: StaffCall[];
   checkouts: CheckoutRecord[]; // 会計履歴（永続）
   // 厨房 / 接続
@@ -130,6 +144,7 @@ interface AppState {
   justOrdered: boolean;
   showHistory: boolean;
   selectedStaffTable: string | null;
+  orderEditMode: boolean; // 注文明細の取消は誤操作防止のためこのモードでのみ可能
   // メニュー管理
   deleteMode: boolean;
   selectedIds: string[];
@@ -150,6 +165,10 @@ interface AppState {
     showFooterPhoto: boolean;
     headerPhoto: string | null;
     footerPhoto: string | null;
+    taxMode: TaxMode | null;
+    taxRate: number | null;
+    chargeRate: number | null;
+    categories: string[];
     tables: TableRec[];
     menu: MenuItem[];
     orders: Order[];
@@ -200,9 +219,11 @@ interface AppState {
 
   // ---- 会計 / テーブル ----
   selectStaffTable: (id: string) => void;
-  confirmCheckout: () => void;
-  checkout: () => void;
+  confirmCheckout: (discountType: DiscountType, discountValue: number, chargeEnabled: boolean) => void;
+  checkout: (discountType: DiscountType, discountValue: number, chargeEnabled: boolean) => void;
   cancelUnit: (menuItemId: string) => void;
+  setOrderEditMode: (v: boolean) => void;
+  confirmFinishOrderEdit: () => void;
   setTableEditMode: (v: boolean) => void;
   addTable: () => void;
   startEditTable: (id: string) => void;
@@ -221,9 +242,14 @@ interface AppState {
   toggleSoldOut: (id: string) => void;
   setNewField: (k: "newName" | "newPrice" | "newStock", v: string) => void;
   setNewCat: (c: Cat) => void;
+  setCat: (id: string, cat: string) => void;
   addItem: () => void;
   setPhoto: (id: string, url: string) => void;
   removePhoto: (id: string) => void;
+  // カテゴリ管理
+  setNewCategoryName: (v: string) => void;
+  addCategory: () => void;
+  confirmDeleteCategory: (name: string) => void;
   // 並び替え
   dragStart: (id: string) => void;
   dragEnd: () => void;
@@ -360,6 +386,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     showFooterPhoto: false,
     headerPhoto: null,
     footerPhoto: null,
+    taxMode: "inclusive",
+    taxRate: 10,
+    chargeRate: 0,
   },
   showSettings: false,
   customerCat: "すべて",
@@ -421,6 +450,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     { id: "potato", name: "ポテトフライ", cat: "揚げ物", price: 420, soldOut: false, stock: 25, photo: null },
     { id: "ramen", name: "締めのラーメン", cat: "〆", price: 780, soldOut: false, stock: 20, photo: null },
   ],
+  categories: ["ドリンク", "一品料理", "刺身", "揚げ物", "〆", "その他"],
+  newCategoryName: "",
   calls: [],
   checkouts: [
     {
@@ -433,6 +464,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         { menuItemId: "edamame", name: "枝豆", qty: 1, price: 380 },
       ],
       count: 6,
+      subtotal: 3190,
+      discountType: null,
+      discountValue: 0,
+      discountAmount: 0,
+      chargeAmount: 0,
+      taxAmount: 0,
       total: 3190,
       closedAt: new Date(Date.now() - 95 * 60000).toISOString(),
     },
@@ -445,6 +482,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         { menuItemId: "ramen", name: "締めのラーメン", qty: 2, price: 780 },
       ],
       count: 4,
+      subtotal: 2460,
+      discountType: null,
+      discountValue: 0,
+      discountAmount: 0,
+      chargeAmount: 0,
+      taxAmount: 0,
       total: 2460,
       closedAt: new Date(Date.now() - 40 * 60000).toISOString(),
     },
@@ -456,6 +499,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   justOrdered: false,
   showHistory: false,
   selectedStaffTable: null,
+  orderEditMode: false,
   deleteMode: false,
   selectedIds: [],
   dragId: null,
@@ -467,7 +511,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   loaded: false,
 
   // ---- データ層（Supabase） ----
-  hydrate: (snap) =>
+  hydrate: (snap) => {
+    // 厨房の通知音: 初回ロードでは鳴らさず、以後に他端末から届いた新規の調理中注文だけで鳴らす
+    const prev = get();
+    const prevOrderIds = new Set(prev.orders.map((o) => o.id));
+    const hasNewCookingOrder = snap.orders.some(
+      (o) => o.status === "cooking" && !prevOrderIds.has(o.id)
+    );
+    const shouldBeep = prev.loaded && prev.soundOn && hasNewCookingOrder;
+
     set((s) => {
       // customerTableId をロードした卓に合わせる（QR未実装のデモは「テーブル 5」→先頭の順で選択）
       const preferred =
@@ -484,16 +536,24 @@ export const useAppStore = create<AppState>((set, get) => ({
           showFooterPhoto: snap.showFooterPhoto,
           headerPhoto: snap.headerPhoto,
           footerPhoto: snap.footerPhoto,
+          taxMode: snap.taxMode ?? s.settings.taxMode,
+          taxRate: snap.taxRate ?? s.settings.taxRate,
+          chargeRate: snap.chargeRate ?? s.settings.chargeRate,
         },
         tables: snap.tables,
         menu: snap.menu,
+        categories: snap.categories.length > 0 ? snap.categories : s.categories,
+        newCat: snap.categories.includes(s.newCat) ? s.newCat : (snap.categories[0] ?? s.newCat),
         orders: snap.orders,
         calls: snap.calls,
         checkouts: snap.checkouts,
         customerTableId,
         loaded: true,
       };
-    }),
+    });
+
+    if (shouldBeep) playBeep(true);
+  },
   setConnected: (v) => set({ connected: v }),
   setCustomerTable: (id) => set({ customerTableId: id }),
   setCustomerToken: (k) => set({ customerToken: k }),
@@ -518,17 +578,30 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // QR再発行: qr_token/session_token を作り直し（印刷済みQRを無効化）
   regenerateToken: (id) => {
+    const doRegenerate = async () => {
+      get().closeDialog();
+      const nw = await db.dbRegenerateToken(id);
+      if (nw) set((st) => ({ tableTokens: { ...st.tableTokens, [id]: nw } }));
+    };
     set((s) => ({
       dialog: {
         title: (s.tableName(id) || "この卓") + " のQRを再発行",
         body:
           "新しいQRコードを発行します。印刷済みの古いQRはすべて使えなくなります。\n\n発行後、新しいQRを印刷して各卓に置き直してください。よろしいですか？",
-        confirmText: "再発行する",
+        confirmText: "再発行に進む",
         danger: true,
-        onConfirm: async () => {
-          get().closeDialog();
-          const nw = await db.dbRegenerateToken(id);
-          if (nw) set((st) => ({ tableTokens: { ...st.tableTokens, [id]: nw } }));
+        onConfirm: () => {
+          // 2段階目（最終確認）。取り消せない操作のため誤タップを防ぐ
+          set({
+            dialog: {
+              title: "最終確認",
+              body:
+                "この操作は取り消せません。印刷済みの古いQRは今すぐ完全に使えなくなります。\n本当に再発行しますか？",
+              confirmText: "完全に再発行する",
+              danger: true,
+              onConfirm: doRegenerate,
+            },
+          });
         },
       },
     }));
@@ -768,62 +841,109 @@ export const useAppStore = create<AppState>((set, get) => ({
   toggleConnection: () => set((s) => ({ connected: !s.connected })),
 
   // ---- 会計 / テーブル ----
-  selectStaffTable: (id) => set({ selectedStaffTable: id }),
-  confirmCheckout: () => {
+  selectStaffTable: (id) => set({ selectedStaffTable: id, orderEditMode: false }),
+  setOrderEditMode: (v) => set({ orderEditMode: v }),
+  confirmFinishOrderEdit: () => {
+    set({
+      dialog: {
+        title: "注文明細の編集を終了",
+        body: "編集を終了し、注文明細をロックします。よろしいですか？",
+        confirmText: "終了する",
+        danger: false,
+        onConfirm: () => {
+          get().closeDialog();
+          set({ orderEditMode: false });
+        },
+      },
+    });
+  },
+  confirmCheckout: (discountType, discountValue, chargeEnabled) => {
     const s = get();
     const t = s.selectedStaffTable;
     if (t == null) return;
-    const total = s.orders
+    const subtotal = s.orders
       .filter((o) => o.table === t)
       .reduce(
         (sum, o) => sum + o.items.reduce((x, it) => x + it.price * it.qty, 0),
         0
       );
+    const b = computeCheckoutBreakdown(
+      subtotal,
+      discountType,
+      discountValue,
+      chargeEnabled ? s.settings.chargeRate : 0,
+      s.settings.taxMode,
+      s.settings.taxRate
+    );
+    const lines = [`小計 ${s.yen(b.subtotal)}`];
+    if (b.discountAmount > 0) lines.push(`割引 −${s.yen(b.discountAmount)}`);
+    if (b.chargeAmount > 0) lines.push(`チャージ料 +${s.yen(b.chargeAmount)}`);
+    if (b.taxAmount > 0) lines.push(`消費税 +${s.yen(b.taxAmount)}`);
+    lines.push(`合計 ${s.yen(b.total)}${s.settings.taxMode === "exclusive" ? "（税込）" : ""}`);
     set({
       dialog: {
         title: s.tableName(t) + " のお会計",
         body:
-          "合計 " +
-          s.yen(total) +
-          "（税込）でこのテーブルのセッションを締めます。よろしいですか？\n\n※決済は既存レジで実施してください。",
+          lines.join("\n") +
+          "\n\nこのテーブルのセッションを締めます。よろしいですか？\n\n※決済は既存レジで実施してください。",
         confirmText: "お会計する",
         danger: false,
         onConfirm: () => {
-          get().checkout();
+          get().checkout(discountType, discountValue, chargeEnabled);
           get().closeDialog();
         },
       },
     });
   },
-  checkout: () => {
+  checkout: (discountType, discountValue, chargeEnabled) => {
     const s = get();
     const t = s.selectedStaffTable;
     if (t == null) return;
     const tableOrders = s.orders.filter((o) => o.table === t);
     if (tableOrders.length === 0) {
-      set({ selectedStaffTable: null });
+      set({ selectedStaffTable: null, orderEditMode: false });
       return;
     }
     // 品目を menuItemId+価格で集約してスナップショット化
     const agg: Record<string, OrderItem> = {};
-    let total = 0;
+    let subtotal = 0;
     let count = 0;
     tableOrders.forEach((o) =>
       o.items.forEach((it) => {
         const k = it.menuItemId + ":" + it.price;
         if (!agg[k]) agg[k] = { ...it, qty: 0 };
         agg[k].qty += it.qty;
-        total += it.price * it.qty;
+        subtotal += it.price * it.qty;
         count += it.qty;
       })
     );
     const items = Object.values(agg);
     const tableName = s.tableName(t);
+    const b = computeCheckoutBreakdown(
+      subtotal,
+      discountType,
+      discountValue,
+      chargeEnabled ? s.settings.chargeRate : 0,
+      s.settings.taxMode,
+      s.settings.taxRate
+    );
     // DBへ: 会計履歴を記録し、その卓の注文を削除
     if (ORDER_VIA_FUNCTION) {
-      db.dbCloseTable(t); // 1トランザクション（履歴INSERT+注文DELETE+呼出クリア）
+      db.dbCloseTable(t, discountType, discountValue, chargeEnabled); // 1トランザクション（履歴INSERT+注文DELETE+呼出クリア）
     } else {
-      db.dbCheckout({ tableId: t, tableName, items, count, total });
+      db.dbCheckout({
+        tableId: t,
+        tableName,
+        items,
+        count,
+        subtotal: b.subtotal,
+        discountType,
+        discountValue,
+        discountAmount: b.discountAmount,
+        chargeAmount: b.chargeAmount,
+        taxAmount: b.taxAmount,
+        total: b.total,
+      });
     }
     const record: CheckoutRecord = {
       id: newId(),
@@ -831,7 +951,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       tableName,
       items,
       count,
-      total,
+      subtotal: b.subtotal,
+      discountType,
+      discountValue,
+      discountAmount: b.discountAmount,
+      chargeAmount: b.chargeAmount,
+      taxAmount: b.taxAmount,
+      total: b.total,
       closedAt: new Date().toISOString(),
     };
     set((st) => ({
@@ -839,6 +965,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       orders: st.orders.filter((o) => o.table !== t),
       calls: st.calls.filter((c) => c.table !== t),
       selectedStaffTable: null,
+      orderEditMode: false,
     }));
   },
   cancelUnit: (menuItemId) => {
@@ -1004,6 +1131,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   setNewField: (k, v) => set({ [k]: v } as Pick<AppState, typeof k>),
   setNewCat: (c) => set({ newCat: c }),
+  setCat: (id, cat) => {
+    db.dbUpdateMenu(id, { cat });
+    set((s) => ({ menu: s.menu.map((m) => (m.id === id ? { ...m, cat } : m)) }));
+  },
   addItem: () => {
     const s = get();
     const name = s.newName.trim();
@@ -1029,6 +1160,57 @@ export const useAppStore = create<AppState>((set, get) => ({
   removePhoto: (id) => {
     db.dbUpdateMenu(id, { photo_url: null });
     set((s) => ({ menu: s.menu.map((m) => (m.id === id ? { ...m, photo: null } : m)) }));
+  },
+
+  // ---- カテゴリ管理 ----
+  setNewCategoryName: (v) => set({ newCategoryName: v }),
+  addCategory: () => {
+    const s = get();
+    const name = s.newCategoryName.trim();
+    if (!name || s.categories.includes(name)) return;
+    db.dbInsertCategory(name, s.categories.length);
+    set((st) => ({
+      categories: [...st.categories, name],
+      newCategoryName: "",
+    }));
+  },
+  confirmDeleteCategory: (name) => {
+    if (name === "その他") return; // フォールバック先は削除不可
+    const s = get();
+    const affected = s.menu.filter((m) => m.cat === name).length;
+    set({
+      dialog: {
+        title: "「" + name + "」を削除",
+        body:
+          (affected > 0
+            ? "このカテゴリのメニュー " + affected + "件は「その他」に移動します。\n\n"
+            : "") + "よろしいですか？",
+        confirmText: "削除に進む",
+        danger: true,
+        onConfirm: () => {
+          set({
+            dialog: {
+              title: "最終確認",
+              body: "この操作は取り消せません。「" + name + "」を完全に削除しますか？",
+              confirmText: "完全に削除",
+              danger: true,
+              onConfirm: () => {
+                db.dbDeleteCategory(name);
+                set((st) => ({
+                  categories: st.categories.filter((c) => c !== name),
+                  menu: st.menu.map((m) => (m.cat === name ? { ...m, cat: "その他" } : m)),
+                  newCat: st.newCat === name ? (st.categories.find((c) => c !== name) ?? "その他") : st.newCat,
+                  adminCat: st.adminCat === name ? "すべて" : st.adminCat,
+                  customerCat: st.customerCat === name ? "すべて" : st.customerCat,
+                  proxyCat: st.proxyCat === name ? "すべて" : st.proxyCat,
+                  dialog: null,
+                }));
+              },
+            },
+          });
+        },
+      },
+    });
   },
 
   // 並び替え
@@ -1116,6 +1298,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       showFooterPhoto: "show_footer_photo",
       headerPhoto: "header_photo_url",
       footerPhoto: "footer_photo_url",
+      taxMode: "tax_mode",
+      taxRate: "tax_rate",
+      chargeRate: "charge_rate",
     }[k];
     db.dbUpdateStore({ [col]: v });
     set((s) => ({ settings: { ...s.settings, [k]: v } }));

@@ -12,6 +12,8 @@
 create extension if not exists pgcrypto;
 
 -- ---- 店舗（テナント） --------------------------------------
+--   tax_mode: 'inclusive'(内税) | 'exclusive'(外税)。tax_rate は外税のときの消費税率(%)。
+--   charge_rate: チャージ料(%)。0なら無し。
 create table if not exists stores (
   id                uuid primary key default gen_random_uuid(),
   name              text not null,
@@ -20,6 +22,9 @@ create table if not exists stores (
   show_footer_photo boolean not null default false,
   header_photo_url  text,
   footer_photo_url  text,
+  tax_mode          text not null default 'inclusive',
+  tax_rate          numeric not null default 10,
+  charge_rate       numeric not null default 0,
   created_at        timestamptz not null default now()
 );
 
@@ -57,12 +62,23 @@ create table if not exists table_sessions (
   closed_at  timestamptz
 );
 
+-- ---- カテゴリ（メニュー分類。店舗ごとに増減可能） -----------
+-- 「その他」は削除不可のフォールバック（UI側で保護。カテゴリ削除時、そのカテゴリの
+-- menu_items.cat は「その他」へ書き換える）。
+create table if not exists categories (
+  id       uuid primary key default gen_random_uuid(),
+  store_id uuid not null references stores(id) on delete cascade,
+  name     text not null,
+  sort     int not null default 0
+);
+create unique index if not exists idx_categories_store_name on categories(store_id, name);
+
 -- ---- メニュー ----------------------------------------------
 create table if not exists menu_items (
   id         uuid primary key default gen_random_uuid(),
   store_id   uuid not null references stores(id) on delete cascade,
   name       text not null,
-  cat        text not null,          -- ドリンク/一品料理/刺身/揚げ物/〆
+  cat        text not null,          -- categories.name を自由入力で参照（FK制約は無し）
   price      int not null default 0, -- 1円単位
   sold_out   boolean not null default false,
   stock      int not null default 0,
@@ -107,14 +123,20 @@ create table if not exists staff_calls (
 
 -- ---- 会計履歴（レシート・スナップショット。常時閲覧） ------
 create table if not exists checkouts (
-  id         uuid primary key default gen_random_uuid(),
-  store_id   uuid not null references stores(id) on delete cascade,
-  table_id   uuid references tables(id) on delete set null,
-  table_name text not null,           -- 会計時点の卓名スナップショット
-  items      jsonb not null default '[]', -- [{menuItemId,name,price,qty}]
-  count      int not null default 0,
-  total      int not null default 0,
-  closed_at  timestamptz not null default now()
+  id              uuid primary key default gen_random_uuid(),
+  store_id        uuid not null references stores(id) on delete cascade,
+  table_id        uuid references tables(id) on delete set null,
+  table_name      text not null,           -- 会計時点の卓名スナップショット
+  items           jsonb not null default '[]', -- [{menuItemId,name,price,qty}]
+  count           int not null default 0,
+  subtotal        int not null default 0, -- 品目合計（割引/チャージ料/税を引く前）
+  discount_type   text,                   -- 'percent' | 'amount' | null
+  discount_value  numeric,                -- percentなら%、amountなら円
+  discount_amount int not null default 0, -- 実際に引かれた円額
+  charge_amount   int not null default 0, -- チャージ料（円）
+  tax_amount      int not null default 0, -- 消費税額（外税のときのみ0超）
+  total           int not null default 0, -- 最終合計
+  closed_at       timestamptz not null default now()
 );
 
 -- ---- インデックス ------------------------------------------
@@ -145,7 +167,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'orders','order_items','menu_items','tables','staff_calls','checkouts'
+    'orders','order_items','menu_items','tables','staff_calls','checkouts','categories'
   ]
   loop
     if not exists (
@@ -174,6 +196,7 @@ alter table stores          enable row level security;
 alter table staff           enable row level security;
 alter table tables          enable row level security;
 alter table table_sessions  enable row level security;
+alter table categories      enable row level security;
 alter table menu_items      enable row level security;
 alter table orders          enable row level security;
 alter table order_items     enable row level security;
@@ -183,6 +206,10 @@ alter table checkouts       enable row level security;
 -- stores: 誰でも閲覧、更新はスタッフのみ
 create policy stores_select_all          on stores for select to anon, authenticated using (true);
 create policy stores_update_authenticated on stores for update to authenticated using (true) with check (true);
+
+-- categories: 閲覧は誰でも、増減はスタッフのみ
+create policy categories_select_all          on categories for select to anon, authenticated using (true);
+create policy categories_write_authenticated on categories for all to authenticated using (true) with check (true);
 
 -- tables: 客は qr_token/session_token を直接読めない（open_session RPC経由のみ配布）
 revoke select on tables from anon;

@@ -9,6 +9,8 @@ import type {
   StaffCall,
   CheckoutRecord,
   Cat,
+  TaxMode,
+  DiscountType,
 } from "@/store/useAppStore";
 
 export interface Snapshot {
@@ -18,6 +20,10 @@ export interface Snapshot {
   showFooterPhoto: boolean;
   headerPhoto: string | null;
   footerPhoto: string | null;
+  taxMode: TaxMode | null;
+  taxRate: number | null;
+  chargeRate: number | null;
+  categories: string[];
   tables: TableRec[];
   menu: MenuItem[];
   orders: Order[];
@@ -30,8 +36,9 @@ export async function loadSnapshot(): Promise<Snapshot | null> {
   const sb = getSupabase();
   if (!sb || !STORE_ID) return null;
 
-  const [store, tables, menu, orders, calls, checkouts] = await Promise.all([
-    sb.from("stores").select("name,theme,show_header_photo,show_footer_photo,header_photo_url,footer_photo_url").eq("id", STORE_ID).single(),
+  const [store, categories, tables, menu, orders, calls, checkouts] = await Promise.all([
+    sb.from("stores").select("name,theme,show_header_photo,show_footer_photo,header_photo_url,footer_photo_url,tax_mode,tax_rate,charge_rate").eq("id", STORE_ID).single(),
+    sb.from("categories").select("id,name,sort").eq("store_id", STORE_ID).order("sort"),
     sb.from("tables").select("id,name,sort").eq("store_id", STORE_ID).order("sort"),
     sb.from("menu_items").select("id,name,cat,price,sold_out,stock,photo_url,sort").eq("store_id", STORE_ID).order("sort"),
     sb
@@ -40,10 +47,14 @@ export async function loadSnapshot(): Promise<Snapshot | null> {
       .eq("store_id", STORE_ID)
       .order("created_at", { ascending: true }),
     sb.from("staff_calls").select("id,table_id,created_at").eq("store_id", STORE_ID).is("resolved_at", null),
-    sb.from("checkouts").select("id,table_id,table_name,items,count,total,closed_at").eq("store_id", STORE_ID).order("closed_at", { ascending: false }),
+    sb
+      .from("checkouts")
+      .select("id,table_id,table_name,items,count,subtotal,discount_type,discount_value,discount_amount,charge_amount,tax_amount,total,closed_at")
+      .eq("store_id", STORE_ID)
+      .order("closed_at", { ascending: false }),
   ]);
 
-  const err = store.error || tables.error || menu.error || orders.error || calls.error || checkouts.error;
+  const err = store.error || categories.error || tables.error || menu.error || orders.error || calls.error || checkouts.error;
   if (err) {
     console.error("loadSnapshot error:", err.message);
     return null;
@@ -56,6 +67,10 @@ export async function loadSnapshot(): Promise<Snapshot | null> {
     showFooterPhoto: store.data?.show_footer_photo ?? false,
     headerPhoto: (store.data?.header_photo_url as string | null) ?? null,
     footerPhoto: (store.data?.footer_photo_url as string | null) ?? null,
+    taxMode: (store.data?.tax_mode as TaxMode | null) ?? null,
+    taxRate: (store.data?.tax_rate as number | null) ?? null,
+    chargeRate: (store.data?.charge_rate as number | null) ?? null,
+    categories: (categories.data ?? []).map((c) => c.name as string),
     tables: (tables.data ?? []).map((t) => ({ id: t.id as string, name: t.name as string })),
     menu: (menu.data ?? []).map((m) => ({
       id: m.id as string,
@@ -90,6 +105,12 @@ export async function loadSnapshot(): Promise<Snapshot | null> {
       tableName: c.table_name as string,
       items: (c.items as OrderItem[]) ?? [],
       count: c.count as number,
+      subtotal: (c.subtotal as number) ?? (c.total as number),
+      discountType: (c.discount_type as DiscountType) ?? null,
+      discountValue: (c.discount_value as number) ?? 0,
+      discountAmount: (c.discount_amount as number) ?? 0,
+      chargeAmount: (c.charge_amount as number) ?? 0,
+      taxAmount: (c.tax_amount as number) ?? 0,
       total: c.total as number,
       closedAt: c.closed_at as string,
     })),
@@ -259,11 +280,24 @@ export async function dbRegenerateToken(tableId: string): Promise<string | null>
   return (data as string) ?? null;
 }
 
-/** 会計を RPC `close_table` で1トランザクション確定（履歴INSERT+注文DELETE+呼出クリア） */
-export async function dbCloseTable(tableId: string): Promise<boolean> {
+/** 会計を RPC `close_table` で1トランザクション確定（履歴INSERT+注文DELETE+呼出クリア）。
+ *  割引はスタッフがその場で入力する値をそのまま渡す。チャージ料率はDB側のstores設定から
+ *  計算するが、今回適用するかどうか(chargeEnabled)はその場で指定する。 */
+export async function dbCloseTable(
+  tableId: string,
+  discountType: DiscountType,
+  discountValue: number,
+  chargeEnabled: boolean
+): Promise<boolean> {
   const sb = getSupabase();
   if (!sb || !STORE_ID) return false;
-  const { error } = await sb.rpc("close_table", { p_store: STORE_ID, p_table: tableId });
+  const { error } = await sb.rpc("close_table", {
+    p_store: STORE_ID,
+    p_table: tableId,
+    p_discount_type: discountType,
+    p_discount_value: discountValue,
+    p_charge_enabled: chargeEnabled,
+  });
   if (error) {
     console.error("dbCloseTable:", error.message);
     return false;
@@ -277,12 +311,18 @@ export async function dbSetOrderStatus(orderId: string, status: "cooking" | "ser
   await sb.from("orders").update({ status }).eq("id", orderId);
 }
 
-/** 会計: 会計履歴を記録し、その卓の注文を削除 */
+/** 会計（Edge Function未使用時の直接書込フォールバック）: 会計履歴を記録し、その卓の注文を削除 */
 export async function dbCheckout(record: {
   tableId: string;
   tableName: string;
   items: OrderItem[];
   count: number;
+  subtotal: number;
+  discountType: DiscountType;
+  discountValue: number;
+  discountAmount: number;
+  chargeAmount: number;
+  taxAmount: number;
   total: number;
 }) {
   const sb = getSupabase();
@@ -293,6 +333,12 @@ export async function dbCheckout(record: {
     table_name: record.tableName,
     items: record.items,
     count: record.count,
+    subtotal: record.subtotal,
+    discount_type: record.discountType,
+    discount_value: record.discountValue,
+    discount_amount: record.discountAmount,
+    charge_amount: record.chargeAmount,
+    tax_amount: record.taxAmount,
     total: record.total,
   });
   await sb.from("orders").delete().eq("store_id", STORE_ID).eq("table_id", record.tableId);
@@ -373,6 +419,23 @@ export async function dbReorderMenu(idsInOrder: string[]) {
   const sb = getSupabase();
   if (!sb) return;
   await Promise.all(idsInOrder.map((id, i) => sb.from("menu_items").update({ sort: i }).eq("id", id)));
+}
+
+/* ---- カテゴリ管理 ---- */
+export async function dbInsertCategory(name: string, sort: number) {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return;
+  await sb.from("categories").insert({ store_id: STORE_ID, name, sort });
+}
+
+/** カテゴリを削除。先にそのカテゴリのメニューを「その他」へ書き換えてから削除する */
+export async function dbDeleteCategory(name: string) {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return;
+  if (name !== "その他") {
+    await sb.from("menu_items").update({ cat: "その他" }).eq("store_id", STORE_ID).eq("cat", name);
+  }
+  await sb.from("categories").delete().eq("store_id", STORE_ID).eq("name", name);
 }
 
 /* ---- テーブル ---- */

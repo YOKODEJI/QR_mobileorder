@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useAppStore, CATS } from "@/store/useAppStore";
+import { useAppStore } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import type { MenuItem } from "@/store/useAppStore";
 import ChipRow from "@/components/ui/ChipRow";
@@ -146,10 +146,13 @@ function PhotoCell({ item }: { item: MenuItem }) {
 export default function MenuManagement() {
   const s = useAppStore(
     useShallow((st) => ({
+      addCategory: st.addCategory,
       addItem: st.addItem,
       adminCat: st.adminCat,
       bumpStock: st.bumpStock,
       cancelDeleteMode: st.cancelDeleteMode,
+      categories: st.categories,
+      confirmDeleteCategory: st.confirmDeleteCategory,
       deleteMode: st.deleteMode,
       dragEnd: st.dragEnd,
       dragId: st.dragId,
@@ -158,13 +161,16 @@ export default function MenuManagement() {
       enterDeleteMode: st.enterDeleteMode,
       menu: st.menu,
       newCat: st.newCat,
+      newCategoryName: st.newCategoryName,
       newName: st.newName,
       newPrice: st.newPrice,
       newStock: st.newStock,
       requestDelete: st.requestDelete,
       selectedIds: st.selectedIds,
       setAdminCat: st.setAdminCat,
+      setCat: st.setCat,
       setNewCat: st.setNewCat,
+      setNewCategoryName: st.setNewCategoryName,
       setNewField: st.setNewField,
       setPrice: st.setPrice,
       setStock: st.setStock,
@@ -211,10 +217,10 @@ export default function MenuManagement() {
           />
           <select
             value={s.newCat}
-            onChange={(e) => s.setNewCat(e.target.value as (typeof CATS)[number])}
+            onChange={(e) => s.setNewCat(e.target.value)}
             style={{ ...insetInput, flex: "1 1 110px" }}
           >
-            {CATS.map((c) => (
+            {s.categories.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
@@ -362,20 +368,29 @@ export default function MenuManagement() {
                   >
                     {m.name}
                   </div>
-                  <span
+                  <select
+                    value={m.cat}
+                    onChange={(e) => s.setCat(m.id, e.target.value)}
                     style={{
-                      display: "inline-block",
                       marginTop: "3px",
                       fontSize: "11px",
                       background: "#f0f0f2",
-                      color: "#8e8e93",
+                      color: "#6b6b70",
+                      border: "none",
                       borderRadius: "999px",
                       padding: "2px 8px",
-                      whiteSpace: "nowrap",
+                      fontFamily: "inherit",
+                      cursor: "pointer",
                     }}
                   >
-                    {m.cat}
-                  </span>
+                    {/* 削除済みなど、一覧に無い現在値も選べるよう先頭に補完 */}
+                    {!s.categories.includes(m.cat) && <option value={m.cat}>{m.cat}</option>}
+                    {s.categories.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* 価格 */}
@@ -447,6 +462,79 @@ export default function MenuManagement() {
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* カテゴリ管理 */}
+      <div style={{ background: "#fff", borderRadius: "22px", padding: "20px 22px", boxShadow: "0 12px 34px rgba(0,0,0,.06)" }}>
+        <div style={{ fontSize: "17px", fontWeight: 800, marginBottom: "4px" }}>カテゴリ管理</div>
+        <div style={{ fontSize: "12px", color: "#8e8e93", marginBottom: "14px" }}>
+          カテゴリを追加・削除できます。削除すると、そのカテゴリのメニューは「その他」に移動します。
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "16px" }}>
+          {s.categories.map((c) => (
+            <span
+              key={c}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                background: "#f0f0f2",
+                color: "#1c1c1e",
+                borderRadius: "999px",
+                padding: "6px 8px 6px 14px",
+                fontSize: "13px",
+                fontWeight: 700,
+              }}
+            >
+              {c}
+              {c !== "その他" && (
+                <button
+                  onClick={() => s.confirmDeleteCategory(c)}
+                  aria-label={c + "を削除"}
+                  style={{
+                    width: "20px",
+                    height: "20px",
+                    borderRadius: "50%",
+                    border: "none",
+                    background: "#e3e3e6",
+                    color: "#6b6b70",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    lineHeight: 1,
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </span>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: "10px" }}>
+          <input
+            placeholder="新しいカテゴリ名"
+            value={s.newCategoryName}
+            onChange={(e) => s.setNewCategoryName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") s.addCategory();
+            }}
+            style={{ ...insetInput, flex: 1 }}
+          />
+          <button
+            onClick={s.addCategory}
+            disabled={!s.newCategoryName.trim()}
+            style={{
+              ...pill,
+              border: "none",
+              background: s.newCategoryName.trim() ? accent : "#f0f0f2",
+              color: s.newCategoryName.trim() ? "#fff" : "#c7c7cc",
+              padding: "11px 22px",
+              fontSize: "14px",
+            }}
+          >
+            追加
+          </button>
         </div>
       </div>
     </div>

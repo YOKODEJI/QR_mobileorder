@@ -1,9 +1,12 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import ChipRow from "@/components/ui/ChipRow";
+import Toggle from "@/components/ui/Toggle";
 import { proxyCardStyle, proxyAddStyle, proxySubStyle, addBtnStyle } from "@/lib/styles";
+import { computeCheckoutBreakdown, type DiscountType } from "@/lib/pricing";
 
 export default function StaffCheckout() {
   const s = useAppStore(
@@ -14,6 +17,7 @@ export default function StaffCheckout() {
       cancelUnit: st.cancelUnit,
       confirmCheckout: st.confirmCheckout,
       confirmDeleteTable: st.confirmDeleteTable,
+      confirmFinishOrderEdit: st.confirmFinishOrderEdit,
       dragEndTable: st.dragEndTable,
       dragStartTable: st.dragStartTable,
       dragTableId: st.dragTableId,
@@ -22,6 +26,7 @@ export default function StaffCheckout() {
       editingTableId: st.editingTableId,
       justAddedTableId: st.justAddedTableId,
       menu: st.menu,
+      orderEditMode: st.orderEditMode,
       orders: st.orders,
       proxyCat: st.proxyCat,
       removeStaff: st.removeStaff,
@@ -29,6 +34,7 @@ export default function StaffCheckout() {
       selectStaffTable: st.selectStaffTable,
       selectedStaffTable: st.selectedStaffTable,
       setEditTableName: st.setEditTableName,
+      setOrderEditMode: st.setOrderEditMode,
       setProxyCat: st.setProxyCat,
       setTableEditMode: st.setTableEditMode,
       settings: st.settings,
@@ -59,6 +65,16 @@ export default function StaffCheckout() {
   const sel = s.selectedStaffTable;
   const selOrders = sel != null ? s.orders.filter((o) => o.table === sel) : [];
 
+  // 割引はその場入力、チャージ料は設定の料率を使うがオンオフはその場で選べる（テーブルを切り替えたらリセット）。
+  const [discountType, setDiscountType] = useState<DiscountType>(null);
+  const [discountValue, setDiscountValue] = useState("");
+  const [chargeEnabled, setChargeEnabled] = useState(true);
+  useEffect(() => {
+    setDiscountType(null);
+    setDiscountValue("");
+    setChargeEnabled(true);
+  }, [sel]);
+
   // 明細を商品ID＋単価で集約（名前一致に依存しない。会期中の値変更にも安全）
   const agg: Record<
     string,
@@ -75,6 +91,15 @@ export default function StaffCheckout() {
   });
   const aggList = Object.values(agg);
   const selTotal = sel != null ? tableTotal(sel) : 0;
+  const discountNum = parseFloat(discountValue) || 0;
+  const breakdown = computeCheckoutBreakdown(
+    selTotal,
+    discountType,
+    discountNum,
+    chargeEnabled ? s.settings.chargeRate : 0,
+    s.settings.taxMode,
+    s.settings.taxRate
+  );
 
   const proxyFiltered = s.menu.filter(
     (m) => s.proxyCat === "すべて" || m.cat === s.proxyCat
@@ -305,20 +330,70 @@ export default function StaffCheckout() {
             </div>
           ) : (
             <>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "18px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}>
                 <div style={{ fontSize: "23px", fontWeight: 800 }}>{s.tableName(sel)}</div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: "11px", color: "#8e8e93" }}>合計（税込）</div>
+                  <div style={{ fontSize: "11px", color: "#8e8e93" }}>
+                    合計{s.settings.taxMode === "exclusive" ? "（税込）" : "（内税）"}
+                  </div>
                   <div style={{ fontSize: "25px", fontWeight: 800, color: accent }}>
-                    {s.yen(selTotal)}
+                    {s.yen(breakdown.total)}
                   </div>
                 </div>
               </div>
+              <div style={{ fontSize: "11px", color: "#8e8e93", marginBottom: "18px", textAlign: "right" }}>
+                {s.settings.taxMode === "exclusive"
+                  ? `表示価格は税抜です（消費税率 ${s.settings.taxRate}%）`
+                  : "表示価格は税込です"}
+              </div>
 
               {/* 注文明細 */}
-              <div style={{ fontSize: "14px", fontWeight: 800, marginBottom: "4px" }}>注文明細</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px", gap: "8px" }}>
+                <div style={{ fontSize: "14px", fontWeight: 800 }}>注文明細</div>
+                {aggList.length > 0 && (
+                  s.orderEditMode ? (
+                    <button
+                      onClick={s.confirmFinishOrderEdit}
+                      style={{
+                        border: "none",
+                        background: accent,
+                        color: "#fff",
+                        borderRadius: "999px",
+                        padding: "5px 14px",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        fontFamily: "inherit",
+                        cursor: "pointer",
+                        flexShrink: 0,
+                      }}
+                    >
+                      完了
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => s.setOrderEditMode(true)}
+                      style={{
+                        border: "1px solid #d1d1d6",
+                        background: "#fff",
+                        color: "#6b6b70",
+                        borderRadius: "999px",
+                        padding: "5px 14px",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        fontFamily: "inherit",
+                        cursor: "pointer",
+                        flexShrink: 0,
+                      }}
+                    >
+                      注文編集
+                    </button>
+                  )
+                )}
+              </div>
               <div style={{ fontSize: "12px", color: "#8e8e93", marginBottom: "10px" }}>
-                品目1個ずつ取消できます
+                {s.orderEditMode
+                  ? "「−」で品目を1個ずつ取消できます。完了を押すと編集を終了します。"
+                  : "誤操作防止のため、取消するには「注文編集」を押してください。"}
               </div>
               {aggList.length === 0 ? (
                 <div style={{ color: "#8e8e93", fontSize: "14px", padding: "16px 0" }}>
@@ -357,23 +432,25 @@ export default function StaffCheckout() {
                         {s.yen(it.price * it.qty)}
                       </span>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <button
-                          onClick={() => s.cancelUnit(it.menuItemId)}
-                          style={{
-                            width: "34px",
-                            height: "34px",
-                            borderRadius: "10px",
-                            border: "none",
-                            background: "#ffe5e3",
-                            color: "#ff3b30",
-                            fontSize: "20px",
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            lineHeight: 1,
-                          }}
-                        >
-                          −
-                        </button>
+                        {s.orderEditMode && (
+                          <button
+                            onClick={() => s.cancelUnit(it.menuItemId)}
+                            style={{
+                              width: "34px",
+                              height: "34px",
+                              borderRadius: "10px",
+                              border: "none",
+                              background: "#ffe5e3",
+                              color: "#ff3b30",
+                              fontSize: "20px",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              lineHeight: 1,
+                            }}
+                          >
+                            −
+                          </button>
+                        )}
                         <span style={{ fontSize: "15px", fontWeight: 800, minWidth: "16px", textAlign: "center" }}>
                           {it.qty}
                         </span>
@@ -383,8 +460,96 @@ export default function StaffCheckout() {
                 </div>
               )}
 
+              {/* 割引 / チャージ料 / 内訳 */}
+              {aggList.length > 0 && (
+                <div style={{ marginTop: "18px", paddingTop: "16px", borderTop: "1px solid #f0f0f2" }}>
+                  <div style={{ fontSize: "14px", fontWeight: 800, marginBottom: "10px" }}>割引</div>
+                  <div style={{ display: "flex", gap: "8px", marginBottom: "10px" }}>
+                    {(
+                      [
+                        { v: null, label: "なし" },
+                        { v: "percent", label: "％" },
+                        { v: "amount", label: "円" },
+                      ] as const
+                    ).map((opt) => (
+                      <button
+                        key={String(opt.v)}
+                        onClick={() => setDiscountType(opt.v)}
+                        style={{
+                          border: "none",
+                          borderRadius: "999px",
+                          padding: "7px 16px",
+                          fontSize: "13px",
+                          fontWeight: 700,
+                          fontFamily: "inherit",
+                          cursor: "pointer",
+                          background: discountType === opt.v ? accent : "#f0f0f2",
+                          color: discountType === opt.v ? "#fff" : "#6b6b70",
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                    {discountType && (
+                      <input
+                        type="number"
+                        min={0}
+                        value={discountValue}
+                        onChange={(e) => setDiscountValue(e.target.value)}
+                        placeholder={discountType === "percent" ? "例: 10" : "例: 500"}
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          padding: "7px 12px",
+                          borderRadius: "10px",
+                          border: "none",
+                          background: "#f0f0f2",
+                          fontSize: "14px",
+                          fontFamily: "inherit",
+                        }}
+                      />
+                    )}
+                  </div>
+
+                  {/* 内訳 */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "13px", color: "#6b6b70" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span>小計</span>
+                      <span>{s.yen(breakdown.subtotal)}</span>
+                    </div>
+                    {breakdown.discountAmount > 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between", color: "#ff3b30" }}>
+                        <span>割引</span>
+                        <span>−{s.yen(breakdown.discountAmount)}</span>
+                      </div>
+                    )}
+                    {s.settings.chargeRate > 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          チャージ料（{s.settings.chargeRate}%）
+                          <span style={{ transform: "scale(.6)", transformOrigin: "left center" }}>
+                            <Toggle on={chargeEnabled} onChange={setChargeEnabled} />
+                          </span>
+                        </span>
+                        <span>{chargeEnabled ? `+${s.yen(breakdown.chargeAmount)}` : "適用なし"}</span>
+                      </div>
+                    )}
+                    {breakdown.taxAmount > 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span>消費税（{s.settings.taxRate}%）</span>
+                        <span>+{s.yen(breakdown.taxAmount)}</span>
+                      </div>
+                    )}
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "15px", fontWeight: 800, color: "#1c1c1e", marginTop: "2px" }}>
+                      <span>合計</span>
+                      <span>{s.yen(breakdown.total)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <button
-                onClick={s.confirmCheckout}
+                onClick={() => s.confirmCheckout(discountType, discountNum, chargeEnabled)}
                 style={{
                   width: "100%",
                   marginTop: "16px",

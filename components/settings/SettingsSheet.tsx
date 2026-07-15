@@ -3,6 +3,7 @@
 import { useAppStore } from "@/store/useAppStore";
 import Toggle from "@/components/ui/Toggle";
 import PhotoSlot from "@/components/ui/PhotoSlot";
+import QrCodes from "@/components/qr/QrCodes";
 import { deletePhoto } from "@/lib/storage";
 
 const SWATCHES = ["#cf4b2c", "#e0902a", "#248a3d", "#0a84ff", "#8a4fd0"];
@@ -222,6 +223,76 @@ export default function SettingsSheet() {
           }}
         >
           写真は管理画面から設定します。客用ページには表示だけされます。
+        </div>
+
+        {/* 税・チャージ料 */}
+        <div style={{ ...labelStyle, marginTop: "20px" }}>税・チャージ料</div>
+        <div style={{ background: "#fff", borderRadius: "14px", padding: "16px" }}>
+          <div style={{ fontSize: "13px", fontWeight: 700, marginBottom: "8px" }}>表示価格の税区分</div>
+          <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+            {(
+              [
+                { v: "inclusive" as const, label: "内税（税込表示）" },
+                { v: "exclusive" as const, label: "外税（税抜表示）" },
+              ]
+            ).map((opt) => (
+              <button
+                key={opt.v}
+                onClick={() => setSetting("taxMode", opt.v)}
+                style={{
+                  flex: 1,
+                  border: "none",
+                  borderRadius: "10px",
+                  padding: "10px 8px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  fontFamily: "inherit",
+                  cursor: "pointer",
+                  background: settings.taxMode === opt.v ? "var(--accent)" : "#f0f0f2",
+                  color: settings.taxMode === opt.v ? "#fff" : "#6b6b70",
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {settings.taxMode === "exclusive" && (
+            <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+              <span style={{ fontSize: "13px" }}>消費税率</span>
+              <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <input
+                  type="number"
+                  min={0}
+                  value={settings.taxRate}
+                  onChange={(e) => setSetting("taxRate", parseFloat(e.target.value) || 0)}
+                  style={{ width: "64px", padding: "8px 10px", borderRadius: "9px", border: "none", background: "#f0f0f2", fontSize: "14px", fontFamily: "inherit", textAlign: "right" }}
+                />
+                <span style={{ fontSize: "13px", color: "#8e8e93" }}>%</span>
+              </span>
+            </label>
+          )}
+          <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: "13px" }}>チャージ料</span>
+            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <input
+                type="number"
+                min={0}
+                value={settings.chargeRate}
+                onChange={(e) => setSetting("chargeRate", parseFloat(e.target.value) || 0)}
+                style={{ width: "64px", padding: "8px 10px", borderRadius: "9px", border: "none", background: "#f0f0f2", fontSize: "14px", fontFamily: "inherit", textAlign: "right" }}
+              />
+              <span style={{ fontSize: "13px", color: "#8e8e93" }}>%</span>
+            </span>
+          </label>
+        </div>
+        <div style={{ fontSize: "12px", color: "#8e8e93", margin: "10px 8px 0", lineHeight: 1.5 }}>
+          会計時に自動で反映されます。チャージ料は0%で無しになります。
+        </div>
+
+        {/* QRコード管理 */}
+        <div style={{ ...labelStyle, marginTop: "20px" }}>QRコード管理</div>
+        <div style={{ background: "#fff", borderRadius: "14px", padding: "16px" }}>
+          <QrCodes />
         </div>
       </div>
     </div>

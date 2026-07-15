@@ -95,9 +95,20 @@ end $$;
 
 
 -- ---- 会計確定: 履歴INSERT + 注文DELETE + 呼び出しクリア を1トランザクションで ----
+-- p_discount_type: 'percent' | 'amount' | null。割引はスタッフがその場で入力する値をそのまま渡す。
+-- 税/チャージ料は stores.tax_mode / tax_rate / charge_rate から算出（クライアント改ざん不可）。
+-- 計算順序: 小計 → 割引 → チャージ料 → (外税なら)消費税。lib/pricing.ts と同じ式を維持すること。
+-- p_charge_enabled: チャージ料(stores.charge_rate)を今回の会計に適用するか。
+--   料率自体は設定に置いたまま、会計画面でその都度オンオフできるようにするための引数。
+-- 旧シグネチャを破棄してから再定義（オーバーロード回避）。
+drop function if exists close_table(uuid, uuid);
+drop function if exists close_table(uuid, uuid, text, numeric);
 create or replace function close_table(
   p_store uuid,
-  p_table uuid
+  p_table uuid,
+  p_discount_type text default null,
+  p_discount_value numeric default 0,
+  p_charge_enabled boolean default true
 ) returns uuid
 language plpgsql
 security definer
@@ -106,10 +117,16 @@ as $$
 declare
   v_checkout uuid;
   v_count int;
-  v_total int;
+  v_subtotal int;
   v_name  text;
   v_items jsonb;
+  v_store stores%rowtype;
+  v_discount_amount int;
+  v_charge_amount int;
+  v_tax_amount int;
+  v_total int;
 begin
+  select * into v_store from stores where id = p_store;
   select name into v_name from tables where id = p_table and store_id = p_store;
 
   -- その卓の注文明細を menu_item + price で集約
@@ -124,15 +141,42 @@ begin
     coalesce(jsonb_agg(jsonb_build_object('menuItemId', menu_item_id, 'name', name, 'price', price, 'qty', qty)), '[]'::jsonb),
     coalesce(sum(qty), 0)::int,
     coalesce(sum(qty * price), 0)::int
-  into v_items, v_count, v_total
+  into v_items, v_count, v_subtotal
   from agg;
 
   if v_count = 0 then
     return null; -- 注文が無ければ何もしない
   end if;
 
-  insert into checkouts (store_id, table_id, table_name, items, count, total)
-    values (p_store, p_table, coalesce(v_name, 'テーブル'), v_items, v_count, v_total)
+  v_discount_amount := case
+    when p_discount_type = 'percent' then round(v_subtotal * greatest(0, coalesce(p_discount_value, 0)) / 100)
+    when p_discount_type = 'amount'  then round(greatest(0, coalesce(p_discount_value, 0)))
+    else 0
+  end;
+  v_discount_amount := least(v_discount_amount, v_subtotal);
+
+  v_charge_amount := case
+    when coalesce(p_charge_enabled, true)
+      then round((v_subtotal - v_discount_amount) * greatest(0, coalesce(v_store.charge_rate, 0)) / 100)
+    else 0
+  end;
+
+  v_tax_amount := case
+    when v_store.tax_mode = 'exclusive'
+      then round((v_subtotal - v_discount_amount + v_charge_amount) * greatest(0, coalesce(v_store.tax_rate, 10)) / 100)
+    else 0
+  end;
+
+  v_total := v_subtotal - v_discount_amount + v_charge_amount + v_tax_amount;
+
+  insert into checkouts (
+    store_id, table_id, table_name, items, count,
+    subtotal, discount_type, discount_value, discount_amount, charge_amount, tax_amount, total
+  )
+    values (
+      p_store, p_table, coalesce(v_name, 'テーブル'), v_items, v_count,
+      v_subtotal, p_discount_type, p_discount_value, v_discount_amount, v_charge_amount, v_tax_amount, v_total
+    )
     returning id into v_checkout;
 
   delete from orders where store_id = p_store and table_id = p_table;
@@ -214,8 +258,8 @@ grant  execute on function place_order(uuid, uuid, boolean, text, jsonb, text) t
 
 grant execute on function open_session(uuid, uuid, text) to anon, authenticated;
 
-revoke execute on function close_table(uuid, uuid) from public, anon;
-grant  execute on function close_table(uuid, uuid) to authenticated;
+revoke execute on function close_table(uuid, uuid, text, numeric, boolean) from public, anon;
+grant  execute on function close_table(uuid, uuid, text, numeric, boolean) to authenticated;
 
 revoke execute on function regenerate_table_token(uuid, uuid) from public, anon;
 grant  execute on function regenerate_table_token(uuid, uuid) to authenticated;

@@ -1,9 +1,29 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import { dateLabel, dateTimeLabel } from "@/lib/time";
 import type { CheckoutRecord } from "@/store/useAppStore";
+
+const DISCOUNT_LABEL = { percent: "%割引", amount: "円引き" } as const;
+
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        transition: "transform .18s ease",
+        transform: open ? "rotate(90deg)" : "rotate(0deg)",
+        color: "#c7c7cc",
+        fontSize: "13px",
+        fontWeight: 800,
+      }}
+    >
+      ▸
+    </span>
+  );
+}
 
 export default function CheckoutHistory() {
   const s = useAppStore(
@@ -28,7 +48,39 @@ export default function CheckoutHistory() {
     g.total += r.total;
   });
 
-  const grandTotal = s.checkouts.reduce((sum, r) => sum + r.total, 0);
+  // トップのサマリーは「その日（今日）」の合算。今日の記録が無ければ0件・¥0。
+  const todayLabel = dateLabel(new Date().toISOString());
+  const todayGroup = groups.find((g) => g.date === todayLabel);
+  const todayTotal = todayGroup?.total ?? 0;
+  const todayCount = todayGroup?.records.length ?? 0;
+
+  // 日付の開閉（既定: 最新日付のみ開く）／ テーブル行の開閉（既定: 全て閉じる＝明細は折りたたみ）
+  const [openDates, setOpenDates] = useState<Set<string>>(new Set());
+  const [openRecords, setOpenRecords] = useState<Set<string>>(new Set());
+  const seededDate = useRef<string | null>(null);
+  useEffect(() => {
+    const latest = groups[0]?.date;
+    if (latest && seededDate.current !== latest) {
+      seededDate.current = latest;
+      setOpenDates((prev) => new Set(prev).add(latest));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups[0]?.date]);
+
+  const toggleDate = (d: string) =>
+    setOpenDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(d)) next.delete(d);
+      else next.add(d);
+      return next;
+    });
+  const toggleRecord = (id: string) =>
+    setOpenRecords((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   return (
     <div style={{ padding: "24px 18px 40px", maxWidth: "900px", margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", gap: "18px" }}>
@@ -37,12 +89,12 @@ export default function CheckoutHistory() {
         <div>
           <div style={{ fontSize: "19px", fontWeight: 800 }}>会計履歴</div>
           <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px" }}>
-            会計済みのセッションを時刻つきで記録しています。
+            会計済みのセッションを時刻つきで記録しています。日付・テーブルをタップで開閉できます。
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: "11px", color: "#8e8e93" }}>累計 {s.checkouts.length}件</div>
-          <div style={{ fontSize: "23px", fontWeight: 800, color: accent }}>{s.yen(grandTotal)}</div>
+          <div style={{ fontSize: "11px", color: "#8e8e93" }}>本日 {todayCount}件</div>
+          <div style={{ fontSize: "23px", fontWeight: 800, color: accent }}>{s.yen(todayTotal)}</div>
         </div>
       </div>
 
@@ -51,40 +103,125 @@ export default function CheckoutHistory() {
           まだ会計履歴はありません。
         </div>
       ) : (
-        groups.map((g) => (
-          <div key={g.date} style={{ background: "#fff", borderRadius: "22px", padding: "16px 18px 8px", boxShadow: "0 12px 34px rgba(0,0,0,.06)" }}>
-            {/* 日付ヘッダー */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "0 4px 10px", borderBottom: "1px solid #f4f4f6", marginBottom: "10px" }}>
-              <span style={{ fontSize: "15px", fontWeight: 800 }}>{g.date}</span>
-              <span style={{ fontSize: "13px", fontWeight: 700, color: "#8e8e93" }}>
-                {g.records.length}件 · <span style={{ color: accent }}>{s.yen(g.total)}</span>
-              </span>
-            </div>
+        groups.map((g) => {
+          const dateOpen = openDates.has(g.date);
+          return (
+            <div key={g.date} style={{ background: "#fff", borderRadius: "22px", overflow: "hidden", boxShadow: "0 12px 34px rgba(0,0,0,.06)" }}>
+              {/* 日付ヘッダー（タップで開閉） */}
+              <button
+                onClick={() => toggleDate(g.date)}
+                style={{
+                  width: "100%",
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  textAlign: "left",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "16px 18px",
+                }}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Chevron open={dateOpen} />
+                  <span style={{ fontSize: "15px", fontWeight: 800 }}>{g.date}</span>
+                </span>
+                <span style={{ fontSize: "13px", fontWeight: 700, color: "#8e8e93" }}>
+                  {g.records.length}件 · <span style={{ color: accent }}>{s.yen(g.total)}</span>
+                </span>
+              </button>
 
-            {g.records.map((r) => (
-              <div key={r.id} style={{ padding: "10px 4px", borderBottom: "1px solid #f7f7f9" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                  <div>
-                    <span style={{ fontSize: "15px", fontWeight: 700 }}>{r.tableName}</span>
-                    <span style={{ fontSize: "12px", color: "#8e8e93", marginLeft: "8px" }}>
-                      {dateTimeLabel(r.closedAt)} · {r.count}点
-                    </span>
-                  </div>
-                  <span style={{ fontSize: "17px", fontWeight: 800, color: accent }}>
-                    {s.yen(r.total)}
-                  </span>
+              {dateOpen && (
+                <div style={{ borderTop: "1px solid #f4f4f6", padding: "4px 10px 10px" }}>
+                  {g.records.map((r) => {
+                    const recOpen = openRecords.has(r.id);
+                    return (
+                      <div key={r.id} style={{ borderBottom: "1px solid #f7f7f9" }}>
+                        <button
+                          onClick={() => toggleRecord(r.id)}
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            background: "transparent",
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                            textAlign: "left",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: "10px 8px",
+                          }}
+                        >
+                          <span style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                            <Chevron open={recOpen} />
+                            <span>
+                              <span style={{ fontSize: "15px", fontWeight: 700 }}>{r.tableName}</span>
+                              <span style={{ fontSize: "12px", color: "#8e8e93", marginLeft: "8px" }}>
+                                {dateTimeLabel(r.closedAt)} · {r.count}点
+                              </span>
+                            </span>
+                          </span>
+                          <span style={{ fontSize: "17px", fontWeight: 800, color: accent, flexShrink: 0, marginLeft: "10px" }}>
+                            {s.yen(r.total)}
+                          </span>
+                        </button>
+                        {recOpen && (
+                          <div style={{ padding: "0 8px 12px 30px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                            {r.items.map((it, i) => (
+                              <div
+                                key={i}
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  fontSize: "13px",
+                                  color: "#6b6b70",
+                                }}
+                              >
+                                <span>
+                                  {it.name} <span style={{ color: "#a0a0a5" }}>×{it.qty}</span>
+                                </span>
+                                <span>{s.yen(it.price * it.qty)}</span>
+                              </div>
+                            ))}
+                            {(r.discountAmount > 0 || r.chargeAmount > 0 || r.taxAmount > 0) && (
+                              <div style={{ marginTop: "6px", paddingTop: "6px", borderTop: "1px dashed #ececee", display: "flex", flexDirection: "column", gap: "3px" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#a0a0a5" }}>
+                                  <span>小計</span>
+                                  <span>{s.yen(r.subtotal)}</span>
+                                </div>
+                                {r.discountAmount > 0 && (
+                                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#ff3b30" }}>
+                                    <span>
+                                      割引{r.discountType ? `（${r.discountValue}${DISCOUNT_LABEL[r.discountType]}）` : ""}
+                                    </span>
+                                    <span>−{s.yen(r.discountAmount)}</span>
+                                  </div>
+                                )}
+                                {r.chargeAmount > 0 && (
+                                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#a0a0a5" }}>
+                                    <span>チャージ料</span>
+                                    <span>+{s.yen(r.chargeAmount)}</span>
+                                  </div>
+                                )}
+                                {r.taxAmount > 0 && (
+                                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#a0a0a5" }}>
+                                    <span>消費税</span>
+                                    <span>+{s.yen(r.taxAmount)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-                <div style={{ marginTop: "4px", display: "flex", flexWrap: "wrap", gap: "6px 14px" }}>
-                  {r.items.map((it, i) => (
-                    <span key={i} style={{ fontSize: "12px", color: "#6b6b70" }}>
-                      {it.name} <span style={{ color: "#a0a0a5" }}>×{it.qty}</span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        ))
+              )}
+            </div>
+          );
+        })
       )}
     </div>
   );

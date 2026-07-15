@@ -2,7 +2,7 @@
 
 import { chipStyle } from "@/lib/styles";
 import type { CatFilter } from "@/store/useAppStore";
-import { CAT_FILTERS } from "@/store/useAppStore";
+import { useAppStore } from "@/store/useAppStore";
 
 export default function ChipRow({
   value,
@@ -17,6 +17,8 @@ export default function ChipRow({
   borderBottom?: boolean;
   wrap?: boolean;
 }) {
+  const categories = useAppStore((s) => s.categories);
+  const filters: CatFilter[] = ["すべて", ...categories];
   return (
     <div
       style={{
@@ -28,7 +30,7 @@ export default function ChipRow({
         borderBottom: borderBottom ? "1px solid #f0f0f2" : undefined,
       }}
     >
-      {CAT_FILTERS.map((c) => (
+      {filters.map((c) => (
         <button
           key={c}
           onClick={() => onChange(c)}
