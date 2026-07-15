@@ -197,3 +197,25 @@ begin
   end if;
   return v_new;
 end $$;
+
+
+-- ============================================================
+-- 実行権限（ステップ5 RLS厳格化とセット。詳細は step5-rls.sql 参照）
+--   place_order: submit_order Edge Function(service_role)経由のみ。
+--     anonが直接rpc()で呼んでproxy=trueを渡すと「客注文のふりをしたスタッフ代理注文」で
+--     トークン検証/レート制限をスキップできてしまうため、直接呼び出しは禁止する。
+--   open_session: 読み取り専用（照合するだけ）なので客ページから直接呼んでよい。
+--   close_table / regenerate_table_token: スタッフのみ（ログイン必須画面からの呼び出し）。
+-- ============================================================
+-- 注意: Supabaseは関数作成時にanon/authenticatedへEXECUTEを"直接"自動付与するため、
+-- `revoke ... from public` だけでは取り消せない。anon/authenticatedからも明示的にrevokeする。
+revoke execute on function place_order(uuid, uuid, boolean, text, jsonb, text) from public, anon, authenticated;
+grant  execute on function place_order(uuid, uuid, boolean, text, jsonb, text) to service_role;
+
+grant execute on function open_session(uuid, uuid, text) to anon, authenticated;
+
+revoke execute on function close_table(uuid, uuid) from public, anon;
+grant  execute on function close_table(uuid, uuid) to authenticated;
+
+revoke execute on function regenerate_table_token(uuid, uuid) from public, anon;
+grant  execute on function regenerate_table_token(uuid, uuid) to authenticated;

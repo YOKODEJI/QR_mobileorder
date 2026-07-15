@@ -1,47 +1,41 @@
-// ステップ4 セキュリティ検証: トークン検証 / セッション / レート制限 / 会計更新
+// ステップ4/5 セキュリティ回帰検証: トークン検証 / セッション / レート制限（anonの立場から）
 // 実行: node --env-file=.env.local scripts/test-security.mjs
+//
+// 注意（ステップ5以降）: anonは tables.qr_token を直接読めない（意図的な制限）。
+// そのため対象卓のid/qr_tokenは、SQL Editorで下記を実行して取得し、定数として渡す。
+//   select id, qr_token from tables where store_id = '<STORE_ID>' and name = 'テーブル 1';
 import { createClient } from "@supabase/supabase-js";
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const storeId = process.env.NEXT_PUBLIC_STORE_ID;
-const sb = createClient(url, key);
+const sb = createClient(url, key); // anonのみ。ログインしない。
+
+const TABLE_ID = process.argv[2] ?? "3026ce72-83bb-4e77-8caa-5eb6aadad0f8"; // テーブル1
+const QR_TOKEN = process.argv[3] ?? "02772b1816ada60f2777159f"; // テーブル1のqr_token
 
 const ok = (b) => (b ? "✅" : "❌");
+let failures = 0;
+const check = (label, passed, detail) => {
+  console.log(`${ok(passed)} ${label}${detail ? `  (${detail})` : ""}`);
+  if (!passed) failures++;
+};
 
-// --- 0) ① 列の存在確認 ---
-const { data: tbls, error: colErr } = await sb
-  .from("tables")
-  .select("id,name,qr_token,session_token")
-  .eq("store_id", storeId)
-  .order("sort")
-  .limit(1);
-if (colErr) {
-  console.log(`❌ ① 未実行っぽい: tables.qr_token を読めません（${colErr.message}）`);
-  console.log("   → SQL Editor で step①（列追加）を実行してください。");
-  process.exit(1);
-}
-const table = tbls[0];
-console.log(`対象卓: ${table.name}  qr_token=${table.qr_token?.slice(0, 8)}…  ✅ ①列OK`);
+console.log(`対象卓id=${TABLE_ID.slice(0, 8)}…`);
 
-// --- 1) ② open_session RPC の存在＋照合 ---
+// --- 1) open_session RPC の照合 ---
 const { data: sess, error: osErr } = await sb.rpc("open_session", {
   p_store: storeId,
-  p_table: table.id,
-  p_k: table.qr_token,
+  p_table: TABLE_ID,
+  p_k: QR_TOKEN,
 });
-if (osErr) {
-  console.log(`❌ ② 未実行っぽい: open_session を呼べません（${osErr.message}）`);
-  console.log("   → SQL Editor で step②（関数更新）を実行してください。");
-  process.exit(1);
-}
-console.log(`open_session(正しいk) → session_token=${String(sess).slice(0, 8)}…  ✅ ②関数OK`);
+check("open_session(正しいk) 成功", !osErr && !!sess, osErr?.message ?? `session=${String(sess).slice(0, 8)}…`);
 
 const { error: badKErr } = await sb.rpc("open_session", {
   p_store: storeId,
-  p_table: table.id,
+  p_table: TABLE_ID,
   p_k: "wrong-token-xxxx",
 });
-console.log(`open_session(誤ったk) → ${ok(!!badKErr)} 拒否 (${badKErr?.message ?? "通ってしまった"})`);
+check("open_session(誤ったk) 拒否", !!badKErr, badKErr?.message);
 
 // --- ヘルパー: submit_order 呼び出し ---
 const { data: menu } = await sb
@@ -56,7 +50,7 @@ async function order(token, idem) {
   const { data, error } = await sb.functions.invoke("submit_order", {
     body: {
       storeId,
-      tableId: table.id,
+      tableId: TABLE_ID,
       proxy: false,
       idempotencyKey: idem,
       token,
@@ -71,28 +65,23 @@ async function order(token, idem) {
   return { orderId: data.orderId };
 }
 
-// --- 2) トークン無しの注文は弾かれる ---
+// --- 2) トークン無し／誤りの注文は弾かれる ---
 const noTok = await order(null, crypto.randomUUID());
-console.log(`注文(トークン無し) → ${ok(!!noTok.error)} 拒否 (${noTok.error ?? "通ってしまった orderId=" + noTok.orderId})`);
+check("注文(トークン無し) 拒否", !!noTok.error, noTok.error ?? `通ってしまった orderId=${noTok.orderId}`);
 
-// --- 3) 誤トークンの注文は弾かれる ---
 const badTok = await order("wrong-session-xxxx", crypto.randomUUID());
-console.log(`注文(誤トークン)   → ${ok(!!badTok.error)} 拒否 (${badTok.error ?? "通ってしまった"})`);
+check("注文(誤トークン) 拒否", !!badTok.error, badTok.error);
 
-// --- 4) 正しい session_token の注文は成功 ---
+// --- 3) 正しい session_token の注文は成功 ---
 const good = await order(sess, crypto.randomUUID());
-console.log(`注文(正セッション) → ${ok(!!good.orderId)} 成功 (${good.orderId ? "orderId=" + good.orderId.slice(0, 8) + "…" : "失敗: " + good.error})`);
+check("注文(正セッション) 成功", !!good.orderId, good.orderId ? `orderId=${good.orderId.slice(0, 8)}…` : good.error);
 
-// --- 5) 会計で session_token が更新され、旧トークンが無効化される ---
-await sb.rpc("close_table", { p_store: storeId, p_table: table.id });
-const afterClose = await order(sess, crypto.randomUUID());
-console.log(`会計後、旧トークンで注文 → ${ok(!!afterClose.error)} 拒否 (${afterClose.error ?? "通ってしまった＝更新されてない"})`);
-
-// 新しい session_token を取り直せば再び注文できる
-const { data: sess2 } = await sb.rpc("open_session", { p_store: storeId, p_table: table.id, p_k: table.qr_token });
-const reorder = await order(sess2, crypto.randomUUID());
-console.log(`新セッション取得後   → ${ok(!!reorder.orderId)} 成功 (${reorder.orderId ? "OK" : reorder.error})`);
-
-// 後片付け: このテスト注文を会計で消す
-await sb.rpc("close_table", { p_store: storeId, p_table: table.id });
-console.log("— 検証完了（テスト注文は会計で片付け済み）—");
+console.log(
+  `\n${failures === 0 ? "✅ 全項目パス（anonの立場での検証はここまで）" : `❌ ${failures}件失敗`}\n` +
+  `注意: close_table(会計)はステップ5でauthenticated限定にしたため、このスクリプト(anon)からは検証不可（想定通り）。\n` +
+  `      「会計でセッションが更新される」ことは /admin に実際にログインして確認してください:\n` +
+  `      1. /admin にログイン → テーブル/会計 → テーブル1を会計\n` +
+  `      2. その直後、上のテスト用の正セッション(sess)で再度注文しても拒否されればOK\n` +
+  `      （このテスト注文1件は会計されずに残るので、上記の手動確認で一緒に片付きます）`
+);
+process.exit(failures === 0 ? 0 : 1);
