@@ -1,27 +1,46 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { isSupabaseConfigured } from "@/lib/supabase";
+import { uploadPhoto, deletePhoto } from "@/lib/storage";
 
-/* クリック / ドラッグ&ドロップで画像を設定できる汎用スロット（ローカル保持） */
+/* クリック / ドラッグ&ドロップで画像を設定できる汎用スロット。
+   Supabase設定時はStorageへアップロードして公開URLを保持、未設定時はローカルbase64のまま動く。 */
 export default function PhotoSlot({
   height,
   radius = 0,
   label = "写真をドラッグ＆ドロップ／タップで追加",
   value,
   onChange,
+  folder = "photo",
 }: {
   height: number;
   radius?: number;
   label?: string;
   value?: string | null;
   onChange?: (url: string | null) => void;
+  /** Storageの保存先プレフィックス（例: "header" / "footer" / "menu-<id>"） */
+  folder?: string;
 }) {
   const [local, setLocal] = useState<string | null>(value ?? null);
+  const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const img = value !== undefined ? value : local;
 
-  const handleFile = (f: File | undefined) => {
+  const handleFile = async (f: File | undefined) => {
     if (!f) return;
+    if (isSupabaseConfigured()) {
+      setUploading(true);
+      const url = await uploadPhoto(f, folder);
+      setUploading(false);
+      if (!url) return; // 失敗時は何もしない（既存の写真はそのまま）
+      const prev = img;
+      if (onChange) onChange(url);
+      else setLocal(url);
+      if (prev && prev !== url) deletePhoto(prev); // 差し替え前の画像は掃除（失敗しても無視）
+      return;
+    }
+    // 未設定（ローカル開発）はこれまで通りbase64で保持
     const r = new FileReader();
     r.onload = () => {
       const url = r.result as string;
@@ -33,22 +52,23 @@ export default function PhotoSlot({
 
   return (
     <div
-      onClick={() => inputRef.current?.click()}
+      onClick={() => !uploading && inputRef.current?.click()}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault();
-        handleFile(e.dataTransfer.files?.[0]);
+        if (!uploading) handleFile(e.dataTransfer.files?.[0]);
       }}
       style={{
         height: `${height}px`,
         borderRadius: `${radius}px`,
-        cursor: "pointer",
+        cursor: uploading ? "default" : "pointer",
         overflow: "hidden",
         background: img ? "transparent" : "#f7f7f9",
         border: img ? "none" : "2px dashed #d1d1d6",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        position: "relative",
       }}
     >
       {img ? (
@@ -64,6 +84,23 @@ export default function PhotoSlot({
         >
           {label}
         </span>
+      )}
+      {uploading && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "rgba(255,255,255,.75)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "12px",
+            fontWeight: 700,
+            color: "#6b6b70",
+          }}
+        >
+          アップロード中…
+        </div>
       )}
       <input
         ref={inputRef}

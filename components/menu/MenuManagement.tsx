@@ -1,10 +1,12 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useAppStore, CATS } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import type { MenuItem } from "@/store/useAppStore";
 import ChipRow from "@/components/ui/ChipRow";
+import { isSupabaseConfigured } from "@/lib/supabase";
+import { uploadPhoto, deletePhoto } from "@/lib/storage";
 
 function DragDots() {
   return (
@@ -27,13 +29,50 @@ function PhotoCell({ item }: { item: MenuItem }) {
   const setPhoto = useAppStore((s) => s.setPhoto);
   const removePhoto = useAppStore((s) => s.removePhoto);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
-  const onFile = (f: File | undefined) => {
+  const onFile = async (f: File | undefined) => {
     if (!f) return;
+    if (isSupabaseConfigured()) {
+      setUploading(true);
+      const url = await uploadPhoto(f, `menu-${item.id}`);
+      setUploading(false);
+      if (!url) return;
+      const prev = item.photo;
+      setPhoto(item.id, url);
+      if (prev) deletePhoto(prev);
+      return;
+    }
     const r = new FileReader();
     r.onload = () => setPhoto(item.id, r.result as string);
     r.readAsDataURL(f);
   };
+
+  if (uploading) {
+    return (
+      <div
+        style={{
+          width: "54px",
+          height: "54px",
+          borderRadius: "13px",
+          background: "#f0f0f2",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "10px",
+          fontWeight: 700,
+          color: "#8e8e93",
+          flexShrink: 0,
+          textAlign: "center",
+          lineHeight: 1.3,
+        }}
+      >
+        処理
+        <br />
+        中…
+      </div>
+    );
+  }
 
   if (item.photo) {
     return (
@@ -45,7 +84,10 @@ function PhotoCell({ item }: { item: MenuItem }) {
           style={{ width: "54px", height: "54px", borderRadius: "13px", objectFit: "cover", display: "block" }}
         />
         <button
-          onClick={() => removePhoto(item.id)}
+          onClick={() => {
+            deletePhoto(item.photo);
+            removePhoto(item.id);
+          }}
           style={{
             position: "absolute",
             top: "-6px",

@@ -3,6 +3,7 @@
 import { useAppStore } from "@/store/useAppStore";
 import Toggle from "@/components/ui/Toggle";
 import PhotoSlot from "@/components/ui/PhotoSlot";
+import { deletePhoto } from "@/lib/storage";
 
 const SWATCHES = ["#cf4b2c", "#e0902a", "#248a3d", "#0a84ff", "#8a4fd0"];
 
@@ -157,10 +158,14 @@ export default function SettingsSheet() {
                 label="ヘッダー写真をタップ／ドロップで追加"
                 value={settings.headerPhoto}
                 onChange={(url) => setSetting("headerPhoto", url)}
+                folder="header"
               />
               {settings.headerPhoto && (
                 <button
-                  onClick={() => setSetting("headerPhoto", null)}
+                  onClick={() => {
+                    deletePhoto(settings.headerPhoto);
+                    setSetting("headerPhoto", null);
+                  }}
                   style={removeBtn}
                 >
                   写真を削除
@@ -192,10 +197,14 @@ export default function SettingsSheet() {
                 label="フッター写真をタップ／ドロップで追加"
                 value={settings.footerPhoto}
                 onChange={(url) => setSetting("footerPhoto", url)}
+                folder="footer"
               />
               {settings.footerPhoto && (
                 <button
-                  onClick={() => setSetting("footerPhoto", null)}
+                  onClick={() => {
+                    deletePhoto(settings.footerPhoto);
+                    setSetting("footerPhoto", null);
+                  }}
                   style={removeBtn}
                 >
                   写真を削除
