@@ -5,6 +5,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import type { MenuItem } from "@/store/useAppStore";
 import ChipRow from "@/components/ui/ChipRow";
+import Picker from "@/components/ui/Picker";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { uploadPhoto, deletePhoto } from "@/lib/storage";
 
@@ -215,17 +216,19 @@ export default function MenuManagement() {
             onChange={(e) => s.setNewField("newName", e.target.value)}
             style={{ ...insetInput, flex: "2 1 160px" }}
           />
-          <select
+          <Picker
             value={s.newCat}
-            onChange={(e) => s.setNewCat(e.target.value)}
-            style={{ ...insetInput, flex: "1 1 110px" }}
-          >
-            {s.categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+            options={s.categories}
+            onChange={s.setNewCat}
+            label="カテゴリ"
+            accent={accent}
+            triggerStyle={{
+              ...insetInput,
+              flex: "1 1 110px",
+              justifyContent: "space-between",
+              fontWeight: 400,
+            }}
+          />
           <input
             type="number"
             placeholder="価格"
@@ -368,29 +371,17 @@ export default function MenuManagement() {
                   >
                     {m.name}
                   </div>
-                  <select
-                    value={m.cat}
-                    onChange={(e) => s.setCat(m.id, e.target.value)}
-                    style={{
-                      marginTop: "3px",
-                      fontSize: "11px",
-                      background: "#f0f0f2",
-                      color: "#6b6b70",
-                      border: "none",
-                      borderRadius: "999px",
-                      padding: "2px 8px",
-                      fontFamily: "inherit",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {/* 削除済みなど、一覧に無い現在値も選べるよう先頭に補完 */}
-                    {!s.categories.includes(m.cat) && <option value={m.cat}>{m.cat}</option>}
-                    {s.categories.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
+                  <div style={{ marginTop: "3px" }}>
+                    <Picker
+                      value={m.cat}
+                      // 削除済みなど、一覧に無い現在値も選べるよう先頭に補完
+                      options={s.categories.includes(m.cat) ? s.categories : [m.cat, ...s.categories]}
+                      onChange={(c) => s.setCat(m.id, c)}
+                      label="カテゴリ"
+                      accent={accent}
+                      triggerStyle={{ fontSize: "11px", padding: "2px 8px 2px 10px" }}
+                    />
+                  </div>
                 </div>
 
                 {/* 価格 */}
