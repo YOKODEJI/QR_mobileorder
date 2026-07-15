@@ -31,105 +31,204 @@ export interface Snapshot {
   checkouts: CheckoutRecord[];
 }
 
-/** 店舗の全業務データをDBから取得してストア形状にマップ */
+export interface StoreSettingsSlice {
+  storeName: string | null;
+  theme: string | null;
+  showHeaderPhoto: boolean;
+  showFooterPhoto: boolean;
+  headerPhoto: string | null;
+  footerPhoto: string | null;
+  taxMode: TaxMode | null;
+  taxRate: number | null;
+  chargeRate: number | null;
+}
+
+/** 店舗設定のみ取得（Realtime差分更新用の1テーブル分） */
+export async function fetchStoreSettings(): Promise<StoreSettingsSlice | null> {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return null;
+  const { data, error } = await sb
+    .from("stores")
+    .select("name,theme,show_header_photo,show_footer_photo,header_photo_url,footer_photo_url,tax_mode,tax_rate,charge_rate")
+    .eq("id", STORE_ID)
+    .single();
+  if (error) {
+    console.error("fetchStoreSettings:", error.message);
+    return null;
+  }
+  return {
+    storeName: data?.name ?? null,
+    theme: data?.theme ?? null,
+    showHeaderPhoto: data?.show_header_photo ?? false,
+    showFooterPhoto: data?.show_footer_photo ?? false,
+    headerPhoto: (data?.header_photo_url as string | null) ?? null,
+    footerPhoto: (data?.footer_photo_url as string | null) ?? null,
+    taxMode: (data?.tax_mode as TaxMode | null) ?? null,
+    taxRate: (data?.tax_rate as number | null) ?? null,
+    chargeRate: (data?.charge_rate as number | null) ?? null,
+  };
+}
+
+/** カテゴリ一覧のみ取得（Realtime差分更新用の1テーブル分） */
+export async function fetchCategories(): Promise<string[] | null> {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return null;
+  const { data, error } = await sb.from("categories").select("id,name,sort").eq("store_id", STORE_ID).order("sort");
+  if (error) {
+    console.error("fetchCategories:", error.message);
+    return null;
+  }
+  return (data ?? []).map((c) => c.name as string);
+}
+
+/** テーブル(卓)一覧のみ取得（Realtime差分更新用の1テーブル分） */
+export async function fetchTables(): Promise<TableRec[] | null> {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return null;
+  const { data, error } = await sb.from("tables").select("id,name,sort").eq("store_id", STORE_ID).order("sort");
+  if (error) {
+    console.error("fetchTables:", error.message);
+    return null;
+  }
+  return (data ?? []).map((t) => ({ id: t.id as string, name: t.name as string }));
+}
+
+/** メニュー一覧のみ取得（Realtime差分更新用の1テーブル分） */
+export async function fetchMenu(): Promise<MenuItem[] | null> {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return null;
+  const { data, error } = await sb
+    .from("menu_items")
+    .select("id,name,cat,price,sold_out,stock,photo_url,sort")
+    .eq("store_id", STORE_ID)
+    .order("sort");
+  if (error) {
+    console.error("fetchMenu:", error.message);
+    return null;
+  }
+  return (data ?? []).map((m) => ({
+    id: m.id as string,
+    name: m.name as string,
+    cat: m.cat as Cat,
+    price: m.price as number,
+    soldOut: m.sold_out as boolean,
+    stock: m.stock as number,
+    photo: (m.photo_url as string | null) ?? null,
+  }));
+}
+
+/** 未会計の注文(明細つき)のみ取得（Realtime差分更新用。ordersとorder_items両方をカバー） */
+export async function fetchOrders(): Promise<Order[] | null> {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return null;
+  const { data, error } = await sb
+    .from("orders")
+    .select("id,table_id,status,proxy,created_at, order_items(menu_item_id,name,price,qty)")
+    .eq("store_id", STORE_ID)
+    .order("created_at", { ascending: true });
+  if (error) {
+    console.error("fetchOrders:", error.message);
+    return null;
+  }
+  return (data ?? []).map((o) => ({
+    id: o.id as string,
+    table: o.table_id as string,
+    createdAt: o.created_at as string,
+    status: o.status as Order["status"],
+    proxy: (o.proxy as boolean) || undefined,
+    items: ((o.order_items ?? []) as Array<Record<string, unknown>>).map((it) => ({
+      menuItemId: (it.menu_item_id as string) ?? "",
+      name: it.name as string,
+      price: it.price as number,
+      qty: it.qty as number,
+    })) as OrderItem[],
+  }));
+}
+
+/** 未対応のスタッフ呼び出しのみ取得（Realtime差分更新用の1テーブル分） */
+export async function fetchCalls(): Promise<StaffCall[] | null> {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return null;
+  const { data, error } = await sb
+    .from("staff_calls")
+    .select("id,table_id,created_at")
+    .eq("store_id", STORE_ID)
+    .is("resolved_at", null);
+  if (error) {
+    console.error("fetchCalls:", error.message);
+    return null;
+  }
+  return (data ?? []).map((c) => ({
+    id: c.id as string,
+    table: c.table_id as string,
+    createdAt: c.created_at as string,
+  }));
+}
+
+/** 会計履歴のみ取得（Realtime差分更新用の1テーブル分） */
+export async function fetchCheckouts(): Promise<CheckoutRecord[] | null> {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return null;
+  const { data, error } = await sb
+    .from("checkouts")
+    .select("id,table_id,table_name,items,count,subtotal,discount_type,discount_value,discount_amount,charge_amount,tax_amount,total,closed_at")
+    .eq("store_id", STORE_ID)
+    .order("closed_at", { ascending: false });
+  if (error) {
+    console.error("fetchCheckouts:", error.message);
+    return null;
+  }
+  return (data ?? []).map((c) => ({
+    id: c.id as string,
+    tableId: (c.table_id as string) ?? "",
+    tableName: c.table_name as string,
+    items: (c.items as OrderItem[]) ?? [],
+    count: c.count as number,
+    subtotal: (c.subtotal as number) ?? (c.total as number),
+    discountType: (c.discount_type as DiscountType) ?? null,
+    discountValue: (c.discount_value as number) ?? 0,
+    discountAmount: (c.discount_amount as number) ?? 0,
+    chargeAmount: (c.charge_amount as number) ?? 0,
+    taxAmount: (c.tax_amount as number) ?? 0,
+    total: c.total as number,
+    closedAt: c.closed_at as string,
+  }));
+}
+
+/** 店舗の全業務データをDBから取得してストア形状にマップ（初回ロード・ポーリング用の全件取得） */
 export async function loadSnapshot(): Promise<Snapshot | null> {
   const sb = getSupabase();
   if (!sb || !STORE_ID) return null;
 
   const [store, categories, tables, menu, orders, calls, checkouts] = await Promise.all([
-    sb.from("stores").select("name,theme,show_header_photo,show_footer_photo,header_photo_url,footer_photo_url,tax_mode,tax_rate,charge_rate").eq("id", STORE_ID).single(),
-    sb.from("categories").select("id,name,sort").eq("store_id", STORE_ID).order("sort"),
-    sb.from("tables").select("id,name,sort").eq("store_id", STORE_ID).order("sort"),
-    sb.from("menu_items").select("id,name,cat,price,sold_out,stock,photo_url,sort").eq("store_id", STORE_ID).order("sort"),
-    sb
-      .from("orders")
-      .select("id,table_id,status,proxy,created_at, order_items(menu_item_id,name,price,qty)")
-      .eq("store_id", STORE_ID)
-      .order("created_at", { ascending: true }),
-    sb.from("staff_calls").select("id,table_id,created_at").eq("store_id", STORE_ID).is("resolved_at", null),
-    sb
-      .from("checkouts")
-      .select("id,table_id,table_name,items,count,subtotal,discount_type,discount_value,discount_amount,charge_amount,tax_amount,total,closed_at")
-      .eq("store_id", STORE_ID)
-      .order("closed_at", { ascending: false }),
+    fetchStoreSettings(),
+    fetchCategories(),
+    fetchTables(),
+    fetchMenu(),
+    fetchOrders(),
+    fetchCalls(),
+    fetchCheckouts(),
   ]);
 
-  const err = store.error || categories.error || tables.error || menu.error || orders.error || calls.error || checkouts.error;
-  if (err) {
-    console.error("loadSnapshot error:", err.message);
+  // どれか1つでも取得失敗したら（部分的に古いデータのまま反映せず）全体を失敗扱いにする
+  if (!store || categories == null || tables == null || menu == null || orders == null || calls == null || checkouts == null) {
     return null;
   }
 
-  return {
-    storeName: store.data?.name ?? null,
-    theme: store.data?.theme ?? null,
-    showHeaderPhoto: store.data?.show_header_photo ?? false,
-    showFooterPhoto: store.data?.show_footer_photo ?? false,
-    headerPhoto: (store.data?.header_photo_url as string | null) ?? null,
-    footerPhoto: (store.data?.footer_photo_url as string | null) ?? null,
-    taxMode: (store.data?.tax_mode as TaxMode | null) ?? null,
-    taxRate: (store.data?.tax_rate as number | null) ?? null,
-    chargeRate: (store.data?.charge_rate as number | null) ?? null,
-    categories: (categories.data ?? []).map((c) => c.name as string),
-    tables: (tables.data ?? []).map((t) => ({ id: t.id as string, name: t.name as string })),
-    menu: (menu.data ?? []).map((m) => ({
-      id: m.id as string,
-      name: m.name as string,
-      cat: m.cat as Cat,
-      price: m.price as number,
-      soldOut: m.sold_out as boolean,
-      stock: m.stock as number,
-      photo: (m.photo_url as string | null) ?? null,
-    })),
-    orders: (orders.data ?? []).map((o) => ({
-      id: o.id as string,
-      table: o.table_id as string,
-      createdAt: o.created_at as string,
-      status: o.status as Order["status"],
-      proxy: (o.proxy as boolean) || undefined,
-      items: ((o.order_items ?? []) as Array<Record<string, unknown>>).map((it) => ({
-        menuItemId: (it.menu_item_id as string) ?? "",
-        name: it.name as string,
-        price: it.price as number,
-        qty: it.qty as number,
-      })) as OrderItem[],
-    })),
-    calls: (calls.data ?? []).map((c) => ({
-      id: c.id as string,
-      table: c.table_id as string,
-      createdAt: c.created_at as string,
-    })),
-    checkouts: (checkouts.data ?? []).map((c) => ({
-      id: c.id as string,
-      tableId: (c.table_id as string) ?? "",
-      tableName: c.table_name as string,
-      items: (c.items as OrderItem[]) ?? [],
-      count: c.count as number,
-      subtotal: (c.subtotal as number) ?? (c.total as number),
-      discountType: (c.discount_type as DiscountType) ?? null,
-      discountValue: (c.discount_value as number) ?? 0,
-      discountAmount: (c.discount_amount as number) ?? 0,
-      chargeAmount: (c.charge_amount as number) ?? 0,
-      taxAmount: (c.tax_amount as number) ?? 0,
-      total: c.total as number,
-      closedAt: c.closed_at as string,
-    })),
-  };
+  return { ...store, categories, tables, menu, orders, calls, checkouts };
 }
 
-/** 業務テーブルの変更を購読。onChange をデバウンスして全件再取得するのは呼び出し側の責務 */
-export function subscribeRealtime(onChange: () => void): () => void {
+/** Realtimeで変化があったテーブル名（"orders"等）を都度通知する。
+ *  デバウンスして「変わったテーブルだけ」再取得するのは呼び出し側(SupabaseSync)の責務。 */
+export function subscribeRealtime(onChange: (table: string) => void): () => void {
   const sb = getSupabase();
   if (!sb) return () => {};
-  const channel = sb
-    .channel("qr-order-changes")
-    .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, onChange)
-    .on("postgres_changes", { event: "*", schema: "public", table: "order_items" }, onChange)
-    .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, onChange)
-    .on("postgres_changes", { event: "*", schema: "public", table: "tables" }, onChange)
-    .on("postgres_changes", { event: "*", schema: "public", table: "staff_calls" }, onChange)
-    .on("postgres_changes", { event: "*", schema: "public", table: "checkouts" }, onChange)
-    .subscribe();
+  const tables = ["stores", "categories", "tables", "menu_items", "orders", "order_items", "staff_calls", "checkouts"];
+  let channel = sb.channel("qr-order-changes");
+  for (const t of tables) {
+    channel = channel.on("postgres_changes", { event: "*", schema: "public", table: t }, () => onChange(t));
+  }
+  channel.subscribe();
   return () => {
     sb.removeChannel(channel);
   };
