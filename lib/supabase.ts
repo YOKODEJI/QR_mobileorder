@@ -36,3 +36,24 @@ export function getSupabase(): SupabaseClient | null {
 export function isSupabaseConfigured(): boolean {
   return Boolean(url && anonKey && STORE_ID);
 }
+
+/**
+ * 客ページ用: 匿名認証(signInAnonymously)でauth.uid()を確保する。
+ * これにより orders/order_items/staff_calls のRLS(has_table_session())が
+ * その客を自分の卓に限定できるようになる（詳細はdocs/07-tenant-isolation.md）。
+ * 既にセッションがあれば何もしない（ログイン済みスタッフのセッションを上書きしない）。
+ * signInAnonymously自体が失敗した場合（ダッシュボードで無効化されている等）はfalseを返し、
+ * 呼び出し側は「自分の注文状況は見られないが、注文自体はtoken方式のまま可能」として続行する。
+ */
+export async function ensureAnonymousSession(): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb) return false;
+  const { data } = await sb.auth.getSession();
+  if (data.session) return true; // 既存セッション（匿名/スタッフ問わず）があれば維持
+  const { error } = await sb.auth.signInAnonymously();
+  if (error) {
+    console.error("ensureAnonymousSession:", error.message);
+    return false;
+  }
+  return true;
+}

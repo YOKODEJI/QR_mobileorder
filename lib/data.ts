@@ -361,17 +361,16 @@ export async function dbOpenSession(tableId: string, k: string): Promise<string 
   return (data as string) ?? null;
 }
 
-/** 管理QR画面用: 各卓の qr_token を取得（QRのURL生成に使う）。id→qr_token のマップ。 */
+/** 管理QR画面用: 各卓の qr_token を取得（QRのURL生成に使う）。id→qr_token のマップ。
+ *  qr_token列はauthenticatedからも直接select不可(RLS/GRANTで封鎖済み)のため、
+ *  staff_store_id()で自店舗に絞る fetch_table_tokens() RPC 経由で取得する。 */
 export async function dbFetchTableTokens(): Promise<Record<string, string>> {
   const sb = getSupabase();
   if (!sb || !STORE_ID) return {};
-  const { data, error } = await sb
-    .from("tables")
-    .select("id,qr_token")
-    .eq("store_id", STORE_ID);
+  const { data, error } = await sb.rpc("fetch_table_tokens");
   if (error || !data) return {};
   const map: Record<string, string> = {};
-  for (const row of data) map[row.id as string] = (row.qr_token as string) ?? "";
+  for (const row of data as Array<{ id: string; qr_token: string }>) map[row.id] = row.qr_token ?? "";
   return map;
 }
 

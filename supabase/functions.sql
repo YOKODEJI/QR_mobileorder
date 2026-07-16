@@ -197,12 +197,18 @@ begin
   update tables set session_token = encode(gen_random_bytes(12), 'hex')
     where id = p_table and store_id = p_store;
 
+  -- 退店した客の閲覧セッション(table_sessions)も失効させる
+  update table_sessions set status = 'closed', closed_at = now()
+    where table_id = p_table and store_id = p_store and status = 'open';
+
   return v_result;
 end $$;
 
 
 -- ---- 来店セッション開始: QRの k(=qr_token) を照合し、今の session_token を返す ----
--- 客ページ読込時に anon から rpc で呼ぶ（security definer で RLS を越えて照合）。
+-- 客ページ読込時に anon/匿名認証済みauthenticated から rpc で呼ぶ
+-- （security definer で RLS を越えて照合）。匿名認証済み(auth.uid()あり)なら
+-- table_sessionsにも upsert し、has_table_session()経由でのRLS判定に使う。
 create or replace function open_session(
   p_store uuid,
   p_table uuid,
@@ -210,7 +216,7 @@ create or replace function open_session(
 ) returns text
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions  -- gen_random_bytes は extensions スキーマ
 as $$
 declare
   v_qr   text;
@@ -224,6 +230,19 @@ begin
   if p_k is null or p_k <> v_qr then
     raise exception 'invalid token';  -- QRの合言葉が違う（総当たり等）
   end if;
+
+  if auth.uid() is not null then
+    insert into table_sessions (store_id, table_id, user_id, token, status, opened_at, closed_at)
+      values (p_store, p_table, auth.uid(), encode(gen_random_bytes(12), 'hex'), 'open', now(), null)
+    on conflict (user_id) do update
+      set store_id  = excluded.store_id,
+          table_id  = excluded.table_id,
+          token     = excluded.token,
+          status    = 'open',
+          opened_at = now(),
+          closed_at = null;
+  end if;
+
   return v_sess;
 end $$;
 
@@ -254,6 +273,11 @@ begin
   if v_new is null then
     raise exception 'table not found';
   end if;
+
+  -- 旧QRで開いていた客の閲覧セッションも失効させる
+  update table_sessions set status = 'closed', closed_at = now()
+    where table_id = p_table and store_id = p_store and status = 'open';
+
   return v_new;
 end $$;
 

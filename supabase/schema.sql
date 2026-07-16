@@ -51,11 +51,15 @@ create table if not exists tables (
   session_token text not null default encode(gen_random_bytes(12), 'hex')
 );
 
--- ---- 来店セッション（QR悪用対策の核。M2後半で本格利用） ----
+-- ---- 来店セッション（客(anon)の店舗間/卓間読み取り分離の核。Anonymous Auth連携） ----
+--   user_id: 客が signInAnonymously() で得た auth.uid()。1ユーザー1卓（unique）。
+--   open_session RPCがqr_token照合成功時にupsertし、close_table/regenerate_table_token
+--   がその卓のセッションを閉じる。has_table_session()/customer_store_id()の判定源。
 create table if not exists table_sessions (
   id         uuid primary key default gen_random_uuid(),
   store_id   uuid not null references stores(id) on delete cascade,
   table_id   uuid not null references tables(id) on delete cascade,
+  user_id    uuid unique references auth.users(id) on delete cascade,
   token      text unique not null,
   status     text not null default 'open',  -- open / closed
   opened_at  timestamptz not null default now(),
@@ -200,10 +204,11 @@ end $$;
 -- （owner=postgres として実行されるため、ここでのRLS/権限を越えて動く＝これらの関数の
 -- 中身自体が唯一の防御線になる。詳細は functions.sql のコメント参照）。
 --
--- 既知の残課題: 客(anon)の閲覧は店舗単位までしか絞れていない（同一店舗内の卓間、
--- および複数店舗をこの1プロジェクトで共有する場合は店舗間も）。anonは認証を持たないため
--- RLSだけで卓/店舗単位に絞るには Anonymous Auth 等の追加設計が要る。詳細は
--- docs/07-tenant-isolation.md 参照。
+-- 客(orders/order_items/staff_calls)の卓単位分離は Supabase Anonymous Auth で実現。
+-- customerがsignInAnonymously()で得たauth.uid()をtable_sessionsに紐付け、
+-- has_table_session()で自卓のみに限定する（詳細は docs/07-tenant-isolation.md）。
+-- stores/categories/tables/menu_items は印刷メニューと同程度の公開情報のため
+-- 店舗間分離は見送り、anon/authenticated双方に公開のまま。
 -- ============================================================
 alter table stores          enable row level security;
 alter table staff           enable row level security;
@@ -231,42 +236,101 @@ $$;
 revoke execute on function staff_store_id() from public, anon;
 grant  execute on function staff_store_id() to authenticated;
 
--- stores: 閲覧は誰でも、authenticatedの閲覧/更新は自店舗のみ
+-- has_table_session(p_table): 匿名認証済みの客(auth.uid())が今その卓の有効な閲覧
+-- セッションを持っているか。table_sessionsはポリシー0件のため、SECURITY DEFINERで
+-- それを乗り越えて自分の行だけ見る。orders/order_items/staff_callsの客向けRLSの判定源。
+create or replace function has_table_session(p_table uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists(
+    select 1 from table_sessions
+    where table_id = p_table and user_id = auth.uid() and status = 'open'
+  );
+$$;
+revoke execute on function has_table_session(uuid) from public, anon;
+grant  execute on function has_table_session(uuid) to authenticated;
+
+-- customer_store_id(): 匿名認証済みの客が今どの店舗のセッション中か（予備の判定源）。
+create or replace function customer_store_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select store_id from table_sessions where user_id = auth.uid() and status = 'open' limit 1;
+$$;
+revoke execute on function customer_store_id() from public, anon;
+grant  execute on function customer_store_id() to authenticated;
+
+-- stores: 閲覧は誰でも(anon/匿名認証客とも)、authenticatedの更新は自店舗スタッフのみ
 create policy stores_select_anon          on stores for select to anon using (true);
 create policy stores_select_authenticated on stores for select to authenticated using (id = staff_store_id());
+create policy stores_select_customer      on stores for select to authenticated
+  using (coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false));
 create policy stores_update_authenticated on stores for update to authenticated
   using (id = staff_store_id()) with check (id = staff_store_id());
 
 -- categories: 閲覧は誰でも、増減は自店舗スタッフのみ
 create policy categories_select_anon          on categories for select to anon using (true);
 create policy categories_select_authenticated on categories for select to authenticated using (store_id = staff_store_id());
+create policy categories_select_customer      on categories for select to authenticated
+  using (coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false));
 create policy categories_write_authenticated  on categories for all to authenticated
   using (store_id = staff_store_id()) with check (store_id = staff_store_id());
 
--- tables: 客は qr_token/session_token を直接読めない（open_session RPC経由のみ配布）
+-- tables: qr_token/session_token は anon からもauthenticatedからも列単位で読めない
+-- （authenticatedロールは本物のスタッフと匿名認証客の両方が使うため列GRANTでは
+-- 区別できない。列を封鎖し、スタッフ向けは fetch_table_tokens() RPC 経由に一本化）。
 revoke select on tables from anon;
 grant select (id, store_id, name, sort) on tables to anon;
+revoke select on tables from authenticated;
+grant select (id, store_id, name, sort) on tables to authenticated;
 create policy tables_select_anon          on tables for select to anon using (true);
 create policy tables_select_authenticated on tables for select to authenticated using (store_id = staff_store_id());
+create policy tables_select_customer      on tables for select to authenticated
+  using (coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false));
 create policy tables_write_authenticated  on tables for all to authenticated
   using (store_id = staff_store_id()) with check (store_id = staff_store_id());
+
+create or replace function fetch_table_tokens()
+returns table(id uuid, qr_token text)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select t.id, t.qr_token from tables t where t.store_id = staff_store_id();
+$$;
+revoke execute on function fetch_table_tokens() from public, anon;
+grant  execute on function fetch_table_tokens() to authenticated;
 
 -- menu_items: 閲覧は誰でも、CRUD は自店舗スタッフのみ
 create policy menu_items_select_anon          on menu_items for select to anon using (true);
 create policy menu_items_select_authenticated on menu_items for select to authenticated using (store_id = staff_store_id());
+create policy menu_items_select_customer      on menu_items for select to authenticated
+  using (coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false));
 create policy menu_items_write_authenticated  on menu_items for all to authenticated
   using (store_id = staff_store_id()) with check (store_id = staff_store_id());
 
 -- orders / order_items: insertは誰にも許可しない（place_order RPC経由のみ）。
+-- 閲覧は「自店舗スタッフ」または「その卓の有効セッションを持つ客」のみ
+-- （anon向けusing(true)は撤去＝客は必ずsignInAnonymously経由になる）。
 -- status更新・明細の取消/削除は自店舗スタッフのみ。
-create policy orders_select_anon          on orders for select to anon using (true);
 create policy orders_select_authenticated on orders for select to authenticated using (store_id = staff_store_id());
+create policy orders_select_customer      on orders for select to authenticated using (has_table_session(table_id));
 create policy orders_update_authenticated on orders for update to authenticated
   using (store_id = staff_store_id()) with check (store_id = staff_store_id());
 
-create policy order_items_select_anon on order_items for select to anon using (true);
 create policy order_items_select_authenticated on order_items for select to authenticated using (
   exists (select 1 from orders o where o.id = order_items.order_id and o.store_id = staff_store_id())
+);
+create policy order_items_select_customer on order_items for select to authenticated using (
+  exists (select 1 from orders o where o.id = order_items.order_id and has_table_session(o.table_id))
 );
 create policy order_items_update_authenticated on order_items for update to authenticated
   using (exists (select 1 from orders o where o.id = order_items.order_id and o.store_id = staff_store_id()))
@@ -274,9 +338,12 @@ create policy order_items_update_authenticated on order_items for update to auth
 create policy order_items_delete_authenticated on order_items for delete to authenticated
   using (exists (select 1 from orders o where o.id = order_items.order_id and o.store_id = staff_store_id()));
 
--- staff_calls: 客は呼び出す(insert)＋確認(select)のみ。対応済み化(update)/削除は自店舗スタッフのみ
-create policy staff_calls_select_anon          on staff_calls for select to anon using (true);
+-- staff_calls: 閲覧は自店舗スタッフ or その卓の有効セッションを持つ客のみ。
+-- 呼び出す(insert)は anon も含めて誰でも許可（匿名認証が万一失敗しても
+-- 「スタッフを呼ぶ」ボタンだけは動くようにする安全側のフォールバック）。
+-- 対応済み化(update)/削除は自店舗スタッフのみ。
 create policy staff_calls_select_authenticated on staff_calls for select to authenticated using (store_id = staff_store_id());
+create policy staff_calls_select_customer      on staff_calls for select to authenticated using (has_table_session(table_id));
 create policy staff_calls_insert_all           on staff_calls for insert to anon, authenticated with check (true);
 create policy staff_calls_update_authenticated on staff_calls for update to authenticated
   using (store_id = staff_store_id()) with check (store_id = staff_store_id());
@@ -288,4 +355,5 @@ create policy checkouts_select_authenticated on checkouts for select to authenti
 create policy checkouts_insert_authenticated on checkouts for insert to authenticated with check (store_id = staff_store_id());
 
 -- staff / table_sessions: アプリからは未使用。ポリシー0件のまま（＝全ロール完全拒否）が最も安全。
+-- table_sessionsへのアクセスは has_table_session()/customer_store_id()関数(SECURITY DEFINER)経由のみ。
 -- staffテーブルへのアクセスは staff_store_id() 関数(SECURITY DEFINER)経由のみ。

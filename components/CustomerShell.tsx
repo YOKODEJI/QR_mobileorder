@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
-import { isSupabaseConfigured } from "@/lib/supabase";
+import { isSupabaseConfigured, ensureAnonymousSession } from "@/lib/supabase";
 import CustomerOrder from "@/components/customer/CustomerOrder";
 import AlertDialog from "@/components/ui/AlertDialog";
 import Toast from "@/components/ui/Toast";
@@ -23,10 +23,26 @@ export default function CustomerShell({ table }: { table?: string }) {
   const customerToken = useAppStore((s) => s.customerToken);
   const customerTableId = useAppStore((s) => s.customerTableId);
   const loading = isSupabaseConfigured() && !loaded;
+  // 匿名認証(signInAnonymously)完了フラグ。auth.uid()が要るopen_sessionより先に済ませる。
+  // 未設定時はそもそも不要なのでtrue扱い。
+  const [authReady, setAuthReady] = useState(!isSupabaseConfigured());
 
   useEffect(() => {
     document.documentElement.style.setProperty("--accent", theme);
   }, [theme]);
+
+  // 匿名認証: これにより注文状況(orders/staff_calls)を自分の卓分だけ閲覧できる
+  // (has_table_session()経由のRLS)。失敗しても注文自体(token方式)は引き続き可能。
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    let cancelled = false;
+    ensureAnonymousSession().finally(() => {
+      if (!cancelled) setAuthReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // QRに埋め込んだ合言葉 ?k= を取り込む（=その卓の qr_token）
   useEffect(() => {
@@ -45,11 +61,11 @@ export default function CustomerShell({ table }: { table?: string }) {
     if (t) setCustomerTable(t.id);
   }, [loading, table, tables, setCustomerTable]);
 
-  // 卓が決まり合言葉があれば来店セッションを開始（session_token 取得）
+  // 匿名認証完了・卓が決まり・合言葉があれば来店セッションを開始（session_token 取得）
   useEffect(() => {
-    if (loading || !customerToken || !customerTableId) return;
+    if (loading || !authReady || !customerToken || !customerTableId) return;
     openSession();
-  }, [loading, customerToken, customerTableId, openSession]);
+  }, [loading, authReady, customerToken, customerTableId, openSession]);
 
   return (
     <div

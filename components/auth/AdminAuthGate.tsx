@@ -29,8 +29,12 @@ export default function AdminAuthGate({ children }: { children: React.ReactNode 
     }
     let mounted = true;
 
-    const checkStoreMatch = async (hasSession: boolean) => {
-      if (!hasSession) {
+    // 客ページ(CustomerShell)が匿名認証(signInAnonymously)したセッションが
+    // 同じブラウザに残っている場合は「未ログイン」として通常のログインフォームを出す
+    // （"このアカウントは登録されていません"は本物のスタッフ資格情報向けのエラーなので、
+    // 客が/adminに来ただけのケースと区別する）。
+    const checkStoreMatch = async (session: { user?: { is_anonymous?: boolean } } | null) => {
+      if (!session || session.user?.is_anonymous) {
         if (mounted) setState("out");
         return;
       }
@@ -44,9 +48,9 @@ export default function AdminAuthGate({ children }: { children: React.ReactNode 
       setState("in");
     };
 
-    sb.auth.getSession().then(({ data }) => checkStoreMatch(!!data.session));
+    sb.auth.getSession().then(({ data }) => checkStoreMatch(data.session));
     const { data: sub } = sb.auth.onAuthStateChange((_e, session) => {
-      checkStoreMatch(!!session);
+      checkStoreMatch(session);
     });
     return () => {
       mounted = false;
