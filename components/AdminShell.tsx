@@ -43,6 +43,23 @@ export default function AdminShell() {
         letterSpacing: ".01em",
       }}
     >
+      {/* ガラスは背後に何か無いと透明感が見えない。ニュートラルな淡い光を固定で敷き、
+          ガラス面がスクロールでその上を流れることで屈折が視認できるようにする
+          （ログイン画面と同じ手法。fixedなのでスクロールしても光は動かない）。 */}
+      <div
+        aria-hidden
+        className="no-print"
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: "none",
+          background:
+            "radial-gradient(44% 38% at 10% 8%, rgba(120,120,140,.18), transparent 70%), " +
+            "radial-gradient(52% 44% at 92% 30%, rgba(160,160,170,.15), transparent 72%), " +
+            "radial-gradient(48% 40% at 30% 96%, rgba(90,100,130,.14), transparent 72%)",
+        }}
+      />
       <header
         className="no-print"
         style={{
@@ -117,7 +134,7 @@ export default function AdminShell() {
         </div>
       </header>
 
-      <main style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+      <main style={{ flex: 1, display: "flex", flexDirection: "column", position: "relative", zIndex: 1 }}>
         {loading ? (
           <LoadingScreen />
         ) : (

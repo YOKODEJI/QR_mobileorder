@@ -85,7 +85,7 @@ export default function CheckoutHistory() {
   return (
     <div style={{ padding: "24px 18px 40px", maxWidth: "900px", margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", gap: "18px" }}>
       {/* サマリー */}
-      <div style={{ background: "#fff", borderRadius: "22px", padding: "20px 22px", boxShadow: "0 12px 34px rgba(0,0,0,.06)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+      <div style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", padding: "20px 22px", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
         <div>
           <div style={{ fontSize: "19px", fontWeight: 800 }}>会計履歴</div>
           <div style={{ fontSize: "12px", color: "var(--text-2)", marginTop: "2px" }}>
@@ -99,14 +99,14 @@ export default function CheckoutHistory() {
       </div>
 
       {s.checkouts.length === 0 ? (
-        <div style={{ background: "#fff", borderRadius: "22px", padding: "40px 22px", boxShadow: "0 12px 34px rgba(0,0,0,.06)", textAlign: "center", color: "var(--text-2)", fontSize: "15px" }}>
+        <div style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", padding: "40px 22px", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)", textAlign: "center", color: "var(--text-2)", fontSize: "15px" }}>
           まだ会計履歴はありません。
         </div>
       ) : (
         groups.map((g) => {
           const dateOpen = openDates.has(g.date);
           return (
-            <div key={g.date} style={{ background: "#fff", borderRadius: "22px", overflow: "hidden", boxShadow: "0 12px 34px rgba(0,0,0,.06)" }}>
+            <div key={g.date} style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", overflow: "hidden", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)" }}>
               {/* 日付ヘッダー（タップで開閉） */}
               <button
                 onClick={() => toggleDate(g.date)}

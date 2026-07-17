@@ -212,7 +212,7 @@ export default function MenuManagement() {
   return (
     <div style={{ padding: "24px 18px 40px", maxWidth: "900px", margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", gap: "18px" }}>
       {/* 商品を追加 */}
-      <div style={{ background: "#fff", borderRadius: "22px", padding: "20px 22px", boxShadow: "0 12px 34px rgba(0,0,0,.06)" }}>
+      <div style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", padding: "20px 22px", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)" }}>
         <div style={{ fontSize: "17px", fontWeight: 800, marginBottom: "14px" }}>商品を追加</div>
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
           <input
@@ -258,7 +258,7 @@ export default function MenuManagement() {
       </div>
 
       {/* メニュー管理 */}
-      <div style={{ background: "#fff", borderRadius: "22px", overflow: "hidden", boxShadow: "0 12px 34px rgba(0,0,0,.06)" }}>
+      <div style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", overflow: "hidden", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)" }}>
         <div style={{ padding: "18px 22px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", flexWrap: "wrap" }}>
           <div>
             <div style={{ fontSize: "19px", fontWeight: 800 }}>メニュー管理</div>
@@ -462,7 +462,7 @@ export default function MenuManagement() {
       </div>
 
       {/* カテゴリ管理 */}
-      <div style={{ background: "#fff", borderRadius: "22px", padding: "20px 22px", boxShadow: "0 12px 34px rgba(0,0,0,.06)" }}>
+      <div style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", padding: "20px 22px", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)" }}>
         <div style={{ fontSize: "17px", fontWeight: 800, marginBottom: "4px" }}>カテゴリ管理</div>
         <div style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "14px" }}>
           カテゴリを追加・削除・名前変更できます。削除すると、そのカテゴリのメニューは「その他」に移動します。

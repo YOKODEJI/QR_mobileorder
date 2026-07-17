@@ -63,7 +63,7 @@ export default function KitchenDisplay() {
 
   return (
     <div style={{ padding: "24px 18px 40px", maxWidth: "1140px", margin: "0 auto", width: "100%" }}>
-      <div style={{ background: "#fff", borderRadius: "24px", padding: "20px 22px", boxShadow: "0 12px 34px rgba(0,0,0,.06)" }}>
+      <div style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "24px", padding: "20px 22px", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)" }}>
         {/* ヘッダー */}
         <div
           style={{

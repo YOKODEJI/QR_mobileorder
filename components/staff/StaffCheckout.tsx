@@ -119,7 +119,7 @@ export default function StaffCheckout() {
     <div style={{ padding: "24px 18px 40px", maxWidth: "1140px", margin: "0 auto", width: "100%" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
         {/* テーブル一覧（3列グリッド） */}
-        <div style={{ background: "#fff", borderRadius: "22px", padding: "16px 18px", boxShadow: "0 12px 34px rgba(0,0,0,.06)" }}>
+        <div style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", padding: "16px 18px", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", gap: "6px" }}>
             <span style={{ fontSize: "16px", fontWeight: 800 }}>テーブル一覧</span>
             {s.tableEditMode ? (
@@ -323,7 +323,7 @@ export default function StaffCheckout() {
         </div>
 
         {/* テーブル詳細（下に全幅表示） */}
-        <div style={{ background: "#fff", borderRadius: "22px", padding: "20px 22px", boxShadow: "0 12px 34px rgba(0,0,0,.06)", minHeight: "300px" }}>
+        <div style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", padding: "20px 22px", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)", minHeight: "300px" }}>
           {sel == null ? (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "260px", color: "var(--text-2)", fontSize: "15px" }}>
               上のテーブルを選択してください
