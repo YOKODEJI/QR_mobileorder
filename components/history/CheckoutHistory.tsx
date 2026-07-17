@@ -133,11 +133,11 @@ export default function CheckoutHistory() {
               </button>
 
               {dateOpen && (
-                <div style={{ borderTop: "1px solid #f4f4f6", padding: "4px 10px 10px" }}>
+                <div style={{ borderTop: "1px solid var(--hairline-2)", padding: "4px 10px 10px" }}>
                   {g.records.map((r) => {
                     const recOpen = openRecords.has(r.id);
                     return (
-                      <div key={r.id} style={{ borderBottom: "1px solid #f7f7f9" }}>
+                      <div key={r.id} style={{ borderBottom: "1px solid var(--hairline-2)" }}>
                         <button
                           onClick={() => toggleRecord(r.id)}
                           style={{
@@ -185,7 +185,7 @@ export default function CheckoutHistory() {
                               </div>
                             ))}
                             {(r.discountAmount > 0 || r.chargeAmount > 0 || r.taxAmount > 0) && (
-                              <div style={{ marginTop: "6px", paddingTop: "6px", borderTop: "1px dashed #ececee", display: "flex", flexDirection: "column", gap: "3px" }}>
+                              <div style={{ marginTop: "6px", paddingTop: "6px", borderTop: "1px dashed var(--hairline)", display: "flex", flexDirection: "column", gap: "3px" }}>
                                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--text-3)" }}>
                                   <span>小計</span>
                                   <span>{s.yen(r.subtotal)}</span>

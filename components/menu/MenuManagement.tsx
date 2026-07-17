@@ -117,7 +117,7 @@ function PhotoCell({ item }: { item: MenuItem }) {
         height: "54px",
         borderRadius: "13px",
         border: "1px dashed var(--text-3)",
-        background: "#fafafa",
+        background: "var(--chip-tint)",
         color: "var(--text-2)",
         fontSize: "12px",
         fontWeight: 700,
@@ -322,14 +322,14 @@ export default function MenuManagement() {
                   gap: "14px",
                   padding: "12px 20px",
                   minWidth: "660px",
-                  borderBottom: "1px solid #f4f4f6",
+                  borderBottom: "1px solid var(--hairline-2)",
                   background: dragging
                     ? "rgba(238,243,255,.5)"
                     : s.deleteMode && selected
-                      ? "#fff5f5"
+                      ? "var(--red-bg-2)"
                       : m.soldOut
-                        ? "#fafafa"
-                        : "#fff",
+                        ? "var(--chip-tint)"
+                        : "transparent",
                 }}
               >
                 {/* 左: ドラッグ or チェックボックス */}

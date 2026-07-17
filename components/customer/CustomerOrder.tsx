@@ -79,7 +79,7 @@ export default function CustomerOrder() {
           overflowY: "auto",
         }}
       >
-        <div style={{ height: "112px", flexShrink: 0 }} />
+        <div style={{ height: "88px", flexShrink: 0 }} />
 
         {s.settings.showHeaderPhoto && s.settings.headerPhoto && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -169,7 +169,7 @@ export default function CustomerOrder() {
           )}
         </div>
 
-        <div style={{ height: "168px", flexShrink: 0 }} />
+        <div style={{ height: "136px", flexShrink: 0 }} />
       </div>
 
       {/* 浮遊ヘッダー（ガラス） */}
@@ -180,9 +180,9 @@ export default function CustomerOrder() {
           left: 0,
           right: 0,
           zIndex: 10,
-          margin: "10px",
-          padding: "16px 16px 15px",
-          borderRadius: "26px",
+          margin: "8px",
+          padding: "10px 14px 10px",
+          borderRadius: "24px",
           background: "var(--glass)",
           backdropFilter: "blur(26px) saturate(180%)",
           WebkitBackdropFilter: "blur(26px) saturate(180%)",
@@ -195,11 +195,11 @@ export default function CustomerOrder() {
             <div style={{ fontSize: "12px", color: "var(--text-2)" }}>
               ようこそ {s.settings.storeName} へ
             </div>
-            <div style={{ fontSize: "25px", fontWeight: 800, marginTop: "2px", color: "var(--text)" }}>
+            <div style={{ fontSize: "25px", fontWeight: 800, color: "var(--text)" }}>
               {s.tableName(s.customerTableId)}
             </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px", alignItems: "flex-end" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-end" }}>
             <button
               onClick={() => s.toggleHistory(true)}
               style={{
@@ -207,7 +207,7 @@ export default function CustomerOrder() {
                 background: "var(--control-tint)",
                 color: "var(--text)",
                 borderRadius: "999px",
-                padding: "8px 13px",
+                padding: "6px 12px",
                 fontSize: "13px",
                 fontWeight: 700,
                 fontFamily: "inherit",
@@ -225,7 +225,7 @@ export default function CustomerOrder() {
                 background: called ? "var(--control-tint)" : accent,
                 color: called ? "var(--text-2)" : "var(--accent-ink)",
                 borderRadius: "999px",
-                padding: "8px 13px",
+                padding: "6px 12px",
                 fontSize: "13px",
                 fontWeight: 700,
                 fontFamily: "inherit",
@@ -248,14 +248,14 @@ export default function CustomerOrder() {
           left: 0,
           right: 0,
           bottom: 0,
-          margin: "10px",
-          borderRadius: "26px",
+          margin: "8px",
+          borderRadius: "24px",
           background: "var(--glass-strong)",
           backdropFilter: "blur(30px) saturate(190%)",
           WebkitBackdropFilter: "blur(30px) saturate(190%)",
           border: "1px solid var(--glass-edge)",
           boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)",
-          padding: "10px 16px 16px",
+          padding: "8px 14px 12px",
         }}
       >
         <div
@@ -263,7 +263,7 @@ export default function CustomerOrder() {
             textAlign: "center",
             fontSize: "11px",
             color: "var(--text-2)",
-            marginBottom: "8px",
+            marginBottom: "5px",
           }}
         >
           変更・キャンセルはスタッフにお声がけください
@@ -273,7 +273,7 @@ export default function CustomerOrder() {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            marginBottom: "10px",
+            marginBottom: "7px",
           }}
         >
           <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-2)" }}>
@@ -286,8 +286,8 @@ export default function CustomerOrder() {
           disabled={cartCount === 0 || s.submitting}
           style={{
             width: "100%",
-            padding: "15px",
-            borderRadius: "18px",
+            padding: "12px",
+            borderRadius: "16px",
             border: "none",
             background: cartCount === 0 ? "var(--soldout-bg)" : accent,
             color: cartCount === 0 ? "var(--soldout-text)" : "var(--accent-ink)",
@@ -300,7 +300,7 @@ export default function CustomerOrder() {
         >
           {s.submitting ? "送信中…" : "注文する"}
         </button>
-        <div style={{ textAlign: "center", fontSize: "10px", color: "var(--text-3)", marginTop: "8px" }}>
+        <div style={{ textAlign: "center", fontSize: "10px", color: "var(--text-3)", marginTop: "6px" }}>
           {s.settings.taxMode === "exclusive"
             ? `表示価格は税抜です（税込 ${s.yen(priceWithTax(cartTotal, "exclusive", s.settings.taxRate))}）`
             : "表示価格は税込です"}

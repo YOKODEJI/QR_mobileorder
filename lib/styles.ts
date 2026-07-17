@@ -102,9 +102,10 @@ export const proxyCardStyle = (soldOut: boolean): CSSProperties => ({
   justifyContent: "space-between",
   gap: "8px",
   padding: "9px 10px",
-  background: soldOut ? "#f7f7f9" : "#fff",
-  border: "1px solid var(--hairline)",
-  borderRadius: "12px",
+  background: soldOut ? "var(--chip-tint)" : "var(--surface)",
+  border: "none",
+  borderRadius: "14px",
+  boxShadow: soldOut ? "none" : "0 1px 5px rgba(0,0,0,.05)",
   opacity: soldOut ? 0.6 : 1,
 });
 

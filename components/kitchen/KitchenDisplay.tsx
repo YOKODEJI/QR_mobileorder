@@ -208,10 +208,10 @@ export default function KitchenDisplay() {
                 <div
                   key={o.id}
                   style={{
-                    background: "#fff",
+                    background: "var(--surface)",
                     borderRadius: "18px",
-                    border: highlight ? "2px solid var(--red)" : "1px solid #ececee",
-                    boxShadow: "0 4px 14px rgba(0,0,0,.04)",
+                    border: highlight ? "2px solid var(--red)" : "none",
+                    boxShadow: "0 2px 12px rgba(0,0,0,.07)",
                     overflow: "hidden",
                     animation: highlight ? "kpulse 1s ease-out 2" : undefined,
                   }}

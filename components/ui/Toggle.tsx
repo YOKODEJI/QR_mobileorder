@@ -19,7 +19,7 @@ export default function Toggle({
         cursor: "pointer",
         padding: 0,
         position: "relative",
-        background: on ? "#34c759" : "#e4e4ea",
+        background: on ? "var(--green)" : "rgba(120,120,128,.16)",
         transition: "background .2s",
       }}
     >

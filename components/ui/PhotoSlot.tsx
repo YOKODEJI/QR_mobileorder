@@ -63,7 +63,7 @@ export default function PhotoSlot({
         borderRadius: `${radius}px`,
         cursor: uploading ? "default" : "pointer",
         overflow: "hidden",
-        background: img ? "transparent" : "#f7f7f9",
+        background: img ? "transparent" : "var(--chip-tint)",
         border: img ? "none" : "2px dashed var(--soldout-bg)",
         display: "flex",
         alignItems: "center",

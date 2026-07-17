@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getSupabase, isSupabaseConfigured, STORE_ID } from "@/lib/supabase";
+import { fetchStoreSettings } from "@/lib/data";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 
 type AuthState = "loading" | "in" | "out" | "wrong-store";
@@ -70,6 +71,21 @@ function LoginForm({ initialError }: { initialError?: string }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(initialError ?? null);
   const [busy, setBusy] = useState(false);
+  const [storeName, setStoreName] = useState<string | null>(null);
+
+  // ログイン前でも店舗名/テーマは取得できる(storesは公開読み取り)。
+  // 見出しに店名を出し、ボタン等のアクセントも店舗テーマに揃える。
+  useEffect(() => {
+    let mounted = true;
+    fetchStoreSettings().then((s) => {
+      if (!mounted || !s) return;
+      if (s.storeName) setStoreName(s.storeName);
+      if (s.theme) document.documentElement.style.setProperty("--accent", s.theme);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,8 +159,8 @@ function LoginForm({ initialError }: { initialError?: string }) {
           gap: "12px",
         }}
       >
-        <div style={{ fontSize: "20px", fontWeight: 800, marginBottom: "4px" }}>
-          管理ツール ログイン
+        <div style={{ fontSize: "20px", fontWeight: 800, marginBottom: "4px", textWrap: "balance" }}>
+          {storeName ? `${storeName} 管理画面 ログイン` : "管理画面 ログイン"}
         </div>
         <div style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "8px" }}>
           スタッフ用のメールアドレスとパスワードでログインしてください。

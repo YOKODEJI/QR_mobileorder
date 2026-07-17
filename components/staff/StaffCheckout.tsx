@@ -199,15 +199,17 @@ export default function StaffCheckout() {
                     textAlign: "left",
                     width: "100%",
                     cursor: s.tableEditMode ? (canDrag ? "grab" : "default") : "pointer",
-                    borderRadius: "14px",
+                    borderRadius: "16px",
                     padding: "12px 14px",
                     opacity: dragging ? 0.5 : 1,
-                    background: selected ? "#fff" : active ? "#f7f7f9" : "#fbfbfd",
-                    border: selected
-                      ? `2px solid ${accent}`
+                    background: selected || active ? "var(--surface)" : "var(--chip-tint)",
+                    border: selected ? `2px solid ${accent}` : "2px solid transparent",
+                    boxShadow: selected
+                      ? "0 4px 16px rgba(0,0,0,.09)"
                       : active
-                        ? "1px solid #ececee"
-                        : "1px solid var(--hairline)",
+                        ? "0 1px 6px rgba(0,0,0,.05)"
+                        : "none",
+                    transition: "background .15s, box-shadow .15s, border-color .15s",
                   }}
                 >
                   {s.tableEditMode && !editing && (
@@ -408,9 +410,10 @@ export default function StaffCheckout() {
                         display: "flex",
                         alignItems: "center",
                         gap: "12px",
-                        background: "#f7f7f9",
+                        background: "var(--surface)",
                         borderRadius: "14px",
                         padding: "10px 12px",
+                        boxShadow: "0 1px 5px rgba(0,0,0,.05)",
                       }}
                     >
                       {photoById[it.menuItemId] && (
@@ -562,6 +565,7 @@ export default function StaffCheckout() {
                   fontWeight: 700,
                   fontFamily: "inherit",
                   cursor: "pointer",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,.16), 0 8px 20px -8px rgba(0,0,0,.4)",
                 }}
               >
                 お会計する（セッションを締める）
