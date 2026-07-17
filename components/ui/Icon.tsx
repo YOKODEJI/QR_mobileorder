@@ -71,3 +71,13 @@ export function WarningIcon({ size = 16, style }: IconProps) {
     </svg>
   );
 }
+
+/** 直線だけで構成した幾何学的なチェックマーク（フォントのチェック文字は
+ *  丸みや太さが環境依存でぶれるため、注文完了のような強調表示には使わない）。 */
+export function CheckIcon({ size = 16, style }: IconProps) {
+  return (
+    <svg {...base(size)} strokeWidth={2.5} style={style}>
+      <path d="M4 12.5 9.5 18 20 6" />
+    </svg>
+  );
+}

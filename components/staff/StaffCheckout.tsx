@@ -269,7 +269,7 @@ export default function StaffCheckout() {
                             style={{
                               flex: 1,
                               border: `1px solid ${accent}`,
-                              background: "#fff",
+                              background: "var(--surface)",
                               color: accent,
                               fontSize: "13px",
                               fontWeight: 700,
@@ -293,7 +293,7 @@ export default function StaffCheckout() {
                               flexShrink: 0,
                               borderRadius: "50%",
                               border: "1px solid var(--red-bg)",
-                              background: "#fff",
+                              background: "var(--surface)",
                               color: "var(--red)",
                               fontSize: "14px",
                               fontWeight: 700,
@@ -376,7 +376,7 @@ export default function StaffCheckout() {
                       onClick={() => s.setOrderEditMode(true)}
                       style={{
                         border: "1px solid var(--soldout-bg)",
-                        background: "#fff",
+                        background: "var(--surface)",
                         color: "var(--text-2)",
                         borderRadius: "999px",
                         padding: "5px 14px",
@@ -559,7 +559,7 @@ export default function StaffCheckout() {
                   padding: "15px",
                   borderRadius: "16px",
                   border: "none",
-                  background: "var(--text)",
+                  background: "#1c1c1e",
                   color: "#fff",
                   fontSize: "16px",
                   fontWeight: 700,

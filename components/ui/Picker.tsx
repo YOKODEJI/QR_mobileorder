@@ -97,7 +97,7 @@ export default function Picker({
                 {label}
               </div>
             )}
-            <div style={{ background: "#fff", borderRadius: "14px", overflow: "hidden" }}>
+            <div style={{ background: "var(--surface)", borderRadius: "14px", overflow: "hidden" }}>
               {options.map((opt, i) => (
                 <button
                   key={opt}

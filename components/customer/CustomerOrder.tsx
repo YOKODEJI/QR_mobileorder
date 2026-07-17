@@ -3,7 +3,7 @@
 import { useAppStore } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import ChipRow from "@/components/ui/ChipRow";
-import { BellIcon } from "@/components/ui/Icon";
+import { BellIcon, CheckIcon } from "@/components/ui/Icon";
 import { hm, useNow } from "@/lib/time";
 import { priceWithTax } from "@/lib/pricing";
 import {
@@ -359,7 +359,6 @@ export default function CustomerOrder() {
                 borderRadius: "50%",
                 background: "var(--green)",
                 color: "#fff",
-                fontSize: "40px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -367,7 +366,7 @@ export default function CustomerOrder() {
                 boxShadow: "inset 0 1px 0 rgba(255,255,255,.4)",
               }}
             >
-              ✓
+              <CheckIcon size={34} />
             </div>
             <div style={{ fontSize: "21px", fontWeight: 800, color: "var(--text)" }}>ご注文を受け付けました</div>
             <div style={{ fontSize: "14px", color: "var(--text-2)", marginTop: "8px" }}>

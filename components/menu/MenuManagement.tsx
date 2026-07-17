@@ -293,7 +293,7 @@ export default function MenuManagement() {
           ) : (
             <button
               onClick={s.enterDeleteMode}
-              style={{ ...pill, border: "1px solid var(--red-bg)", background: "#fff", color: "var(--red)" }}
+              style={{ ...pill, border: "1px solid var(--red-bg)", background: "var(--surface)", color: "var(--red)" }}
             >
               メニューを削除
             </button>
@@ -341,7 +341,7 @@ export default function MenuManagement() {
                       height: "26px",
                       borderRadius: "50%",
                       border: selected ? "none" : "2px solid var(--soldout-bg)",
-                      background: selected ? accent : "#fff",
+                      background: selected ? accent : "var(--surface)",
                       color: "#fff",
                       fontSize: "14px",
                       cursor: "pointer",
@@ -485,7 +485,7 @@ export default function MenuManagement() {
                     onBlur={s.saveEditCategory}
                     style={{
                       border: "none",
-                      background: "#fff",
+                      background: "var(--surface)",
                       boxShadow: `0 0 0 2px ${accent}`,
                       color: "var(--text)",
                       borderRadius: "999px",

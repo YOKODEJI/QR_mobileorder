@@ -106,7 +106,7 @@ export default function SettingsSheet() {
               padding: "13px 15px",
               borderRadius: "12px",
               border: "none",
-              background: "#fff",
+              background: "var(--surface)",
               fontSize: "16px",
               fontFamily: "inherit",
               color: "var(--text)",
@@ -118,7 +118,7 @@ export default function SettingsSheet() {
         <div style={labelStyle}>テーマカラー</div>
         <div
           style={{
-            background: "#fff",
+            background: "var(--surface)",
             borderRadius: "14px",
             padding: "16px",
             marginBottom: "20px",
@@ -178,7 +178,7 @@ export default function SettingsSheet() {
 
         {/* 写真表示（管理画面から設定。客用は表示のみ） */}
         <div style={labelStyle}>客用ページの写真</div>
-        <div style={{ background: "#fff", borderRadius: "14px", overflow: "hidden" }}>
+        <div style={{ background: "var(--surface)", borderRadius: "14px", overflow: "hidden" }}>
           {/* ヘッダー */}
           <div
             style={{
@@ -270,7 +270,7 @@ export default function SettingsSheet() {
 
         {/* 税・チャージ料 */}
         <div style={{ ...labelStyle, marginTop: "20px" }}>税・チャージ料</div>
-        <div style={{ background: "#fff", borderRadius: "14px", padding: "16px" }}>
+        <div style={{ background: "var(--surface)", borderRadius: "14px", padding: "16px" }}>
           <div style={{ fontSize: "13px", fontWeight: 700, marginBottom: "8px" }}>表示価格の税区分</div>
           <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
             {(
@@ -334,7 +334,7 @@ export default function SettingsSheet() {
 
         {/* QRコード管理 */}
         <div style={{ ...labelStyle, marginTop: "20px" }}>QRコード管理</div>
-        <div style={{ background: "#fff", borderRadius: "14px", padding: "16px" }}>
+        <div style={{ background: "var(--surface)", borderRadius: "14px", padding: "16px" }}>
           <QrCodes />
         </div>
       </div>
