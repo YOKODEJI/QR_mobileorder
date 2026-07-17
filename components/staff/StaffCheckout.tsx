@@ -559,13 +559,13 @@ export default function StaffCheckout() {
                   padding: "15px",
                   borderRadius: "16px",
                   border: "none",
-                  background: "#1c1c1e",
+                  background: accent,
                   color: "#fff",
                   fontSize: "16px",
                   fontWeight: 700,
                   fontFamily: "inherit",
                   cursor: "pointer",
-                  boxShadow: "inset 0 1px 0 rgba(255,255,255,.16), 0 8px 20px -8px rgba(0,0,0,.4)",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,.3)",
                 }}
               >
                 お会計する（セッションを締める）
