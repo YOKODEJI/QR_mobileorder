@@ -9,9 +9,9 @@ function ticketHeaderColor(
   status: "cooking" | "served",
   elapsed: number | null
 ): string {
-  if (status === "served") return "#34c759"; // 提供済み: 緑
+  if (status === "served") return "var(--green)"; // 提供済み: 緑
   if (elapsed == null) return "#2c2c2e"; // 未計測: 落ち着いた黒
-  if (elapsed >= 15) return "#ff3b30"; // 15分超: 赤（急げ）
+  if (elapsed >= 15) return "var(--red)"; // 15分超: 赤（急げ）
   if (elapsed >= 8) return "#e0902a"; // 8分超: 琥珀
   return "#2c2c2e"; // それ未満: 落ち着いた黒
 }
@@ -80,8 +80,8 @@ export default function KitchenDisplay() {
             <span
               style={{
                 ...pill,
-                background: s.connected ? "#e3f7ea" : "#ffe5e3",
-                color: s.connected ? "#248a3d" : "#d70015",
+                background: s.connected ? "var(--green-bg)" : "var(--red-bg)",
+                color: s.connected ? "var(--green-dark)" : "var(--red-dark)",
               }}
             >
               <span
@@ -89,7 +89,7 @@ export default function KitchenDisplay() {
                   width: "9px",
                   height: "9px",
                   borderRadius: "50%",
-                  background: s.connected ? "#34c759" : "#ff3b30",
+                  background: s.connected ? "var(--green)" : "var(--red)",
                 }}
               />
               {s.connected ? "接続中" : "オフライン"}
@@ -99,8 +99,8 @@ export default function KitchenDisplay() {
               style={{
                 ...pill,
                 cursor: "pointer",
-                background: s.soundOn ? "#fff3d6" : "rgba(118,118,128,.12)",
-                color: s.soundOn ? "#a8791a" : "#8e8e93",
+                background: s.soundOn ? "#fff3d6" : "var(--control-tint)",
+                color: s.soundOn ? "#a8791a" : "var(--text-2)",
               }}
             >
               {s.soundOn ? "🔔 通知音 ON" : "🔕 通知音 OFF"}
@@ -110,8 +110,8 @@ export default function KitchenDisplay() {
               style={{
                 ...pill,
                 cursor: "pointer",
-                background: "rgba(118,118,128,.12)",
-                color: "#6b6b70",
+                background: "var(--control-tint)",
+                color: "var(--text-2)",
               }}
             >
               {s.connected ? "切断をシミュレート" : "再接続する"}
@@ -166,8 +166,8 @@ export default function KitchenDisplay() {
               display: "flex",
               alignItems: "center",
               gap: "10px",
-              background: "#fff0ef",
-              border: "1px solid #ffd4d1",
+              background: "var(--red-bg-2)",
+              border: "1px solid var(--red-bg)",
               borderRadius: "14px",
               padding: "12px 16px",
               marginBottom: "16px",
@@ -175,10 +175,10 @@ export default function KitchenDisplay() {
           >
             <span style={{ fontSize: "18px" }}>⚠️</span>
             <div>
-              <div style={{ fontWeight: 700, color: "#d70015", fontSize: "14px" }}>
+              <div style={{ fontWeight: 700, color: "var(--red-dark)", fontSize: "14px" }}>
                 接続が切断されています
               </div>
-              <div style={{ fontSize: "13px", color: "#6b6b70" }}>
+              <div style={{ fontSize: "13px", color: "var(--text-2)" }}>
                 新しい注文を受信できません。ネットワークを確認してください。
               </div>
             </div>
@@ -187,7 +187,7 @@ export default function KitchenDisplay() {
 
         {/* 伝票グリッド */}
         {sorted.length === 0 ? (
-          <div style={{ textAlign: "center", color: "#8e8e93", padding: "60px 0", fontSize: "15px" }}>
+          <div style={{ textAlign: "center", color: "var(--text-2)", padding: "60px 0", fontSize: "15px" }}>
             新しい注文を待っています…
           </div>
         ) : (
@@ -210,7 +210,7 @@ export default function KitchenDisplay() {
                   style={{
                     background: "#fff",
                     borderRadius: "18px",
-                    border: highlight ? "2px solid #ff3b30" : "1px solid #ececee",
+                    border: highlight ? "2px solid var(--red)" : "1px solid #ececee",
                     boxShadow: "0 4px 14px rgba(0,0,0,.04)",
                     overflow: "hidden",
                     animation: highlight ? "kpulse 1s ease-out 2" : undefined,
@@ -253,7 +253,7 @@ export default function KitchenDisplay() {
 
                   <div style={{ padding: "12px 14px" }}>
                     <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
-                      <span style={{ fontSize: "12px", color: "#8e8e93" }}>
+                      <span style={{ fontSize: "12px", color: "var(--text-2)" }}>
                         {now > 0 ? hm(o.createdAt) : "—"}
                       </span>
                       {o.proxy && (
@@ -261,8 +261,8 @@ export default function KitchenDisplay() {
                           style={{
                             fontSize: "11px",
                             fontWeight: 700,
-                            color: "#8e8e93",
-                            background: "#f0f0f2",
+                            color: "var(--text-2)",
+                            background: "var(--hairline)",
                             borderRadius: "999px",
                             padding: "2px 8px",
                           }}
@@ -307,8 +307,8 @@ export default function KitchenDisplay() {
                         fontSize: "14px",
                         fontWeight: 700,
                         cursor: "pointer",
-                        background: cooking ? "#34c759" : "#f0f0f2",
-                        color: cooking ? "#fff" : "#6b6b70",
+                        background: cooking ? "var(--green)" : "var(--hairline)",
+                        color: cooking ? "#fff" : "var(--text-2)",
                       }}
                     >
                       {cooking ? "提供済みにする" : "調理中に戻す"}

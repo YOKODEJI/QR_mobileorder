@@ -87,10 +87,10 @@ function LoginForm({ initialError }: { initialError?: string }) {
     padding: "13px 15px",
     borderRadius: "12px",
     border: "none",
-    background: "#f0f0f2",
+    background: "var(--hairline)",
     fontSize: "16px",
     fontFamily: "inherit",
-    color: "#1c1c1e",
+    color: "var(--text)",
   };
 
   return (
@@ -100,7 +100,7 @@ function LoginForm({ initialError }: { initialError?: string }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#f2f2f7",
+        background: "var(--app-bg)",
         padding: "20px",
         fontFamily:
           "-apple-system, BlinkMacSystemFont, 'Hiragino Sans', var(--font-noto-sans-jp), 'Noto Sans JP', sans-serif",
@@ -111,10 +111,13 @@ function LoginForm({ initialError }: { initialError?: string }) {
         style={{
           width: "360px",
           maxWidth: "100%",
-          background: "#fff",
+          background: "var(--glass-strong)",
+          backdropFilter: "blur(26px) saturate(180%)",
+          WebkitBackdropFilter: "blur(26px) saturate(180%)",
+          border: "1px solid var(--glass-edge)",
           borderRadius: "22px",
           padding: "28px 24px",
-          boxShadow: "0 12px 34px rgba(0,0,0,.08)",
+          boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)",
           display: "flex",
           flexDirection: "column",
           gap: "12px",
@@ -123,7 +126,7 @@ function LoginForm({ initialError }: { initialError?: string }) {
         <div style={{ fontSize: "20px", fontWeight: 800, marginBottom: "4px" }}>
           管理ツール ログイン
         </div>
-        <div style={{ fontSize: "13px", color: "#8e8e93", marginBottom: "8px" }}>
+        <div style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "8px" }}>
           スタッフ用のメールアドレスとパスワードでログインしてください。
         </div>
         <input
@@ -145,7 +148,7 @@ function LoginForm({ initialError }: { initialError?: string }) {
           style={input}
         />
         {error && (
-          <div style={{ fontSize: "13px", color: "#ff3b30", fontWeight: 600 }}>{error}</div>
+          <div style={{ fontSize: "13px", color: "var(--red)", fontWeight: 600 }}>{error}</div>
         )}
         <button
           type="submit"
@@ -155,7 +158,7 @@ function LoginForm({ initialError }: { initialError?: string }) {
             padding: "14px",
             borderRadius: "12px",
             border: "none",
-            background: busy ? "#c7c7cc" : "var(--accent)",
+            background: busy ? "var(--text-3)" : "var(--accent)",
             color: "#fff",
             fontSize: "16px",
             fontWeight: 700,

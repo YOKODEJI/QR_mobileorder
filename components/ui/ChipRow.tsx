@@ -27,7 +27,7 @@ export default function ChipRow({
         gap: "8px",
         overflowX: wrap ? "visible" : "auto",
         padding: "12px 14px",
-        borderBottom: borderBottom ? "1px solid #f0f0f2" : undefined,
+        borderBottom: borderBottom ? "1px solid var(--hairline)" : undefined,
       }}
     >
       {filters.map((c) => (

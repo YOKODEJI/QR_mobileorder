@@ -63,385 +63,418 @@ export default function CustomerOrder() {
       style={{
         flex: 1,
         width: "100%",
-        background: "#fff",
+        background: "var(--app-bg)",
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
         position: "relative",
       }}
     >
-      {/* ヘッダーバンド */}
-        <div style={{ background: accent, color: "#fff", padding: "22px 20px 18px", flexShrink: 0 }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-            }}
-          >
-            <div>
-              <div style={{ fontSize: "12px", opacity: 0.85 }}>
-                ようこそ {s.settings.storeName} へ
-              </div>
-              <div style={{ fontSize: "25px", fontWeight: 800, marginTop: "2px" }}>
-                {s.tableName(s.customerTableId)}
-              </div>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", alignItems: "flex-end" }}>
-              <button
-                onClick={() => s.toggleHistory(true)}
-                style={{
-                  border: "none",
-                  background: "rgba(255,255,255,.22)",
-                  color: "#fff",
-                  borderRadius: "999px",
-                  padding: "8px 13px",
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  fontFamily: "inherit",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                履歴 {s.yen(historyTotal)}
-              </button>
-              <button
-                onClick={s.confirmCallStaff}
-                disabled={called}
-                style={{
-                  border: called ? "none" : "1px solid rgba(255,255,255,.6)",
-                  background: called ? "rgba(255,255,255,.9)" : "transparent",
-                  color: called ? accent : "#fff",
-                  borderRadius: "999px",
-                  padding: "8px 13px",
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  fontFamily: "inherit",
-                  cursor: called ? "default" : "pointer",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {called ? "✓ 呼び出し中" : "🔔 スタッフ呼出"}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* スクロール領域（ヘッダー/カートバーの下を流れる＝ガラスの奥行きの源。
+          パディングは下の実測ヘッダー/カート高さ+余白のおおよその値） */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          overflowY: "auto",
+        }}
+      >
+        <div style={{ height: "112px", flexShrink: 0 }} />
 
-        {/* スクロール領域（縦スクロールは menu list のみ。チップ行は潰さない） */}
-        <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
-          {s.settings.showHeaderPhoto && s.settings.headerPhoto && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={s.settings.headerPhoto}
-              alt=""
-              style={{ width: "100%", height: "150px", objectFit: "cover", display: "block" }}
-            />
-          )}
-
-          <ChipRow
-            value={s.customerCat}
-            onChange={s.setCustomerCat}
-            accent={accent}
-            borderBottom
+        {s.settings.showHeaderPhoto && s.settings.headerPhoto && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={s.settings.headerPhoto}
+            alt=""
+            style={{ width: "100%", height: "150px", objectFit: "cover", display: "block" }}
           />
+        )}
 
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "10px",
-              padding: "14px 14px 24px",
-            }}
-          >
-            {filtered.map((m) => {
-              const qty = s.cart[m.id] || 0;
-              const orderable = s.avail(m);
-              return (
-                <div key={m.id} style={itemCardStyle(!orderable)}>
-                  {m.photo && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={m.photo}
-                      alt=""
-                      style={{
-                        width: "62px",
-                        height: "62px",
-                        borderRadius: "14px",
-                        objectFit: "cover",
-                        flexShrink: 0,
-                      }}
-                    />
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "15px", fontWeight: 700 }}>{m.name}</div>
-                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#8e8e93" }}>
-                      {s.yen(m.price)}
-                    </div>
-                  </div>
-                  {!orderable ? (
-                    <span
-                      style={{
-                        background: "#d1d1d6",
-                        color: "#6b6b70",
-                        fontSize: "12px",
-                        fontWeight: 700,
-                        padding: "6px 12px",
-                        borderRadius: "999px",
-                      }}
-                    >
-                      売切
-                    </span>
-                  ) : qty === 0 ? (
-                    <button onClick={() => s.addCart(m.id)} style={addBtnStyle(accent)}>
-                      追加
-                    </button>
-                  ) : (
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <button onClick={() => s.removeCart(m.id)} style={stepSubStyle(accent)}>
-                        −
-                      </button>
-                      <span style={{ fontSize: "17px", fontWeight: 800, minWidth: "18px", textAlign: "center" }}>
-                        {qty}
-                      </span>
-                      <button onClick={() => s.addCart(m.id)} style={stepAddStyle(accent)}>
-                        ＋
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+        <ChipRow value={s.customerCat} onChange={s.setCustomerCat} accent={accent} />
 
-            {s.settings.showFooterPhoto && s.settings.footerPhoto && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={s.settings.footerPhoto}
-                alt=""
-                style={{ width: "100%", height: "130px", objectFit: "cover", borderRadius: "18px", marginTop: "6px", display: "block" }}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* 固定カートバー */}
         <div
           style={{
-            flexShrink: 0,
-            background: "rgba(248,248,250,.9)",
-            backdropFilter: "blur(20px)",
-            WebkitBackdropFilter: "blur(20px)",
-            borderTop: "1px solid #f0f0f2",
-            padding: "10px 16px 16px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px",
+            padding: "2px 14px 24px",
+          }}
+        >
+          {filtered.map((m) => {
+            const qty = s.cart[m.id] || 0;
+            const orderable = s.avail(m);
+            return (
+              <div key={m.id} style={itemCardStyle(!orderable)}>
+                {m.photo && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={m.photo}
+                    alt=""
+                    style={{
+                      width: "62px",
+                      height: "62px",
+                      borderRadius: "14px",
+                      objectFit: "cover",
+                      flexShrink: 0,
+                    }}
+                  />
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "15px", fontWeight: 700, color: "var(--text)" }}>{m.name}</div>
+                  <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-2)" }}>
+                    {s.yen(m.price)}
+                  </div>
+                </div>
+                {!orderable ? (
+                  <span
+                    style={{
+                      background: "var(--soldout-bg)",
+                      color: "var(--soldout-text)",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      padding: "6px 12px",
+                      borderRadius: "999px",
+                    }}
+                  >
+                    売切
+                  </span>
+                ) : qty === 0 ? (
+                  <button onClick={() => s.addCart(m.id)} style={addBtnStyle(accent)}>
+                    追加
+                  </button>
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <button onClick={() => s.removeCart(m.id)} style={stepSubStyle(accent)}>
+                      −
+                    </button>
+                    <span style={{ fontSize: "17px", fontWeight: 800, minWidth: "18px", textAlign: "center", color: "var(--text)" }}>
+                      {qty}
+                    </span>
+                    <button onClick={() => s.addCart(m.id)} style={stepAddStyle(accent)}>
+                      ＋
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {s.settings.showFooterPhoto && s.settings.footerPhoto && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={s.settings.footerPhoto}
+              alt=""
+              style={{ width: "100%", height: "130px", objectFit: "cover", borderRadius: "18px", marginTop: "6px", display: "block" }}
+            />
+          )}
+        </div>
+
+        <div style={{ height: "168px", flexShrink: 0 }} />
+      </div>
+
+      {/* 浮遊ヘッダー（ガラス） */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 10,
+          margin: "10px",
+          padding: "16px 16px 15px",
+          borderRadius: "26px",
+          background: "var(--glass)",
+          backdropFilter: "blur(26px) saturate(180%)",
+          WebkitBackdropFilter: "blur(26px) saturate(180%)",
+          border: "1px solid var(--glass-edge)",
+          boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontSize: "12px", color: "var(--text-2)" }}>
+              ようこそ {s.settings.storeName} へ
+            </div>
+            <div style={{ fontSize: "25px", fontWeight: 800, marginTop: "2px", color: "var(--text)" }}>
+              {s.tableName(s.customerTableId)}
+            </div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px", alignItems: "flex-end" }}>
+            <button
+              onClick={() => s.toggleHistory(true)}
+              style={{
+                border: "none",
+                background: "var(--control-tint)",
+                color: "var(--text)",
+                borderRadius: "999px",
+                padding: "8px 13px",
+                fontSize: "13px",
+                fontWeight: 700,
+                fontFamily: "inherit",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              履歴 {s.yen(historyTotal)}
+            </button>
+            <button
+              onClick={s.confirmCallStaff}
+              disabled={called}
+              style={{
+                border: "none",
+                background: called ? "var(--control-tint)" : accent,
+                color: called ? "var(--text-2)" : "var(--accent-ink)",
+                borderRadius: "999px",
+                padding: "8px 13px",
+                fontSize: "13px",
+                fontWeight: 700,
+                fontFamily: "inherit",
+                cursor: called ? "default" : "pointer",
+                whiteSpace: "nowrap",
+                boxShadow: called ? undefined : "inset 0 1px 0 rgba(255,255,255,.3)",
+              }}
+            >
+              {called ? "✓ 呼び出し中" : "🔔 スタッフ呼出"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 浮遊カートバー（ガラス） */}
+      <div
+        style={{
+          position: "absolute",
+          zIndex: 10,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          margin: "10px",
+          borderRadius: "26px",
+          background: "var(--glass-strong)",
+          backdropFilter: "blur(30px) saturate(190%)",
+          WebkitBackdropFilter: "blur(30px) saturate(190%)",
+          border: "1px solid var(--glass-edge)",
+          boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)",
+          padding: "10px 16px 16px",
+        }}
+      >
+        <div
+          style={{
+            textAlign: "center",
+            fontSize: "11px",
+            color: "var(--text-2)",
+            marginBottom: "8px",
+          }}
+        >
+          変更・キャンセルはスタッフにお声がけください
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: "10px",
+          }}
+        >
+          <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-2)" }}>
+            {cartCount}点
+          </span>
+          <span style={{ fontSize: "23px", fontWeight: 800, color: "var(--text)" }}>{s.yen(cartTotal)}</span>
+        </div>
+        <button
+          onClick={s.confirmOrder}
+          disabled={cartCount === 0 || s.submitting}
+          style={{
+            width: "100%",
+            padding: "15px",
+            borderRadius: "18px",
+            border: "none",
+            background: cartCount === 0 ? "var(--soldout-bg)" : accent,
+            color: cartCount === 0 ? "var(--soldout-text)" : "var(--accent-ink)",
+            fontSize: "17px",
+            fontWeight: 700,
+            fontFamily: "inherit",
+            cursor: cartCount === 0 ? "default" : "pointer",
+            boxShadow: cartCount === 0 ? undefined : "inset 0 1px 0 rgba(255,255,255,.3)",
+          }}
+        >
+          {s.submitting ? "送信中…" : "注文する"}
+        </button>
+        <div style={{ textAlign: "center", fontSize: "10px", color: "var(--text-3)", marginTop: "8px" }}>
+          {s.settings.taxMode === "exclusive"
+            ? `表示価格は税抜です（税込 ${s.yen(priceWithTax(cartTotal, "exclusive", s.settings.taxRate))}）`
+            : "表示価格は税込です"}
+        </div>
+      </div>
+
+      {/* 注文成功オーバーレイ */}
+      {s.justOrdered && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "rgba(255,255,255,.9)",
+            backdropFilter: "blur(30px) saturate(180%)",
+            WebkitBackdropFilter: "blur(30px) saturate(180%)",
+            zIndex: 20,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "30px",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ animation: "pop .22s ease-out" }}>
+            <div
+              style={{
+                width: "74px",
+                height: "74px",
+                borderRadius: "50%",
+                background: "var(--green)",
+                color: "#fff",
+                fontSize: "40px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 18px",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,.4)",
+              }}
+            >
+              ✓
+            </div>
+            <div style={{ fontSize: "21px", fontWeight: 800, color: "var(--text)" }}>ご注文を受け付けました</div>
+            <div style={{ fontSize: "14px", color: "var(--text-2)", marginTop: "8px" }}>
+              厨房で確認しています。少々お待ちください。
+            </div>
+            <div style={{ fontSize: "12px", color: "var(--text-3)", marginTop: "14px" }}>
+              変更・キャンセルはスタッフにお声がけください
+            </div>
+            <button
+              onClick={s.dismissSuccess}
+              style={{
+                marginTop: "24px",
+                width: "100%",
+                padding: "15px",
+                borderRadius: "18px",
+                border: "none",
+                background: accent,
+                color: "var(--accent-ink)",
+                fontSize: "16px",
+                fontWeight: 700,
+                fontFamily: "inherit",
+                cursor: "pointer",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,.3)",
+              }}
+            >
+              続けて注文する
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 履歴シート */}
+      {s.showHistory && (
+        <div
+          onClick={() => s.toggleHistory(false)}
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "rgba(0,0,0,.32)",
+            zIndex: 25,
+            display: "flex",
+            alignItems: "flex-end",
           }}
         >
           <div
-            style={{
-              textAlign: "center",
-              fontSize: "11px",
-              color: "#8e8e93",
-              marginBottom: "8px",
-            }}
-          >
-            変更・キャンセルはスタッフにお声がけください
-          </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: "10px",
-            }}
-          >
-            <span style={{ fontSize: "14px", fontWeight: 600, color: "#6b6b70" }}>
-              {cartCount}点
-            </span>
-            <span style={{ fontSize: "23px", fontWeight: 800 }}>{s.yen(cartTotal)}</span>
-          </div>
-          <button
-            onClick={s.confirmOrder}
-            disabled={cartCount === 0 || s.submitting}
+            onClick={(e) => e.stopPropagation()}
             style={{
               width: "100%",
-              padding: "15px",
-              borderRadius: "16px",
-              border: "none",
-              background: cartCount === 0 ? "#c7c7cc" : accent,
-              color: "#fff",
-              fontSize: "17px",
-              fontWeight: 700,
-              fontFamily: "inherit",
-              cursor: cartCount === 0 ? "default" : "pointer",
-            }}
-          >
-            {s.submitting ? "送信中…" : "注文する"}
-          </button>
-          <div style={{ textAlign: "center", fontSize: "10px", color: "#a0a0a5", marginTop: "8px" }}>
-            {s.settings.taxMode === "exclusive"
-              ? `表示価格は税抜です（税込 ${s.yen(priceWithTax(cartTotal, "exclusive", s.settings.taxRate))}）`
-              : "表示価格は税込です"}
-          </div>
-        </div>
-
-        {/* 注文成功オーバーレイ */}
-        {s.justOrdered && (
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              background: "rgba(255,255,255,.96)",
-              zIndex: 20,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "30px",
-              textAlign: "center",
-            }}
-          >
-            <div style={{ animation: "pop .22s ease-out" }}>
-              <div
-                style={{
-                  width: "74px",
-                  height: "74px",
-                  borderRadius: "50%",
-                  background: "#34c759",
-                  color: "#fff",
-                  fontSize: "40px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  margin: "0 auto 18px",
-                }}
-              >
-                ✓
-              </div>
-              <div style={{ fontSize: "21px", fontWeight: 800 }}>ご注文を受け付けました</div>
-              <div style={{ fontSize: "14px", color: "#6b6b70", marginTop: "8px" }}>
-                厨房で確認しています。少々お待ちください。
-              </div>
-              <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "14px" }}>
-                変更・キャンセルはスタッフにお声がけください
-              </div>
-              <button
-                onClick={s.dismissSuccess}
-                style={{
-                  marginTop: "24px",
-                  width: "100%",
-                  padding: "15px",
-                  borderRadius: "16px",
-                  border: "none",
-                  background: accent,
-                  color: "#fff",
-                  fontSize: "16px",
-                  fontWeight: 700,
-                  fontFamily: "inherit",
-                  cursor: "pointer",
-                }}
-              >
-                続けて注文する
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* 履歴シート */}
-        {s.showHistory && (
-          <div
-            onClick={() => s.toggleHistory(false)}
-            style={{
-              position: "absolute",
-              inset: 0,
-              background: "rgba(0,0,0,.35)",
-              zIndex: 25,
-              display: "flex",
-              alignItems: "flex-end",
+              background: "var(--glass-strong)",
+              backdropFilter: "blur(30px) saturate(180%)",
+              WebkitBackdropFilter: "blur(30px) saturate(180%)",
+              borderTop: "1px solid var(--glass-edge)",
+              borderRadius: "28px 28px 0 0",
+              padding: "12px 18px 24px",
+              maxHeight: "70%",
+              overflowY: "auto",
+              animation: "sheetup .3s ease-out",
             }}
           >
             <div
-              onClick={(e) => e.stopPropagation()}
               style={{
-                width: "100%",
-                background: "#fff",
-                borderRadius: "28px 28px 0 0",
-                padding: "12px 18px 24px",
-                maxHeight: "70%",
-                overflowY: "auto",
-                animation: "sheetup .3s ease-out",
+                width: "38px",
+                height: "5px",
+                borderRadius: "999px",
+                background: "var(--soldout-bg)",
+                margin: "0 auto 14px",
               }}
-            >
-              <div
-                style={{
-                  width: "38px",
-                  height: "5px",
-                  borderRadius: "999px",
-                  background: "#d1d1d6",
-                  margin: "0 auto 14px",
-                }}
-              />
-              <div style={{ fontSize: "18px", fontWeight: 800, marginBottom: "12px" }}>
-                {s.tableName(s.customerTableId)} の注文履歴
+            />
+            <div style={{ fontSize: "18px", fontWeight: 800, marginBottom: "12px", color: "var(--text)" }}>
+              {s.tableName(s.customerTableId)} の注文履歴
+            </div>
+            {myOrders.length === 0 ? (
+              <div style={{ color: "var(--text-2)", fontSize: "14px", padding: "20px 0" }}>
+                まだ注文はありません
               </div>
-              {myOrders.length === 0 ? (
-                <div style={{ color: "#8e8e93", fontSize: "14px", padding: "20px 0" }}>
-                  まだ注文はありません
-                </div>
-              ) : (
-                <>
-                  {myOrders.flatMap((o) =>
-                    o.items.map((it, i) => (
-                      <div
-                        key={o.id + "-" + i}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          padding: "10px 0",
-                          borderBottom: "1px solid #f4f4f6",
-                        }}
-                      >
-                        <div>
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            <span style={{ fontSize: "15px", fontWeight: 700 }}>{it.name}</span>
-                            <span
-                              style={{
-                                fontSize: "11px",
-                                fontWeight: 700,
-                                padding: "2px 8px",
-                                borderRadius: "999px",
-                                background: o.status === "served" ? "#e3f7ea" : "#fff3d6",
-                                color: o.status === "served" ? "#248a3d" : "#a8791a",
-                              }}
-                            >
-                              {o.status === "served" ? "提供済み" : "調理中"}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px" }}>
-                            ×{it.qty}
-                            {now > 0 ? " · " + hm(o.createdAt) : ""}
-                          </div>
+            ) : (
+              <>
+                {myOrders.flatMap((o) =>
+                  o.items.map((it, i) => (
+                    <div
+                      key={o.id + "-" + i}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        padding: "10px 0",
+                        borderBottom: "1px solid var(--hairline)",
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ fontSize: "15px", fontWeight: 700, color: "var(--text)" }}>{it.name}</span>
+                          <span
+                            style={{
+                              fontSize: "11px",
+                              fontWeight: 700,
+                              padding: "2px 8px",
+                              borderRadius: "999px",
+                              background: o.status === "served" ? "var(--green-bg)" : "#fff3d6",
+                              color: o.status === "served" ? "var(--green-dark)" : "#a8791a",
+                            }}
+                          >
+                            {o.status === "served" ? "提供済み" : "調理中"}
+                          </span>
                         </div>
-                        <div style={{ fontSize: "15px", fontWeight: 700 }}>
-                          {s.yen(it.price * it.qty)}
+                        <div style={{ fontSize: "12px", color: "var(--text-2)", marginTop: "2px" }}>
+                          ×{it.qty}
+                          {now > 0 ? " · " + hm(o.createdAt) : ""}
                         </div>
                       </div>
-                    ))
-                  )}
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      marginTop: "14px",
-                      fontSize: "17px",
-                      fontWeight: 800,
-                    }}
-                  >
-                    <span>合計（税込）</span>
-                    <span style={{ color: accent }}>{s.yen(historyTotal)}</span>
-                  </div>
-                </>
-              )}
-            </div>
+                      <div style={{ fontSize: "15px", fontWeight: 700, color: "var(--text)" }}>
+                        {s.yen(it.price * it.qty)}
+                      </div>
+                    </div>
+                  ))
+                )}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginTop: "14px",
+                    fontSize: "17px",
+                    fontWeight: 800,
+                    color: "var(--text)",
+                  }}
+                >
+                  <span>合計（税込）</span>
+                  <span style={{ color: accent }}>{s.yen(historyTotal)}</span>
+                </div>
+              </>
+            )}
           </div>
-        )}
+        </div>
+      )}
     </div>
   );
 }

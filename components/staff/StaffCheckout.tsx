@@ -128,14 +128,14 @@ export default function StaffCheckout() {
                   onClick={s.addTable}
                   style={{
                     border: "none",
-                    background: "rgba(118,118,128,.12)",
+                    background: "var(--control-tint)",
                     borderRadius: "999px",
                     padding: "6px 12px",
                     fontSize: "13px",
                     fontWeight: 700,
                     fontFamily: "inherit",
                     cursor: "pointer",
-                    color: "#1c1c1e",
+                    color: "var(--text)",
                   }}
                 >
                   ＋ 追加
@@ -162,14 +162,14 @@ export default function StaffCheckout() {
                 onClick={() => s.setTableEditMode(true)}
                 style={{
                   border: "none",
-                  background: "rgba(118,118,128,.12)",
+                  background: "var(--control-tint)",
                   borderRadius: "999px",
                   padding: "6px 14px",
                   fontSize: "13px",
                   fontWeight: 700,
                   fontFamily: "inherit",
                   cursor: "pointer",
-                  color: "#1c1c1e",
+                  color: "var(--text)",
                   flexShrink: 0,
                 }}
               >
@@ -207,7 +207,7 @@ export default function StaffCheckout() {
                       ? `2px solid ${accent}`
                       : active
                         ? "1px solid #ececee"
-                        : "1px solid #f0f0f2",
+                        : "1px solid var(--hairline)",
                   }}
                 >
                   {s.tableEditMode && !editing && (
@@ -223,7 +223,7 @@ export default function StaffCheckout() {
                       {Array.from({ length: 6 }).map((_, i) => (
                         <span
                           key={i}
-                          style={{ width: "3px", height: "3px", borderRadius: "50%", background: "#c7c7cc" }}
+                          style={{ width: "3px", height: "3px", borderRadius: "50%", background: "var(--text-3)" }}
                         />
                       ))}
                     </div>
@@ -239,7 +239,7 @@ export default function StaffCheckout() {
                           padding: "8px 10px",
                           borderRadius: "9px",
                           border: "none",
-                          background: "#f0f0f2",
+                          background: "var(--hairline)",
                           fontSize: "14px",
                           fontFamily: "inherit",
                         }}
@@ -254,7 +254,7 @@ export default function StaffCheckout() {
                   ) : (
                     <div>
                       <div style={{ fontSize: "15px", fontWeight: 700 }}>{t.name}</div>
-                      <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "3px" }}>
+                      <div style={{ fontSize: "12px", color: "var(--text-2)", marginTop: "3px" }}>
                         {active ? `${count}点 · 注文あり` : "空席"}
                       </div>
                       {s.tableEditMode ? (
@@ -290,9 +290,9 @@ export default function StaffCheckout() {
                               height: "32px",
                               flexShrink: 0,
                               borderRadius: "50%",
-                              border: "1px solid #ffd4d1",
+                              border: "1px solid var(--red-bg)",
                               background: "#fff",
-                              color: "#ff3b30",
+                              color: "var(--red)",
                               fontSize: "14px",
                               fontWeight: 700,
                               cursor: "pointer",
@@ -325,7 +325,7 @@ export default function StaffCheckout() {
         {/* テーブル詳細（下に全幅表示） */}
         <div style={{ background: "#fff", borderRadius: "22px", padding: "20px 22px", boxShadow: "0 12px 34px rgba(0,0,0,.06)", minHeight: "300px" }}>
           {sel == null ? (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "260px", color: "#8e8e93", fontSize: "15px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "260px", color: "var(--text-2)", fontSize: "15px" }}>
               上のテーブルを選択してください
             </div>
           ) : (
@@ -333,7 +333,7 @@ export default function StaffCheckout() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}>
                 <div style={{ fontSize: "23px", fontWeight: 800 }}>{s.tableName(sel)}</div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: "11px", color: "#8e8e93" }}>
+                  <div style={{ fontSize: "11px", color: "var(--text-2)" }}>
                     合計{s.settings.taxMode === "exclusive" ? "（税込）" : "（内税）"}
                   </div>
                   <div style={{ fontSize: "25px", fontWeight: 800, color: accent }}>
@@ -341,7 +341,7 @@ export default function StaffCheckout() {
                   </div>
                 </div>
               </div>
-              <div style={{ fontSize: "11px", color: "#8e8e93", marginBottom: "18px", textAlign: "right" }}>
+              <div style={{ fontSize: "11px", color: "var(--text-2)", marginBottom: "18px", textAlign: "right" }}>
                 {s.settings.taxMode === "exclusive"
                   ? `表示価格は税抜です（消費税率 ${s.settings.taxRate}%）`
                   : "表示価格は税込です"}
@@ -373,9 +373,9 @@ export default function StaffCheckout() {
                     <button
                       onClick={() => s.setOrderEditMode(true)}
                       style={{
-                        border: "1px solid #d1d1d6",
+                        border: "1px solid var(--soldout-bg)",
                         background: "#fff",
-                        color: "#6b6b70",
+                        color: "var(--text-2)",
                         borderRadius: "999px",
                         padding: "5px 14px",
                         fontSize: "12px",
@@ -390,13 +390,13 @@ export default function StaffCheckout() {
                   )
                 )}
               </div>
-              <div style={{ fontSize: "12px", color: "#8e8e93", marginBottom: "10px" }}>
+              <div style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "10px" }}>
                 {s.orderEditMode
                   ? "「−」で品目を1個ずつ取消できます。完了を押すと編集を終了します。"
                   : "誤操作防止のため、取消するには「注文編集」を押してください。"}
               </div>
               {aggList.length === 0 ? (
-                <div style={{ color: "#8e8e93", fontSize: "14px", padding: "16px 0" }}>
+                <div style={{ color: "var(--text-2)", fontSize: "14px", padding: "16px 0" }}>
                   このテーブルにまだ注文はありません。
                 </div>
               ) : (
@@ -423,7 +423,7 @@ export default function StaffCheckout() {
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: "15px", fontWeight: 700 }}>{it.name}</div>
-                        <div style={{ fontSize: "11px", color: "#8e8e93" }}>
+                        <div style={{ fontSize: "11px", color: "var(--text-2)" }}>
                           {s.yen(it.price)} × {it.qty}
                           {it.proxy ? " · 代理あり" : ""}
                         </div>
@@ -440,8 +440,8 @@ export default function StaffCheckout() {
                               height: "34px",
                               borderRadius: "10px",
                               border: "none",
-                              background: "#ffe5e3",
-                              color: "#ff3b30",
+                              background: "var(--red-bg)",
+                              color: "var(--red)",
                               fontSize: "20px",
                               fontWeight: 600,
                               cursor: "pointer",
@@ -462,7 +462,7 @@ export default function StaffCheckout() {
 
               {/* 割引 / チャージ料 / 内訳 */}
               {aggList.length > 0 && (
-                <div style={{ marginTop: "18px", paddingTop: "16px", borderTop: "1px solid #f0f0f2" }}>
+                <div style={{ marginTop: "18px", paddingTop: "16px", borderTop: "1px solid var(--hairline)" }}>
                   <div style={{ fontSize: "14px", fontWeight: 800, marginBottom: "10px" }}>割引</div>
                   <div style={{ display: "flex", gap: "8px", marginBottom: "10px" }}>
                     {(
@@ -483,8 +483,8 @@ export default function StaffCheckout() {
                           fontWeight: 700,
                           fontFamily: "inherit",
                           cursor: "pointer",
-                          background: discountType === opt.v ? accent : "#f0f0f2",
-                          color: discountType === opt.v ? "#fff" : "#6b6b70",
+                          background: discountType === opt.v ? accent : "var(--hairline)",
+                          color: discountType === opt.v ? "#fff" : "var(--text-2)",
                         }}
                       >
                         {opt.label}
@@ -503,7 +503,7 @@ export default function StaffCheckout() {
                           padding: "7px 12px",
                           borderRadius: "10px",
                           border: "none",
-                          background: "#f0f0f2",
+                          background: "var(--hairline)",
                           fontSize: "14px",
                           fontFamily: "inherit",
                         }}
@@ -512,13 +512,13 @@ export default function StaffCheckout() {
                   </div>
 
                   {/* 内訳 */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "13px", color: "#6b6b70" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "13px", color: "var(--text-2)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
                       <span>小計</span>
                       <span>{s.yen(breakdown.subtotal)}</span>
                     </div>
                     {breakdown.discountAmount > 0 && (
-                      <div style={{ display: "flex", justifyContent: "space-between", color: "#ff3b30" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", color: "var(--red)" }}>
                         <span>割引</span>
                         <span>−{s.yen(breakdown.discountAmount)}</span>
                       </div>
@@ -540,7 +540,7 @@ export default function StaffCheckout() {
                         <span>+{s.yen(breakdown.taxAmount)}</span>
                       </div>
                     )}
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "15px", fontWeight: 800, color: "#1c1c1e", marginTop: "2px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "15px", fontWeight: 800, color: "var(--text)", marginTop: "2px" }}>
                       <span>合計</span>
                       <span>{s.yen(breakdown.total)}</span>
                     </div>
@@ -556,7 +556,7 @@ export default function StaffCheckout() {
                   padding: "15px",
                   borderRadius: "16px",
                   border: "none",
-                  background: "#1c1c1e",
+                  background: "var(--text)",
                   color: "#fff",
                   fontSize: "16px",
                   fontWeight: 700,
@@ -566,14 +566,14 @@ export default function StaffCheckout() {
               >
                 お会計する（セッションを締める）
               </button>
-              <div style={{ fontSize: "11px", color: "#8e8e93", marginTop: "8px", textAlign: "center" }}>
+              <div style={{ fontSize: "11px", color: "var(--text-2)", marginTop: "8px", textAlign: "center" }}>
                 決済は既存レジで実施。ここではセッションを締めるだけです。
               </div>
 
               {/* 代理注文 */}
-              <div style={{ borderTop: "1px solid #f0f0f2", marginTop: "22px", paddingTop: "18px" }}>
+              <div style={{ borderTop: "1px solid var(--hairline)", marginTop: "22px", paddingTop: "18px" }}>
                 <div style={{ fontSize: "16px", fontWeight: 800 }}>代理注文</div>
-                <div style={{ fontSize: "12px", color: "#8e8e93", marginBottom: "6px" }}>
+                <div style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "6px" }}>
                   同じメニューから店員が入力できます
                 </div>
                 <div style={{ margin: "0 -6px" }}>
@@ -602,10 +602,10 @@ export default function StaffCheckout() {
                         )}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: "13px", fontWeight: 700 }}>{m.name}</div>
-                          <div style={{ fontSize: "12px", color: "#8e8e93" }}>{s.yen(m.price)}</div>
+                          <div style={{ fontSize: "12px", color: "var(--text-2)" }}>{s.yen(m.price)}</div>
                         </div>
                         {!orderable ? (
-                          <span style={{ fontSize: "11px", color: "#6b6b70", fontWeight: 700 }}>売切</span>
+                          <span style={{ fontSize: "11px", color: "var(--text-2)", fontWeight: 700 }}>売切</span>
                         ) : qty === 0 ? (
                           <button
                             onClick={() => s.addStaff(m.id)}
@@ -639,7 +639,7 @@ export default function StaffCheckout() {
                     padding: "13px",
                     borderRadius: "14px",
                     border: "none",
-                    background: proxyCount === 0 ? "#c7c7cc" : accent,
+                    background: proxyCount === 0 ? "var(--text-3)" : accent,
                     color: "#fff",
                     fontSize: "15px",
                     fontWeight: 700,

@@ -26,23 +26,24 @@ export default function AlertDialog() {
         style={{
           width: "300px",
           maxWidth: "100%",
-          background: "rgba(250,250,250,.98)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
+          background: "var(--glass-strong)",
+          backdropFilter: "blur(26px) saturate(180%)",
+          WebkitBackdropFilter: "blur(26px) saturate(180%)",
+          border: "1px solid var(--glass-edge)",
           borderRadius: "20px",
-          boxShadow: "0 24px 60px rgba(0,0,0,.4)",
+          boxShadow: "inset 0 1px 0 var(--glass-spec), 0 24px 60px rgba(0,0,0,.4)",
           overflow: "hidden",
           animation: "pop .22s ease-out",
         }}
       >
         <div style={{ padding: "20px 18px 16px", textAlign: "center" }}>
-          <div style={{ fontSize: "19px", fontWeight: 700, marginBottom: "8px" }}>
+          <div style={{ fontSize: "19px", fontWeight: 700, marginBottom: "8px", color: "var(--text)" }}>
             {dialog.title}
           </div>
           <div
             style={{
               fontSize: "17px",
-              color: "#6b6b70",
+              color: "var(--text-2)",
               lineHeight: 1.6,
               whiteSpace: "pre-line",
             }}
@@ -53,7 +54,7 @@ export default function AlertDialog() {
         <div
           style={{
             display: "flex",
-            borderTop: "1px solid rgba(0,0,0,.1)",
+            borderTop: "1px solid var(--hairline)",
           }}
         >
           <button
@@ -63,11 +64,11 @@ export default function AlertDialog() {
               padding: "13px",
               border: "none",
               background: "transparent",
-              color: "#007aff",
+              color: "var(--blue)",
               fontSize: "16px",
               fontFamily: "inherit",
               cursor: "pointer",
-              borderRight: "1px solid rgba(0,0,0,.1)",
+              borderRight: "1px solid var(--hairline)",
             }}
           >
             キャンセル
@@ -79,7 +80,7 @@ export default function AlertDialog() {
               padding: "13px",
               border: "none",
               background: "transparent",
-              color: dialog.danger ? "#ff3b30" : "#007aff",
+              color: dialog.danger ? "var(--red)" : "var(--blue)",
               fontSize: "16px",
               fontWeight: 600,
               fontFamily: "inherit",

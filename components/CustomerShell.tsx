@@ -71,9 +71,9 @@ export default function CustomerShell({ table }: { table?: string }) {
     <div
       style={{
         minHeight: "100dvh",
-        background: "#f2f2f7",
+        background: "var(--app-bg)",
         fontFamily: FONT,
-        color: "#1c1c1e",
+        color: "var(--text)",
         display: "flex",
         flexDirection: "column",
         letterSpacing: ".01em",

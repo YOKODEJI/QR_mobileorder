@@ -20,7 +20,7 @@ function DragDots() {
       }}
     >
       {Array.from({ length: 6 }).map((_, i) => (
-        <span key={i} style={{ width: "3px", height: "3px", borderRadius: "50%", background: "#c7c7cc" }} />
+        <span key={i} style={{ width: "3px", height: "3px", borderRadius: "50%", background: "var(--text-3)" }} />
       ))}
     </span>
   );
@@ -56,13 +56,13 @@ function PhotoCell({ item }: { item: MenuItem }) {
           width: "54px",
           height: "54px",
           borderRadius: "13px",
-          background: "#f0f0f2",
+          background: "var(--hairline)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           fontSize: "10px",
           fontWeight: 700,
-          color: "#8e8e93",
+          color: "var(--text-2)",
           flexShrink: 0,
           textAlign: "center",
           lineHeight: 1.3,
@@ -97,7 +97,7 @@ function PhotoCell({ item }: { item: MenuItem }) {
             height: "20px",
             borderRadius: "50%",
             border: "none",
-            background: "#ff3b30",
+            background: "var(--red)",
             color: "#fff",
             fontSize: "11px",
             cursor: "pointer",
@@ -116,9 +116,9 @@ function PhotoCell({ item }: { item: MenuItem }) {
         width: "54px",
         height: "54px",
         borderRadius: "13px",
-        border: "1px dashed #c7c7cc",
+        border: "1px dashed var(--text-3)",
         background: "#fafafa",
-        color: "#8e8e93",
+        color: "var(--text-2)",
         fontSize: "12px",
         fontWeight: 700,
         cursor: "pointer",
@@ -195,10 +195,10 @@ export default function MenuManagement() {
     padding: "11px 13px",
     borderRadius: "12px",
     border: "none",
-    background: "#f0f0f2",
+    background: "var(--hairline)",
     fontSize: "15px",
     fontFamily: "inherit",
-    color: "#1c1c1e",
+    color: "var(--text)",
   };
   const pill: React.CSSProperties = {
     borderRadius: "999px",
@@ -262,13 +262,13 @@ export default function MenuManagement() {
         <div style={{ padding: "18px 22px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", flexWrap: "wrap" }}>
           <div>
             <div style={{ fontSize: "19px", fontWeight: 800 }}>メニュー管理</div>
-            <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px" }}>
+            <div style={{ fontSize: "12px", color: "var(--text-2)", marginTop: "2px" }}>
               価格は1円単位、在庫は増減できます。行をドラッグ&ドロップで並び替え。
             </div>
           </div>
           {s.deleteMode ? (
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ fontSize: "13px", fontWeight: 700, color: "#6b6b70" }}>
+              <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-2)" }}>
                 {s.selectedIds.length}件選択中
               </span>
               <button
@@ -277,15 +277,15 @@ export default function MenuManagement() {
                 style={{
                   ...pill,
                   border: "none",
-                  background: s.selectedIds.length === 0 ? "#f0f0f2" : "#ff3b30",
-                  color: s.selectedIds.length === 0 ? "#c7c7cc" : "#fff",
+                  background: s.selectedIds.length === 0 ? "var(--hairline)" : "var(--red)",
+                  color: s.selectedIds.length === 0 ? "var(--text-3)" : "#fff",
                 }}
               >
                 削除する
               </button>
               <button
                 onClick={s.cancelDeleteMode}
-                style={{ ...pill, border: "none", background: "rgba(118,118,128,.12)", color: "#6b6b70" }}
+                style={{ ...pill, border: "none", background: "var(--control-tint)", color: "var(--text-2)" }}
               >
                 キャンセル
               </button>
@@ -293,7 +293,7 @@ export default function MenuManagement() {
           ) : (
             <button
               onClick={s.enterDeleteMode}
-              style={{ ...pill, border: "1px solid #ffd4d1", background: "#fff", color: "#ff3b30" }}
+              style={{ ...pill, border: "1px solid var(--red-bg)", background: "#fff", color: "var(--red)" }}
             >
               メニューを削除
             </button>
@@ -340,7 +340,7 @@ export default function MenuManagement() {
                       width: "26px",
                       height: "26px",
                       borderRadius: "50%",
-                      border: selected ? "none" : "2px solid #d1d1d6",
+                      border: selected ? "none" : "2px solid var(--soldout-bg)",
                       background: selected ? accent : "#fff",
                       color: "#fff",
                       fontSize: "14px",
@@ -354,7 +354,7 @@ export default function MenuManagement() {
                 ) : (
                   <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
                     <DragDots />
-                    <span style={{ minWidth: "20px", fontSize: "15px", fontWeight: 700, color: "#8e8e93" }}>
+                    <span style={{ minWidth: "20px", fontSize: "15px", fontWeight: 700, color: "var(--text-2)" }}>
                       {idx + 1}
                     </span>
                   </div>
@@ -391,7 +391,7 @@ export default function MenuManagement() {
 
                 {/* 価格 */}
                 <div style={{ display: "flex", alignItems: "center", gap: "3px", flexShrink: 0 }}>
-                  <span style={{ fontSize: "14px", color: "#8e8e93" }}>¥</span>
+                  <span style={{ fontSize: "14px", color: "var(--text-2)" }}>¥</span>
                   <input
                     type="number"
                     value={m.price}
@@ -401,7 +401,7 @@ export default function MenuManagement() {
                       padding: "8px 10px",
                       borderRadius: "10px",
                       border: "none",
-                      background: "#f0f0f2",
+                      background: "var(--hairline)",
                       textAlign: "right",
                       fontSize: "15px",
                       fontWeight: 700,
@@ -414,7 +414,7 @@ export default function MenuManagement() {
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
                   <button
                     onClick={() => s.bumpStock(m.id, -1)}
-                    style={{ width: "32px", height: "32px", borderRadius: "9px", border: "none", background: "#f0f0f2", color: "#6b6b70", fontSize: "18px", cursor: "pointer", lineHeight: 1 }}
+                    style={{ width: "32px", height: "32px", borderRadius: "9px", border: "none", background: "var(--hairline)", color: "var(--text-2)", fontSize: "18px", cursor: "pointer", lineHeight: 1 }}
                   >
                     −
                   </button>
@@ -427,7 +427,7 @@ export default function MenuManagement() {
                       padding: "7px 4px",
                       borderRadius: "9px",
                       border: "none",
-                      background: "#f0f0f2",
+                      background: "var(--hairline)",
                       textAlign: "center",
                       fontSize: "14px",
                       fontWeight: 700,
@@ -449,8 +449,8 @@ export default function MenuManagement() {
                     ...pill,
                     border: "none",
                     flexShrink: 0,
-                    background: m.soldOut ? "#ffe5e3" : "#e3f7ea",
-                    color: m.soldOut ? "#ff3b30" : "#248a3d",
+                    background: m.soldOut ? "var(--red-bg)" : "var(--green-bg)",
+                    color: m.soldOut ? "var(--red)" : "var(--green-dark)",
                   }}
                 >
                   {m.soldOut ? "再販" : "停止"}
@@ -464,7 +464,7 @@ export default function MenuManagement() {
       {/* カテゴリ管理 */}
       <div style={{ background: "#fff", borderRadius: "22px", padding: "20px 22px", boxShadow: "0 12px 34px rgba(0,0,0,.06)" }}>
         <div style={{ fontSize: "17px", fontWeight: 800, marginBottom: "4px" }}>カテゴリ管理</div>
-        <div style={{ fontSize: "12px", color: "#8e8e93", marginBottom: "14px" }}>
+        <div style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "14px" }}>
           カテゴリを追加・削除・名前変更できます。削除すると、そのカテゴリのメニューは「その他」に移動します。
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "16px" }}>
@@ -487,7 +487,7 @@ export default function MenuManagement() {
                       border: "none",
                       background: "#fff",
                       boxShadow: `0 0 0 2px ${accent}`,
-                      color: "#1c1c1e",
+                      color: "var(--text)",
                       borderRadius: "999px",
                       padding: "6px 14px",
                       fontSize: "13px",
@@ -506,8 +506,8 @@ export default function MenuManagement() {
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "6px",
-                  background: "#f0f0f2",
-                  color: "#1c1c1e",
+                  background: "var(--hairline)",
+                  color: "var(--text)",
                   borderRadius: "999px",
                   padding: "6px 8px 6px 14px",
                   fontSize: "13px",
@@ -521,7 +521,7 @@ export default function MenuManagement() {
                     style={{
                       border: "none",
                       background: "transparent",
-                      color: "#1c1c1e",
+                      color: "var(--text)",
                       fontSize: "13px",
                       fontWeight: 700,
                       fontFamily: "inherit",
@@ -544,7 +544,7 @@ export default function MenuManagement() {
                       borderRadius: "50%",
                       border: "none",
                       background: "#e3e3e6",
-                      color: "#6b6b70",
+                      color: "var(--text-2)",
                       fontSize: "11px",
                       fontWeight: 700,
                       cursor: "pointer",
@@ -574,8 +574,8 @@ export default function MenuManagement() {
             style={{
               ...pill,
               border: "none",
-              background: s.newCategoryName.trim() ? accent : "#f0f0f2",
-              color: s.newCategoryName.trim() ? "#fff" : "#c7c7cc",
+              background: s.newCategoryName.trim() ? accent : "var(--hairline)",
+              color: s.newCategoryName.trim() ? "#fff" : "var(--text-3)",
               padding: "11px 22px",
               fontSize: "14px",
             }}

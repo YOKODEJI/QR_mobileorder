@@ -20,7 +20,7 @@ export default function SegmentedControl<T extends string>({
     <div
       style={{
         display: "inline-flex",
-        background: "rgba(118,118,128,.12)",
+        background: "var(--control-tint)",
         borderRadius: "12px",
         padding: "3px",
         gap: "3px",

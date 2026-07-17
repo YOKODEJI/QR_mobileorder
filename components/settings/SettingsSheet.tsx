@@ -19,7 +19,7 @@ export default function SettingsSheet() {
   const labelStyle: React.CSSProperties = {
     fontSize: "12px",
     fontWeight: 700,
-    color: "#8e8e93",
+    color: "var(--text-2)",
     margin: "0 8px 7px",
     textTransform: "uppercase",
     letterSpacing: ".04em",
@@ -45,10 +45,13 @@ export default function SettingsSheet() {
         style={{
           width: "440px",
           maxWidth: "100%",
-          background: "#f2f2f7",
+          background: "var(--glass-strong)",
+          backdropFilter: "blur(30px) saturate(180%)",
+          WebkitBackdropFilter: "blur(30px) saturate(180%)",
+          border: "1px solid var(--glass-edge)",
           borderRadius: "26px",
           padding: "20px 18px 24px",
-          boxShadow: "0 30px 70px rgba(0,0,0,.4)",
+          boxShadow: "inset 0 1px 0 var(--glass-spec), 0 30px 70px rgba(0,0,0,.4)",
           animation: "sheetup .28s ease-out",
         }}
       >
@@ -68,13 +71,13 @@ export default function SettingsSheet() {
             onClick={closeSettings}
             style={{
               border: "none",
-              background: "rgba(118,118,128,.14)",
+              background: "var(--control-tint)",
               width: "30px",
               height: "30px",
               borderRadius: "50%",
               fontSize: "15px",
               cursor: "pointer",
-              color: "#8e8e93",
+              color: "var(--text-2)",
               fontWeight: 700,
             }}
           >
@@ -96,7 +99,7 @@ export default function SettingsSheet() {
               background: "#fff",
               fontSize: "16px",
               fontFamily: "inherit",
-              color: "#1c1c1e",
+              color: "var(--text)",
             }}
           />
         </div>
@@ -181,7 +184,7 @@ export default function SettingsSheet() {
               alignItems: "center",
               justifyContent: "space-between",
               padding: "14px 16px",
-              borderTop: "1px solid #f0f0f2",
+              borderTop: "1px solid var(--hairline)",
             }}
           >
             <span style={{ fontSize: "15px" }}>フッター写真を表示</span>
@@ -217,7 +220,7 @@ export default function SettingsSheet() {
         <div
           style={{
             fontSize: "12px",
-            color: "#8e8e93",
+            color: "var(--text-2)",
             margin: "10px 8px 0",
             lineHeight: 1.5,
           }}
@@ -248,8 +251,8 @@ export default function SettingsSheet() {
                   fontWeight: 700,
                   fontFamily: "inherit",
                   cursor: "pointer",
-                  background: settings.taxMode === opt.v ? "var(--accent)" : "#f0f0f2",
-                  color: settings.taxMode === opt.v ? "#fff" : "#6b6b70",
+                  background: settings.taxMode === opt.v ? "var(--accent)" : "var(--hairline)",
+                  color: settings.taxMode === opt.v ? "#fff" : "var(--text-2)",
                 }}
               >
                 {opt.label}
@@ -265,9 +268,9 @@ export default function SettingsSheet() {
                   min={0}
                   value={settings.taxRate}
                   onChange={(e) => setSetting("taxRate", parseFloat(e.target.value) || 0)}
-                  style={{ width: "64px", padding: "8px 10px", borderRadius: "9px", border: "none", background: "#f0f0f2", fontSize: "14px", fontFamily: "inherit", textAlign: "right" }}
+                  style={{ width: "64px", padding: "8px 10px", borderRadius: "9px", border: "none", background: "var(--hairline)", fontSize: "14px", fontFamily: "inherit", textAlign: "right" }}
                 />
-                <span style={{ fontSize: "13px", color: "#8e8e93" }}>%</span>
+                <span style={{ fontSize: "13px", color: "var(--text-2)" }}>%</span>
               </span>
             </label>
           )}
@@ -279,13 +282,13 @@ export default function SettingsSheet() {
                 min={0}
                 value={settings.chargeRate}
                 onChange={(e) => setSetting("chargeRate", parseFloat(e.target.value) || 0)}
-                style={{ width: "64px", padding: "8px 10px", borderRadius: "9px", border: "none", background: "#f0f0f2", fontSize: "14px", fontFamily: "inherit", textAlign: "right" }}
+                style={{ width: "64px", padding: "8px 10px", borderRadius: "9px", border: "none", background: "var(--hairline)", fontSize: "14px", fontFamily: "inherit", textAlign: "right" }}
               />
-              <span style={{ fontSize: "13px", color: "#8e8e93" }}>%</span>
+              <span style={{ fontSize: "13px", color: "var(--text-2)" }}>%</span>
             </span>
           </label>
         </div>
-        <div style={{ fontSize: "12px", color: "#8e8e93", margin: "10px 8px 0", lineHeight: 1.5 }}>
+        <div style={{ fontSize: "12px", color: "var(--text-2)", margin: "10px 8px 0", lineHeight: 1.5 }}>
           会計時に自動で反映されます。チャージ料は0%で無しになります。
         </div>
 
@@ -303,7 +306,7 @@ const removeBtn: React.CSSProperties = {
   marginTop: "8px",
   border: "none",
   background: "transparent",
-  color: "#ff3b30",
+  color: "var(--red)",
   fontSize: "13px",
   fontWeight: 600,
   fontFamily: "inherit",

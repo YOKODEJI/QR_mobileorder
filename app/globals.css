@@ -2,29 +2,45 @@
 
 /* ============================================================
    デザイントークン（_planning/01-design-tokens.md 準拠）
+
+   テキスト/罫線/フィル系は iOS の実測システムカラー（label / secondaryLabel /
+   separator / systemFill 等）に厳密に合わせている。iOSのこれらの色は
+   「黒の半透明の重ね合わせ」で作られており、背後に何があっても正しく馴染む
+   （ガラス面の上に置いても違和感が出ない、という実用上の理由もある）。
+   Appleは正式なHEX値を公開していないが、以下は実機/Xcodeでの実測値として
+   広くWeb/iOSコミュニティで合意されているもの。
    ============================================================ */
 :root {
-  /* サーフェス */
+  /* サーフェス（systemGroupedBackground / systemBackground） */
   --app-bg: #f2f2f7;
   --surface: #ffffff;
   --header-bg: rgba(248, 248, 250, 0.82);
   --inset: #f0f0f2;
 
-  /* テキスト */
-  --text: #1c1c1e;
-  --text-2: #6b6b70;
-  --text-3: #8e8e93;
-  --text-4: #a0a0a5;
+  /* テキスト（label / secondaryLabel / tertiaryLabel / quaternaryLabel） */
+  --text: #000000;
+  --text-2: rgba(60, 60, 67, 0.6);
+  --text-3: rgba(60, 60, 67, 0.3);
+  --text-4: rgba(60, 60, 67, 0.18);
 
-  /* 罫線 */
-  --hairline: #f0f0f2;
-  --hairline-2: #f4f4f6;
+  /* 罫線（カード境界＝分離線ではなく面の輪郭なので、separatorそのものより
+     控えめな極薄アルファに。数値としては同じ黒ベースで統一） */
+  --hairline: rgba(60, 60, 67, 0.08);
+  --hairline-2: rgba(60, 60, 67, 0.05);
 
-  /* コントロール */
-  --control-tint: rgba(118, 118, 128, 0.12);
-  --chip-tint: rgba(118, 118, 128, 0.1);
+  /* コントロール（systemFill / secondarySystemFill） */
+  --control-tint: rgba(120, 120, 128, 0.16);
+  --chip-tint: rgba(120, 120, 128, 0.12);
 
-  /* 意味色 */
+  /* ガラス面（Liquid Glass。半透明の白 + 上端の鏡面ハイライトで構成） */
+  --glass: rgba(255, 255, 255, 0.68);
+  --glass-strong: rgba(255, 255, 255, 0.82);
+  --glass-edge: rgba(0, 0, 0, 0.05);
+  --glass-spec: rgba(255, 255, 255, 0.9);
+  --glass-shadow: 0 8px 26px -10px rgba(0, 0, 0, 0.18);
+  --glass-blur: 22px;
+
+  /* 意味色（systemBlue / systemGreen / systemRed。実測値と完全一致していたため変更なし） */
   --blue: #007aff;
   --green: #34c759;
   --green-dark: #248a3d;
@@ -34,7 +50,7 @@
   --red-bg: #ffe5e3;
   --red-bg-2: #fff0ef;
   --soldout-bg: #d1d1d6;
-  --soldout-text: #6b6b70;
+  --soldout-text: rgba(60, 60, 67, 0.6);
 
   /* テーマアクセント（設定で上書き。既定 red-orange） */
   --accent: #cf4b2c;

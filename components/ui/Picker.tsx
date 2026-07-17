@@ -29,8 +29,8 @@ export default function Picker({
           alignItems: "center",
           gap: "4px",
           border: "none",
-          background: "#f0f0f2",
-          color: "#1c1c1e",
+          background: "var(--hairline)",
+          color: "var(--text)",
           borderRadius: "999px",
           padding: "6px 10px 6px 14px",
           fontSize: "13px",
@@ -41,7 +41,7 @@ export default function Picker({
         }}
       >
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</span>
-        <span style={{ fontSize: "9px", color: "#a0a0a5" }}>▾</span>
+        <span style={{ fontSize: "9px", color: "var(--text-3)" }}>▾</span>
       </button>
 
       {open && (
@@ -50,7 +50,7 @@ export default function Picker({
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,.35)",
+            background: "rgba(0,0,0,.32)",
             zIndex: 80,
             display: "flex",
             alignItems: "flex-end",
@@ -62,7 +62,10 @@ export default function Picker({
             style={{
               width: "100%",
               maxWidth: "480px",
-              background: "#f2f2f7",
+              background: "var(--glass-strong)",
+              backdropFilter: "blur(30px) saturate(180%)",
+              WebkitBackdropFilter: "blur(30px) saturate(180%)",
+              border: "1px solid var(--glass-edge)",
               borderRadius: "20px 20px 0 0",
               padding: "10px 12px 24px",
               maxHeight: "70vh",
@@ -75,7 +78,7 @@ export default function Picker({
                 width: "38px",
                 height: "5px",
                 borderRadius: "999px",
-                background: "#d1d1d6",
+                background: "var(--soldout-bg)",
                 margin: "0 auto 12px",
               }}
             />
@@ -84,7 +87,7 @@ export default function Picker({
                 style={{
                   fontSize: "12px",
                   fontWeight: 700,
-                  color: "#8e8e93",
+                  color: "var(--text-2)",
                   textAlign: "center",
                   marginBottom: "8px",
                   textTransform: "uppercase",
@@ -108,12 +111,12 @@ export default function Picker({
                     alignItems: "center",
                     justifyContent: "space-between",
                     border: "none",
-                    borderTop: i === 0 ? "none" : "1px solid #f0f0f2",
+                    borderTop: i === 0 ? "none" : "1px solid var(--hairline)",
                     background: "transparent",
                     padding: "14px 16px",
                     fontSize: "16px",
                     fontFamily: "inherit",
-                    color: opt === value ? accent : "#1c1c1e",
+                    color: opt === value ? accent : "var(--text)",
                     fontWeight: opt === value ? 700 : 400,
                     cursor: "pointer",
                     textAlign: "left",

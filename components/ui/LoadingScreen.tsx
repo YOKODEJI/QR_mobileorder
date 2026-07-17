@@ -19,12 +19,12 @@ export default function LoadingScreen({ label = "読み込み中…" }: { label?
           width: "34px",
           height: "34px",
           borderRadius: "50%",
-          border: "3px solid #e4e4ea",
+          border: "3px solid var(--hairline)",
           borderTopColor: "var(--accent)",
           animation: "spin .8s linear infinite",
         }}
       />
-      <span style={{ fontSize: "14px", color: "#8e8e93" }}>{label}</span>
+      <span style={{ fontSize: "14px", color: "var(--text-2)" }}>{label}</span>
     </div>
   );
 }

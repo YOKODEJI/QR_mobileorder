@@ -30,7 +30,7 @@ export default function QrCodes() {
     <>
       {/* ヘッダー（印刷しない） */}
       <div className="no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px", marginBottom: "12px" }}>
-        <div style={{ fontSize: "12px", color: "#8e8e93", lineHeight: 1.5 }}>
+        <div style={{ fontSize: "12px", color: "var(--text-2)", lineHeight: 1.5 }}>
           各卓に置くQRです。読み取ると、その卓の注文ページが開きます。
           <br />
           ⚠️ 「再発行」すると印刷済みの古いQRは<strong>使えなくなります</strong>（作り直すと別のQRに）。
@@ -56,7 +56,7 @@ export default function QrCodes() {
 
       {/* QRグリッド */}
       {s.tables.length === 0 ? (
-        <div style={{ textAlign: "center", color: "#8e8e93", padding: "24px 0", fontSize: "13px" }}>
+        <div style={{ textAlign: "center", color: "var(--text-2)", padding: "24px 0", fontSize: "13px" }}>
           テーブルがありません。「テーブル / 会計」で追加してください。
         </div>
       ) : (
@@ -91,7 +91,7 @@ export default function QrCodes() {
                 <div style={{ display: "flex", justifyContent: "center" }}>
                   <QRCodeSVG value={url} size={128} level="M" />
                 </div>
-                <div style={{ fontSize: "10px", color: "#a0a0a5", marginTop: "6px" }}>
+                <div style={{ fontSize: "10px", color: "var(--text-3)", marginTop: "6px" }}>
                   スマホのカメラで読み取り
                 </div>
                 {/* 再発行（印刷しない）。Supabase設定時のみ */}
@@ -103,7 +103,7 @@ export default function QrCodes() {
                       marginTop: "8px",
                       border: "1px solid #ececee",
                       background: "transparent",
-                      color: "#8e8e93",
+                      color: "var(--text-2)",
                       borderRadius: "999px",
                       padding: "5px 12px",
                       fontSize: "11px",

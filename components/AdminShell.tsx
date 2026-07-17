@@ -35,9 +35,9 @@ export default function AdminShell() {
     <div
       style={{
         minHeight: "100vh",
-        background: "#f2f2f7",
+        background: "var(--app-bg)",
         fontFamily: FONT,
-        color: "#1c1c1e",
+        color: "var(--text)",
         display: "flex",
         flexDirection: "column",
         letterSpacing: ".01em",
@@ -46,12 +46,15 @@ export default function AdminShell() {
       <header
         className="no-print"
         style={{
-          background: "rgba(248,248,250,.82)",
-          backdropFilter: "saturate(180%) blur(20px)",
-          WebkitBackdropFilter: "saturate(180%) blur(20px)",
-          borderBottom: "1px solid rgba(0,0,0,.07)",
+          margin: "10px 10px 0",
+          borderRadius: "22px",
+          background: "var(--glass)",
+          backdropFilter: "blur(26px) saturate(180%)",
+          WebkitBackdropFilter: "blur(26px) saturate(180%)",
+          border: "1px solid var(--glass-edge)",
+          boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)",
           position: "sticky",
-          top: 0,
+          top: "10px",
           zIndex: 30,
         }}
       >
@@ -59,7 +62,7 @@ export default function AdminShell() {
           <span style={{ fontWeight: 800, fontSize: "21px", letterSpacing: "-.02em" }}>
             {storeName}
           </span>
-          <span style={{ fontSize: "12px", color: "#8e8e93" }}>管理ツール</span>
+          <span style={{ fontSize: "12px", color: "var(--text-2)" }}>管理ツール</span>
         </div>
         <div style={{ display: "flex", justifyContent: "center", padding: "12px 14px 10px" }}>
           <SegmentedControl
@@ -81,8 +84,8 @@ export default function AdminShell() {
                 padding: "8px 14px",
                 borderRadius: "999px",
                 border: "none",
-                background: "rgba(120,120,128,.12)",
-                color: "#6b6b70",
+                background: "var(--control-tint)",
+                color: "var(--text-2)",
                 fontFamily: "inherit",
                 fontSize: "13px",
                 fontWeight: 600,
@@ -101,8 +104,8 @@ export default function AdminShell() {
               padding: "8px 14px",
               borderRadius: "999px",
               border: "none",
-              background: "rgba(120,120,128,.12)",
-              color: "#1c1c1e",
+              background: "var(--control-tint)",
+              color: "var(--text)",
               fontFamily: "inherit",
               fontSize: "13px",
               fontWeight: 600,

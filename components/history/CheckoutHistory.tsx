@@ -15,7 +15,7 @@ function Chevron({ open }: { open: boolean }) {
         display: "inline-block",
         transition: "transform .18s ease",
         transform: open ? "rotate(90deg)" : "rotate(0deg)",
-        color: "#c7c7cc",
+        color: "var(--text-3)",
         fontSize: "13px",
         fontWeight: 800,
       }}
@@ -88,18 +88,18 @@ export default function CheckoutHistory() {
       <div style={{ background: "#fff", borderRadius: "22px", padding: "20px 22px", boxShadow: "0 12px 34px rgba(0,0,0,.06)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
         <div>
           <div style={{ fontSize: "19px", fontWeight: 800 }}>会計履歴</div>
-          <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px" }}>
+          <div style={{ fontSize: "12px", color: "var(--text-2)", marginTop: "2px" }}>
             会計済みのセッションを時刻つきで記録しています。日付・テーブルをタップで開閉できます。
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: "11px", color: "#8e8e93" }}>本日 {todayCount}件</div>
+          <div style={{ fontSize: "11px", color: "var(--text-2)" }}>本日 {todayCount}件</div>
           <div style={{ fontSize: "23px", fontWeight: 800, color: accent }}>{s.yen(todayTotal)}</div>
         </div>
       </div>
 
       {s.checkouts.length === 0 ? (
-        <div style={{ background: "#fff", borderRadius: "22px", padding: "40px 22px", boxShadow: "0 12px 34px rgba(0,0,0,.06)", textAlign: "center", color: "#8e8e93", fontSize: "15px" }}>
+        <div style={{ background: "#fff", borderRadius: "22px", padding: "40px 22px", boxShadow: "0 12px 34px rgba(0,0,0,.06)", textAlign: "center", color: "var(--text-2)", fontSize: "15px" }}>
           まだ会計履歴はありません。
         </div>
       ) : (
@@ -127,7 +127,7 @@ export default function CheckoutHistory() {
                   <Chevron open={dateOpen} />
                   <span style={{ fontSize: "15px", fontWeight: 800 }}>{g.date}</span>
                 </span>
-                <span style={{ fontSize: "13px", fontWeight: 700, color: "#8e8e93" }}>
+                <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-2)" }}>
                   {g.records.length}件 · <span style={{ color: accent }}>{s.yen(g.total)}</span>
                 </span>
               </button>
@@ -157,7 +157,7 @@ export default function CheckoutHistory() {
                             <Chevron open={recOpen} />
                             <span>
                               <span style={{ fontSize: "15px", fontWeight: 700 }}>{r.tableName}</span>
-                              <span style={{ fontSize: "12px", color: "#8e8e93", marginLeft: "8px" }}>
+                              <span style={{ fontSize: "12px", color: "var(--text-2)", marginLeft: "8px" }}>
                                 {dateTimeLabel(r.closedAt)} · {r.count}点
                               </span>
                             </span>
@@ -175,23 +175,23 @@ export default function CheckoutHistory() {
                                   display: "flex",
                                   justifyContent: "space-between",
                                   fontSize: "13px",
-                                  color: "#6b6b70",
+                                  color: "var(--text-2)",
                                 }}
                               >
                                 <span>
-                                  {it.name} <span style={{ color: "#a0a0a5" }}>×{it.qty}</span>
+                                  {it.name} <span style={{ color: "var(--text-3)" }}>×{it.qty}</span>
                                 </span>
                                 <span>{s.yen(it.price * it.qty)}</span>
                               </div>
                             ))}
                             {(r.discountAmount > 0 || r.chargeAmount > 0 || r.taxAmount > 0) && (
                               <div style={{ marginTop: "6px", paddingTop: "6px", borderTop: "1px dashed #ececee", display: "flex", flexDirection: "column", gap: "3px" }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#a0a0a5" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--text-3)" }}>
                                   <span>小計</span>
                                   <span>{s.yen(r.subtotal)}</span>
                                 </div>
                                 {r.discountAmount > 0 && (
-                                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#ff3b30" }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--red)" }}>
                                     <span>
                                       割引{r.discountType ? `（${r.discountValue}${DISCOUNT_LABEL[r.discountType]}）` : ""}
                                     </span>
@@ -199,13 +199,13 @@ export default function CheckoutHistory() {
                                   </div>
                                 )}
                                 {r.chargeAmount > 0 && (
-                                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#a0a0a5" }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--text-3)" }}>
                                     <span>チャージ料</span>
                                     <span>+{s.yen(r.chargeAmount)}</span>
                                   </div>
                                 )}
                                 {r.taxAmount > 0 && (
-                                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#a0a0a5" }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--text-3)" }}>
                                     <span>消費税</span>
                                     <span>+{s.yen(r.taxAmount)}</span>
                                   </div>

@@ -64,7 +64,7 @@ export default function PhotoSlot({
         cursor: uploading ? "default" : "pointer",
         overflow: "hidden",
         background: img ? "transparent" : "#f7f7f9",
-        border: img ? "none" : "2px dashed #d1d1d6",
+        border: img ? "none" : "2px dashed var(--soldout-bg)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -80,7 +80,7 @@ export default function PhotoSlot({
         />
       ) : (
         <span
-          style={{ fontSize: "12px", color: "#8e8e93", fontWeight: 600, padding: "0 12px", textAlign: "center" }}
+          style={{ fontSize: "12px", color: "var(--text-2)", fontWeight: 600, padding: "0 12px", textAlign: "center" }}
         >
           {label}
         </span>
@@ -96,7 +96,7 @@ export default function PhotoSlot({
             justifyContent: "center",
             fontSize: "12px",
             fontWeight: 700,
-            color: "#6b6b70",
+            color: "var(--text-2)",
           }}
         >
           アップロード中…
