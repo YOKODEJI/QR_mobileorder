@@ -97,6 +97,8 @@ function LoginForm({ initialError }: { initialError?: string }) {
     <div
       style={{
         minHeight: "100vh",
+        position: "relative",
+        overflow: "hidden",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -106,9 +108,27 @@ function LoginForm({ initialError }: { initialError?: string }) {
           "-apple-system, BlinkMacSystemFont, 'Hiragino Sans', var(--font-noto-sans-jp), 'Noto Sans JP', sans-serif",
       }}
     >
+      {/* ガラスは背後に何か無いと透明感が見えない。特定の色に依らないニュートラルな
+          淡い形状を敷いて、blurが実際に屈折して見えるようにする（ログイン前は
+          店舗テーマが未読み込みのため、accentではなくグレー系で統一）。 */}
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: "none",
+          background:
+            "radial-gradient(44% 38% at 12% 10%, rgba(120,120,140,.20), transparent 70%), " +
+            "radial-gradient(50% 42% at 90% 86%, rgba(90,100,130,.18), transparent 72%), " +
+            "radial-gradient(36% 30% at 82% 6%, rgba(160,160,170,.16), transparent 70%)",
+        }}
+      />
       <form
         onSubmit={submit}
         style={{
+          position: "relative",
+          zIndex: 1,
           width: "360px",
           maxWidth: "100%",
           background: "var(--glass-strong)",
