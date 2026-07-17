@@ -1037,7 +1037,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { orders, menu };
     });
     if (!changed) return;
-    const success = await db.dbCancelUnit(t ?? "", menuItemId, prevOrders, prevMenu);
+    const success = await db.dbCancelUnit(t ?? "", menuItemId, prevOrders);
     if (!success) {
       set({ orders: prevOrders, menu: prevMenu });
       get().pushToast("取消の保存に失敗しました。もう一度お試しください。");

@@ -482,47 +482,22 @@ export async function dbCheckout(record: {
   return r1 && r2 && r3;
 }
 
-/** 明細を1個取消（対象卓の最初の該当明細を減算/削除し、在庫を1戻す） */
-export async function dbCancelUnit(tableId: string, menuItemId: string, orders: Order[], menu: MenuItem[]): Promise<boolean> {
+/** 明細を1個取消（対象卓の最初の該当明細を減算/削除し、在庫を1戻す）。
+ *  cancel_order_item() RPCで「行ロック→減算/削除→在庫戻し」を1トランザクションに
+ *  まとめている（従来は3リクエストに分かれており同時操作でズレる理論上の余地があった）。 */
+export async function dbCancelUnit(tableId: string, menuItemId: string, orders: Order[]): Promise<boolean> {
   const sb = getSupabase();
   if (!sb) return true;
-  // 対象卓の注文から、該当 menu_item の order_item を1件特定
+  // 対象卓の注文から、該当 menu_item の order_item を1件特定（どの注文から引くか、はクライアント側の状態で決める）
   const target = orders
     .filter((o) => o.table === tableId)
     .flatMap((o) => o.items.map((it) => ({ orderId: o.id, it })))
     .find((x) => x.it.menuItemId === menuItemId);
   if (!target) return true; // 対象なし＝ローカル状態と既に一致（失敗ではない）
-  // order_items の該当行を取得（order_id + menu_item_id）
-  const { data, error: selErr } = await sb
-    .from("order_items")
-    .select("id,qty")
-    .eq("order_id", target.orderId)
-    .eq("menu_item_id", menuItemId)
-    .limit(1);
-  if (selErr) {
-    console.error("dbCancelUnit(select):", selErr.message);
-    return false;
-  }
-  const row = data?.[0];
-  if (!row) return true;
-  let stepOk: boolean;
-  if ((row.qty as number) > 1) {
-    stepOk = await ok(
-      sb.from("order_items").update({ qty: (row.qty as number) - 1 }).eq("id", row.id as string),
-      "dbCancelUnit(update qty)"
-    );
-  } else {
-    stepOk = await ok(sb.from("order_items").delete().eq("id", row.id as string), "dbCancelUnit(delete item)");
-    // その注文に明細が残っていなければ注文ごと削除
-    const { count } = await sb.from("order_items").select("*", { count: "exact", head: true }).eq("order_id", target.orderId);
-    if (!count) stepOk = (await ok(sb.from("orders").delete().eq("id", target.orderId), "dbCancelUnit(delete order)")) && stepOk;
-  }
-  // 在庫を1戻す
-  const m = menu.find((x) => x.id === menuItemId);
-  const stockOk = m
-    ? await ok(sb.from("menu_items").update({ stock: m.stock + 1 }).eq("id", menuItemId), "dbCancelUnit(restock)")
-    : true;
-  return stepOk && stockOk;
+  return ok(
+    sb.rpc("cancel_order_item", { p_order: target.orderId, p_menu_item: menuItemId }),
+    "dbCancelUnit"
+  );
 }
 
 export async function dbInsertCall(tableId: string): Promise<boolean> {

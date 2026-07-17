@@ -54,6 +54,18 @@
    `AdminAuthGate` は `session.user.is_anonymous` を見て、匿名（客）セッションを
    「未ログイン」として通常のログインフォームを出す（「登録されていません」エラーと区別）。
 
+### ステップ12: プロレビュー指摘への対応（スパム対策・アトミック化）
+
+1. **`staff_calls`連投スパム対策**: insertの`with check`に「その卓に未対応(`resolved_at is null`)
+   の呼び出しが既にあれば拒否」を追加。UI側は既に「呼び出し中は再送不可」だったが、直接APIを
+   叩けば無制限にinsertできる穴があった。時間窓レート制限ではなく業務ルールそのものをDB制約に
+   格上げする方式（`place_order`のような「10秒8件」より単純かつ正確）。
+2. **`cancel_order_item()` RPCで明細取消をアトミック化**: 従来の`dbCancelUnit`は
+   「select→(update qtyまたはdelete)→在庫update」を3リクエストに分けて行っており、
+   同時操作でズレる理論上の余地があった。行ロック(`for update`)を取りながら
+   1トランザクションで完結させ、`staff_store_id()`検証も追加。`lib/data.ts`の
+   `dbCancelUnit`を更新（シグネチャから不要になった`menu`引数を削除）。
+
 ### 動作確認（ローカルdevサーバー・本番Supabase相手・実施済み）
 
 - tsc / `npm test`(vitest 17件) / `npm run build` すべてグリーン

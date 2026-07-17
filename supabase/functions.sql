@@ -282,6 +282,53 @@ begin
 end $$;
 
 
+-- ---- 明細取消(dbCancelUnit)のアトミック化 ----
+-- 従来はクライアントが「select→(update qtyまたはdelete)→在庫update」を3回の別
+-- リクエストに分けて行っており、同時操作でズレる理論上の余地があった。1回のRPC
+-- 呼び出しで、行ロックを取りながらトランザクション内で完結させる。
+create or replace function cancel_order_item(
+  p_order      uuid,
+  p_menu_item  uuid
+) returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_store     uuid;
+  v_row       order_items%rowtype;
+  v_remaining int;
+begin
+  select store_id into v_store from orders where id = p_order for update;
+  if v_store is null then
+    raise exception 'order not found';
+  end if;
+  if v_store <> staff_store_id() then
+    raise exception 'forbidden: store mismatch';
+  end if;
+
+  select * into v_row from order_items
+    where order_id = p_order and menu_item_id = p_menu_item
+    order by id limit 1
+    for update;
+  if not found then
+    return; -- 対象なし＝既にクライアントの状態と一致（失敗ではない）
+  end if;
+
+  if v_row.qty > 1 then
+    update order_items set qty = qty - 1 where id = v_row.id;
+  else
+    delete from order_items where id = v_row.id;
+    select count(*) into v_remaining from order_items where order_id = p_order;
+    if v_remaining = 0 then
+      delete from orders where id = p_order;
+    end if;
+  end if;
+
+  update menu_items set stock = stock + 1 where id = p_menu_item and store_id = v_store;
+end $$;
+
+
 -- ============================================================
 -- 実行権限（ステップ5 RLS厳格化とセット。詳細は step5-rls.sql 参照）
 --   place_order: submit_order Edge Function(service_role)経由のみ。
@@ -302,3 +349,6 @@ grant  execute on function close_table(uuid, uuid, text, numeric, boolean) to au
 
 revoke execute on function regenerate_table_token(uuid, uuid) from public, anon;
 grant  execute on function regenerate_table_token(uuid, uuid) to authenticated;
+
+revoke execute on function cancel_order_item(uuid, uuid) from public, anon;
+grant  execute on function cancel_order_item(uuid, uuid) to authenticated;

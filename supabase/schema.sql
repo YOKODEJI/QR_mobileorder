@@ -340,11 +340,18 @@ create policy order_items_delete_authenticated on order_items for delete to auth
 
 -- staff_calls: 閲覧は自店舗スタッフ or その卓の有効セッションを持つ客のみ。
 -- 呼び出す(insert)は anon も含めて誰でも許可（匿名認証が万一失敗しても
--- 「スタッフを呼ぶ」ボタンだけは動くようにする安全側のフォールバック）。
+-- 「スタッフを呼ぶ」ボタンだけは動くようにする安全側のフォールバック）が、
+-- 未対応(resolved_at is null)の呼び出しが既にある卓からの新規呼び出しは拒否
+-- （連投スパム対策。「呼び出し中は再送不可」というUI側のルールをDB制約に格上げ）。
 -- 対応済み化(update)/削除は自店舗スタッフのみ。
 create policy staff_calls_select_authenticated on staff_calls for select to authenticated using (store_id = staff_store_id());
 create policy staff_calls_select_customer      on staff_calls for select to authenticated using (has_table_session(table_id));
-create policy staff_calls_insert_all           on staff_calls for insert to anon, authenticated with check (true);
+create policy staff_calls_insert_all           on staff_calls for insert to anon, authenticated with check (
+  not exists (
+    select 1 from staff_calls sc
+    where sc.table_id = staff_calls.table_id and sc.resolved_at is null
+  )
+);
 create policy staff_calls_update_authenticated on staff_calls for update to authenticated
   using (store_id = staff_store_id()) with check (store_id = staff_store_id());
 create policy staff_calls_delete_authenticated on staff_calls for delete to authenticated
