@@ -1,10 +1,13 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import Toggle from "@/components/ui/Toggle";
 import PhotoSlot from "@/components/ui/PhotoSlot";
 import QrCodes from "@/components/qr/QrCodes";
+import SegmentedControl from "@/components/ui/SegmentedControl";
 import { deletePhoto } from "@/lib/storage";
+import { getStoredThemeMode, setThemeMode, type ThemeMode } from "@/lib/themeMode";
 
 const SWATCHES = ["#cf4b2c", "#e0902a", "#248a3d", "#0a84ff", "#8a4fd0"];
 
@@ -13,6 +16,13 @@ export default function SettingsSheet() {
   const settings = useAppStore((s) => s.settings);
   const setSetting = useAppStore((s) => s.setSetting);
   const closeSettings = useAppStore((s) => s.closeSettings);
+
+  // 見た目(ライト/ダーク/自動)はこの端末だけのローカル設定(localStorage)。
+  // 店舗全体の設定ではないため useAppStore/DB は経由しない。
+  const [themeMode, setThemeModeState] = useState<ThemeMode>("light");
+  useEffect(() => {
+    setThemeModeState(getStoredThemeMode());
+  }, []);
 
   if (!showSettings) return null;
 
@@ -134,6 +144,36 @@ export default function SettingsSheet() {
               />
             );
           })}
+        </div>
+
+        {/* 画面の見た目（この端末だけのローカル設定。店舗全体の設定ではない） */}
+        <div style={labelStyle}>画面の見た目</div>
+        <div
+          style={{
+            background: "var(--surface)",
+            borderRadius: "14px",
+            padding: "12px 16px",
+            marginBottom: "20px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "10px",
+            flexWrap: "wrap",
+          }}
+        >
+          <span style={{ fontSize: "13px" }}>この端末での表示</span>
+          <SegmentedControl
+            segments={[
+              { value: "light" as ThemeMode, label: "ライト" },
+              { value: "dark" as ThemeMode, label: "ダーク" },
+              { value: "system" as ThemeMode, label: "自動" },
+            ]}
+            value={themeMode}
+            onChange={(v) => {
+              setThemeModeState(v);
+              setThemeMode(v);
+            }}
+          />
         </div>
 
         {/* 写真表示（管理画面から設定。客用は表示のみ） */}
