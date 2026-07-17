@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { isSupabaseConfigured, getSupabase } from "@/lib/supabase";
+import { GearIcon } from "@/components/ui/Icon";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 import SettingsSheet from "@/components/settings/SettingsSheet";
 import AlertDialog from "@/components/ui/AlertDialog";
@@ -43,23 +44,10 @@ export default function AdminShell() {
         letterSpacing: ".01em",
       }}
     >
-      {/* ガラスは背後に何か無いと透明感が見えない。ニュートラルな淡い光を固定で敷き、
-          ガラス面がスクロールでその上を流れることで屈折が視認できるようにする
-          （ログイン画面と同じ手法。fixedなのでスクロールしても光は動かない）。 */}
-      <div
-        aria-hidden
-        className="no-print"
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 0,
-          pointerEvents: "none",
-          background:
-            "radial-gradient(44% 38% at 10% 8%, rgba(120,120,140,.18), transparent 70%), " +
-            "radial-gradient(52% 44% at 92% 30%, rgba(160,160,170,.15), transparent 72%), " +
-            "radial-gradient(48% 40% at 30% 96%, rgba(90,100,130,.14), transparent 72%)",
-        }}
-      />
+      {/* ガラスは背後に何か無いと透明感が見えない。画面全体を覆う連続的な階調を
+          固定で敷き、スクロールしてもどの位置でも屈折が視認できるようにする
+          （隅に光を数点置くだけだとスクロールで通り過ぎた瞬間ガラスが死んで見える）。 */}
+      <div aria-hidden className="no-print ambient-wash" />
       <header
         className="no-print"
         style={{
@@ -129,7 +117,7 @@ export default function AdminShell() {
               cursor: "pointer",
             }}
           >
-            <span style={{ fontSize: "14px" }}>⚙︎</span>設定
+            <GearIcon size={15} />設定
           </button>
         </div>
       </header>

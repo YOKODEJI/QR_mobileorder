@@ -55,6 +55,101 @@
   /* テーマアクセント（設定で上書き。既定 red-orange） */
   --accent: #cf4b2c;
   --accent-ink: #ffffff;
+
+  /* モーション（バネのような押し込み感） */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ============================================================
+   ダークモード（端末/ブラウザの設定に自動追従。トグルUIは無し）
+   iOSの実測ダーク値。意味色もiOSはダークで別の実測値を使うため追従させる
+   （systemBlue #0a84ff / systemGreen #30d158 / systemRed #ff453a）。
+   ============================================================ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --app-bg: #000000;
+    --surface: #1c1c1e;
+    --header-bg: rgba(28, 28, 30, 0.82);
+    --inset: #2c2c2e;
+
+    --text: #ffffff;
+    --text-2: rgba(235, 235, 245, 0.6);
+    --text-3: rgba(235, 235, 245, 0.3);
+    --text-4: rgba(235, 235, 245, 0.16);
+
+    --hairline: rgba(255, 255, 255, 0.08);
+    --hairline-2: rgba(255, 255, 255, 0.05);
+
+    --control-tint: rgba(120, 120, 128, 0.24);
+    --chip-tint: rgba(120, 120, 128, 0.18);
+
+    --glass: rgba(44, 44, 46, 0.6);
+    --glass-strong: rgba(44, 44, 46, 0.78);
+    --glass-edge: rgba(255, 255, 255, 0.1);
+    --glass-spec: rgba(255, 255, 255, 0.14);
+    --glass-shadow: 0 8px 26px -10px rgba(0, 0, 0, 0.6);
+
+    --blue: #0a84ff;
+    --green: #30d158;
+    --green-dark: #30d158;
+    --green-bg: rgba(48, 209, 88, 0.18);
+    --red: #ff453a;
+    --red-dark: #ff453a;
+    --red-bg: rgba(255, 69, 58, 0.18);
+    --red-bg-2: rgba(255, 69, 58, 0.12);
+    --soldout-bg: #3a3a3c;
+    --soldout-text: rgba(235, 235, 245, 0.6);
+  }
+}
+
+/* ============================================================
+   ガラスの背後に敷く、画面全体を覆う連続的な階調（アンビエントウォッシュ）。
+   ガラスはbackdrop-filterで「後ろのもの」をぼかして見せる表現なので、
+   後ろが単色の平面だと何をぼかしても変化が無く透明感が一切見えない。
+   隅に光を数点置くだけでは、スクロールでその位置を通り過ぎた瞬間に
+   ガラスが死んで見える（実際に指摘され判明した問題）。画面全体を
+   継続的な階調で覆うことで、どこにスクロールしても常に何かが透けて見える。
+   ============================================================ */
+.ambient-wash {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(36% 30% at 8% 6%, rgba(120, 120, 150, 0.22), transparent 68%),
+    radial-gradient(40% 34% at 92% 16%, rgba(150, 140, 170, 0.18), transparent 70%),
+    radial-gradient(48% 42% at 50% 48%, rgba(130, 130, 145, 0.14), transparent 74%),
+    radial-gradient(38% 32% at 12% 88%, rgba(110, 120, 150, 0.19), transparent 70%),
+    radial-gradient(42% 36% at 90% 94%, rgba(150, 150, 160, 0.16), transparent 70%);
+}
+@media (prefers-color-scheme: dark) {
+  .ambient-wash {
+    background:
+      radial-gradient(36% 30% at 8% 6%, rgba(90, 100, 150, 0.4), transparent 68%),
+      radial-gradient(40% 34% at 92% 16%, rgba(130, 90, 160, 0.32), transparent 70%),
+      radial-gradient(48% 42% at 50% 48%, rgba(70, 80, 120, 0.34), transparent 74%),
+      radial-gradient(38% 32% at 12% 88%, rgba(80, 100, 150, 0.34), transparent 70%),
+      radial-gradient(42% 36% at 90% 94%, rgba(110, 110, 130, 0.3), transparent 70%);
+  }
+}
+
+/* ============================================================
+   全ボタン共通のバネ的な押し込みフィードバック。
+   個々のinline styleを触らずに全画面へ一括適用する。
+   ============================================================ */
+button {
+  transition: transform 0.15s var(--ease-spring), opacity 0.15s ease;
+}
+button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+@media (prefers-reduced-motion: reduce) {
+  button {
+    transition: none;
+  }
+  button:active:not(:disabled) {
+    transform: none;
+  }
 }
 
 /* ============================================================

@@ -3,6 +3,7 @@
 import { useAppStore } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import ChipRow from "@/components/ui/ChipRow";
+import { BellIcon } from "@/components/ui/Icon";
 import { hm, useNow } from "@/lib/time";
 import { priceWithTax } from "@/lib/pricing";
 import {
@@ -147,7 +148,18 @@ export default function CustomerOrder() {
                     <button onClick={() => s.removeCart(m.id)} style={stepSubStyle(accent)}>
                       −
                     </button>
-                    <span style={{ fontSize: "17px", fontWeight: 800, minWidth: "18px", textAlign: "center", color: "var(--text)" }}>
+                    <span
+                      key={qty}
+                      style={{
+                        fontSize: "17px",
+                        fontWeight: 800,
+                        minWidth: "18px",
+                        textAlign: "center",
+                        color: "var(--text)",
+                        display: "inline-block",
+                        animation: "pop .22s var(--ease-spring)",
+                      }}
+                    >
                       {qty}
                     </span>
                     <button onClick={() => s.addCart(m.id)} style={stepAddStyle(accent)}>
@@ -221,6 +233,9 @@ export default function CustomerOrder() {
               onClick={s.confirmCallStaff}
               disabled={called}
               style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "5px",
                 border: "none",
                 background: called ? "var(--control-tint)" : accent,
                 color: called ? "var(--text-2)" : "var(--accent-ink)",
@@ -234,7 +249,7 @@ export default function CustomerOrder() {
                 boxShadow: called ? undefined : "inset 0 1px 0 rgba(255,255,255,.3)",
               }}
             >
-              {called ? "✓ 呼び出し中" : "🔔 スタッフ呼出"}
+              {called ? "✓ 呼び出し中" : (<><BellIcon size={13} />スタッフ呼出</>)}
             </button>
           </div>
         </div>
@@ -279,7 +294,18 @@ export default function CustomerOrder() {
           <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-2)" }}>
             {cartCount}点
           </span>
-          <span style={{ fontSize: "23px", fontWeight: 800, color: "var(--text)" }}>{s.yen(cartTotal)}</span>
+          <span
+            key={cartTotal}
+            style={{
+              fontSize: "23px",
+              fontWeight: 800,
+              color: "var(--text)",
+              display: "inline-block",
+              animation: cartTotal > 0 ? "pop .22s var(--ease-spring)" : undefined,
+            }}
+          >
+            {s.yen(cartTotal)}
+          </span>
         </div>
         <button
           onClick={s.confirmOrder}

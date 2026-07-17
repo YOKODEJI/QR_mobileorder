@@ -5,6 +5,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useAppStore } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { PrinterIcon, RefreshIcon, WarningIcon } from "@/components/ui/Icon";
 
 /** 各卓のQRコードを発行・印刷する画面（管理ツール） */
 export default function QrCodes() {
@@ -33,11 +34,14 @@ export default function QrCodes() {
         <div style={{ fontSize: "12px", color: "var(--text-2)", lineHeight: 1.5 }}>
           各卓に置くQRです。読み取ると、その卓の注文ページが開きます。
           <br />
-          ⚠️ 「再発行」すると印刷済みの古いQRは<strong>使えなくなります</strong>（作り直すと別のQRに）。
+          <WarningIcon size={11} style={{ verticalAlign: "-1px" }} /> 「再発行」すると印刷済みの古いQRは<strong>使えなくなります</strong>（作り直すと別のQRに）。
         </div>
         <button
           onClick={() => window.print()}
           style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
             border: "none",
             background: accent,
             color: "#fff",
@@ -50,7 +54,7 @@ export default function QrCodes() {
             flexShrink: 0,
           }}
         >
-          🖨 印刷する
+          <PrinterIcon size={14} />印刷する
         </button>
       </div>
 
@@ -77,11 +81,11 @@ export default function QrCodes() {
               <div
                 key={t.id}
                 style={{
-                  border: "1px solid #ececee",
+                  border: "1px solid var(--hairline)",
                   borderRadius: "14px",
                   padding: "14px 10px",
                   textAlign: "center",
-                  background: "#fff",
+                  background: "var(--surface)",
                   breakInside: "avoid",
                 }}
               >
@@ -100,8 +104,11 @@ export default function QrCodes() {
                     className="no-print"
                     onClick={() => regenerateToken(t.id)}
                     style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "5px",
                       marginTop: "8px",
-                      border: "1px solid #ececee",
+                      border: "1px solid var(--hairline)",
                       background: "transparent",
                       color: "var(--text-2)",
                       borderRadius: "999px",
@@ -112,7 +119,7 @@ export default function QrCodes() {
                       cursor: "pointer",
                     }}
                   >
-                    ♻︎ QRを再発行
+                    <RefreshIcon size={11} />QRを再発行
                   </button>
                 )}
               </div>

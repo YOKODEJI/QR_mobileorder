@@ -3,6 +3,7 @@
 import { useAppStore } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import { hm, elapsedMin, useNow } from "@/lib/time";
+import { BellIcon, BellSlashIcon, WarningIcon } from "@/components/ui/Icon";
 
 /** 提供前伝票の経過時間による色エスカレーション */
 function ticketHeaderColor(
@@ -103,7 +104,8 @@ export default function KitchenDisplay() {
                 color: s.soundOn ? "#a8791a" : "var(--text-2)",
               }}
             >
-              {s.soundOn ? "🔔 通知音 ON" : "🔕 通知音 OFF"}
+              {s.soundOn ? <BellIcon size={13} /> : <BellSlashIcon size={13} />}
+              {s.soundOn ? "通知音 ON" : "通知音 OFF"}
             </button>
             <button
               onClick={s.toggleConnection}
@@ -137,7 +139,7 @@ export default function KitchenDisplay() {
                     padding: "12px 16px",
                   }}
                 >
-                  <span style={{ fontSize: "20px" }}>🔔</span>
+                  <BellIcon size={20} style={{ color: "#a8791a", flexShrink: 0 }} />
                   <div style={{ flex: 1 }}>
                     <span style={{ fontWeight: 800, fontSize: "15px" }}>
                       {s.tableName(c.table)} が呼び出し中
@@ -173,7 +175,7 @@ export default function KitchenDisplay() {
               marginBottom: "16px",
             }}
           >
-            <span style={{ fontSize: "18px" }}>⚠️</span>
+            <WarningIcon size={18} style={{ color: "var(--red-dark)", flexShrink: 0 }} />
             <div>
               <div style={{ fontWeight: 700, color: "var(--red-dark)", fontSize: "14px" }}>
                 接続が切断されています

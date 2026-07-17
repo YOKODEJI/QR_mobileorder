@@ -2,6 +2,7 @@
 
 import { useAppStore } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
+import { WarningIcon } from "@/components/ui/Icon";
 
 /** 画面下部に積み上がる非ブロッキングの通知（DB書込失敗など）。数秒で自動的に消える。 */
 export default function Toast() {
@@ -35,6 +36,9 @@ export default function Toast() {
             pointerEvents: "auto",
             cursor: "pointer",
             width: "100%",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
             background: "rgba(28,28,30,.92)",
             backdropFilter: "blur(10px)",
             color: "#fff",
@@ -44,10 +48,11 @@ export default function Toast() {
             fontWeight: 600,
             lineHeight: 1.4,
             boxShadow: "0 8px 24px rgba(0,0,0,.25)",
-            animation: "sheetup .25s ease-out",
+            animation: "sheetup .25s var(--ease-spring)",
           }}
         >
-          ⚠️ {t.message}
+          <WarningIcon size={15} style={{ flexShrink: 0 }} />
+          {t.message}
         </div>
       ))}
     </div>

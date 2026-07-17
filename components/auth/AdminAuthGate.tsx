@@ -124,22 +124,9 @@ function LoginForm({ initialError }: { initialError?: string }) {
           "-apple-system, BlinkMacSystemFont, 'Hiragino Sans', var(--font-noto-sans-jp), 'Noto Sans JP', sans-serif",
       }}
     >
-      {/* ガラスは背後に何か無いと透明感が見えない。特定の色に依らないニュートラルな
-          淡い形状を敷いて、blurが実際に屈折して見えるようにする（ログイン前は
-          店舗テーマが未読み込みのため、accentではなくグレー系で統一）。 */}
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: 0,
-          zIndex: 0,
-          pointerEvents: "none",
-          background:
-            "radial-gradient(44% 38% at 12% 10%, rgba(120,120,140,.20), transparent 70%), " +
-            "radial-gradient(50% 42% at 90% 86%, rgba(90,100,130,.18), transparent 72%), " +
-            "radial-gradient(36% 30% at 82% 6%, rgba(160,160,170,.16), transparent 70%)",
-        }}
-      />
+      {/* ガラスは背後に何か無いと透明感が見えない。画面全体を覆う連続的な階調を敷く
+          （ログイン前は店舗テーマ未読み込みのため、accentではなくニュートラルで統一）。 */}
+      <div aria-hidden className="ambient-wash" />
       <form
         onSubmit={submit}
         style={{
