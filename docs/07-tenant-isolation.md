@@ -65,21 +65,37 @@
 
 ## デプロイ手順（本番適用時・ユーザー実行）
 
-**必ずこの順番で実行すること**。
+### ⚠ 必ず「閉店中」に実施すること
 
-1. ⚠ Supabaseダッシュボード → Authentication → Sign In / Providers →
-   **「Allow anonymous sign-ins」を有効化**（ステップ11のみに必要。これをやらないと
-   `signInAnonymously()`が失敗し続け、客は自分の注文状況を見られない状態のまま残る。
-   注文自体はtoken方式のままなので致命傷にはならないが、体験は劣化する）
-2. Supabase SQL Editor で `supabase/step10-tenant-isolation.sql` を丸ごと実行
-3. 続けて `supabase/step11-customer-sessions.sql` を丸ごと実行
-4. 続けて `supabase/functions.sql` を丸ごと再実行（最新のstore_id検証/table_sessions連携を
-   含む版で全関数を再定義。実行権限のGRANT/REVOKEも含む）
-5. `npx supabase functions deploy submit_order`（Edge Functionの代理注文検証バグ修正を反映）
-6. アプリコード（`AdminAuthGate.tsx`/`CustomerShell.tsx`/`lib/supabase.ts`/`lib/data.ts` 他）を
-   `git push` → Vercel自動デプロイ
+step11 が `orders`/`order_items`/`staff_calls` の **anon向け閲覧ポリシーを外す**ため、
+「step11実行 〜 pushしたクライアントがVercelに反映される」までの数分間、
+**客は注文できるが自分の注文履歴・調理状況を見られない**状態になる
+（客が匿名認証(authenticated)に切り替わるのはクライアントのデプロイ後のため）。
 
-②〜⑤の間はUIが正常でも一部RPCがエラーになる可能性があるため、なるべく連続して実行する。
+- 影響を受けるのは客のみ。スタッフ(`/admin`)は step10 完了時点で正常。
+- 注文・会計そのものは全工程を通じて動作する（place_orderはservice_role経由のため）。
+- 営業中に無停止で行いたい場合は、step11から「anonポリシーのdrop」だけを外して先に適用し、
+  push完了を確認してから別途dropする2段階移行が必要（今回は閉店中実施を前提に簡略化）。
+
+### 手順（この順番で連続して実行する）
+
+1. **Supabaseダッシュボード** → Authentication → Sign In / Providers →
+   **「Allow anonymous sign-ins」を有効化**。これをやらないと `signInAnonymously()` が
+   失敗し続け、step11適用後に客が注文状況を見られないままになる。
+2. **SQL Editor** で `supabase/step10-tenant-isolation.sql` を丸ごと実行
+   （staffバックフィル＋`staff_store_id()`＋RLSのstore_idスコープ化）。
+   → 次のstep4より必ず先に実行すること。staffテーブルが空のまま新しい
+   `submit_order` を配ると、スタッフの代理注文が全て弾かれる。
+3. **SQL Editor** で `supabase/step11-customer-sessions.sql` を丸ごと実行
+   （table_sessions連携＋`has_table_session()`＋客向けRLS＋`fetch_table_tokens()`）。
+4. `npx supabase functions deploy submit_order`
+   （Edge Functionの代理注文検証バグ修正を反映。Docker不要）
+5. `git push` → Vercel自動デプロイ
+   （`AdminAuthGate.tsx`/`CustomerShell.tsx`/`lib/supabase.ts`/`lib/data.ts` 他）
+
+> `supabase/functions.sql` の再実行は**不要**。step11 が変更対象の関数
+> （`open_session`/`close_table`/`regenerate_table_token`）を全て再定義しており、
+> `place_order` は今回変更していないため。`functions.sql` は新規構築時の正本として維持。
 
 ## 動作確認チェックリスト（デプロイ後）
 
