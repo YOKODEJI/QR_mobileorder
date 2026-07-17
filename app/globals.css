@@ -61,12 +61,15 @@
 }
 
 /* ============================================================
-   ダークモード（端末/ブラウザの設定に自動追従。トグルUIは無し）
+   ダークモード（現状は無効。既定は常にライトモード固定）
+   以前 prefers-color-scheme で自動追従させていたが、一部のハードコードされた
+   白背景(#fff)がダーク時に文字と衝突して見えなくなる不具合があったため、
+   ユーザー判断で自動切替を停止。値自体は将来トグルUIを作る際にすぐ使えるよう
+   :root[data-theme="dark"] として残す（何もセットしないので現状は発火しない）。
    iOSの実測ダーク値。意味色もiOSはダークで別の実測値を使うため追従させる
    （systemBlue #0a84ff / systemGreen #30d158 / systemRed #ff453a）。
    ============================================================ */
-@media (prefers-color-scheme: dark) {
-  :root {
+:root[data-theme="dark"] {
     --app-bg: #000000;
     --surface: #1c1c1e;
     --header-bg: rgba(28, 28, 30, 0.82);
@@ -99,7 +102,6 @@
     --red-bg-2: rgba(255, 69, 58, 0.12);
     --soldout-bg: #3a3a3c;
     --soldout-text: rgba(235, 235, 245, 0.6);
-  }
 }
 
 /* ============================================================
@@ -122,15 +124,13 @@
     radial-gradient(38% 32% at 12% 88%, rgba(110, 120, 150, 0.19), transparent 70%),
     radial-gradient(42% 36% at 90% 94%, rgba(150, 150, 160, 0.16), transparent 70%);
 }
-@media (prefers-color-scheme: dark) {
-  .ambient-wash {
-    background:
-      radial-gradient(36% 30% at 8% 6%, rgba(90, 100, 150, 0.4), transparent 68%),
-      radial-gradient(40% 34% at 92% 16%, rgba(130, 90, 160, 0.32), transparent 70%),
-      radial-gradient(48% 42% at 50% 48%, rgba(70, 80, 120, 0.34), transparent 74%),
-      radial-gradient(38% 32% at 12% 88%, rgba(80, 100, 150, 0.34), transparent 70%),
-      radial-gradient(42% 36% at 90% 94%, rgba(110, 110, 130, 0.3), transparent 70%);
-  }
+:root[data-theme="dark"] .ambient-wash {
+  background:
+    radial-gradient(36% 30% at 8% 6%, rgba(90, 100, 150, 0.4), transparent 68%),
+    radial-gradient(40% 34% at 92% 16%, rgba(130, 90, 160, 0.32), transparent 70%),
+    radial-gradient(48% 42% at 50% 48%, rgba(70, 80, 120, 0.34), transparent 74%),
+    radial-gradient(38% 32% at 12% 88%, rgba(80, 100, 150, 0.34), transparent 70%),
+    radial-gradient(42% 36% at 90% 94%, rgba(110, 110, 130, 0.3), transparent 70%);
 }
 
 /* ============================================================

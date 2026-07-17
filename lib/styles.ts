@@ -10,7 +10,7 @@ export const segBtn = (active: boolean): CSSProperties => ({
   fontFamily: "inherit",
   fontSize: "14px",
   fontWeight: active ? 700 : 600,
-  background: active ? "#fff" : "transparent",
+  background: active ? "var(--surface)" : "transparent",
   color: active ? "var(--text)" : "var(--text-2)",
   boxShadow: active
     ? "0 1px 3px rgba(0,0,0,.14), 0 1px 1px rgba(0,0,0,.04)"
