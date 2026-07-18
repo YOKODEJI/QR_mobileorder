@@ -92,8 +92,16 @@ export default function QrCodes() {
                 <div style={{ fontSize: "14px", fontWeight: 800, marginBottom: "8px" }}>
                   {t.name}
                 </div>
-                <div style={{ display: "flex", justifyContent: "center" }}>
-                  <QRCodeSVG value={url} size={128} level="M" />
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    background: "#ffffff",
+                    borderRadius: "10px",
+                    padding: "10px",
+                  }}
+                >
+                  <QRCodeSVG value={url} size={128} level="M" fgColor="#000000" bgColor="#ffffff" />
                 </div>
                 <div style={{ fontSize: "10px", color: "var(--text-3)", marginTop: "6px" }}>
                   スマホのカメラで読み取り
