@@ -150,6 +150,16 @@ create table if not exists checkouts (
   closed_at       timestamptz not null default now()
 );
 
+-- ---- 会計履歴の全消去ログ（設定画面の「危険な操作」からのみ実行可） ----
+-- checkoutsを一括削除する際、取り消せない代わりに「何件・誰が・いつ」を必ず記録する。
+create table if not exists checkout_deletion_log (
+  id            uuid primary key default gen_random_uuid(),
+  store_id      uuid not null references stores(id) on delete cascade,
+  deleted_count int not null,
+  deleted_by    uuid references auth.users(id) on delete set null,
+  created_at    timestamptz not null default now()
+);
+
 -- ---- インデックス ------------------------------------------
 create index if not exists idx_menu_store   on menu_items(store_id, sort);
 create index if not exists idx_tables_store  on tables(store_id, sort);
@@ -220,6 +230,7 @@ alter table orders          enable row level security;
 alter table order_items     enable row level security;
 alter table staff_calls     enable row level security;
 alter table checkouts       enable row level security;
+alter table checkout_deletion_log enable row level security;
 
 -- staff_store_id(): 呼び出しユーザー(auth.uid())が属する店舗idを返す。
 -- staffテーブル自体はポリシー0件（全ロール拒否）のため、SECURITY DEFINERで
@@ -360,6 +371,11 @@ create policy staff_calls_delete_authenticated on staff_calls for delete to auth
 -- checkouts: 会計履歴は客に見せない。スタッフも自店舗分のみ
 create policy checkouts_select_authenticated on checkouts for select to authenticated using (store_id = staff_store_id());
 create policy checkouts_insert_authenticated on checkouts for insert to authenticated with check (store_id = staff_store_id());
+
+-- checkout_deletion_log: 閲覧は自店舗スタッフのみ。挿入はclear_checkout_history()経由のみ
+-- （直接insertは誰にも許可しない＝ポリシー無し）。
+create policy checkout_deletion_log_select_authenticated on checkout_deletion_log
+  for select to authenticated using (store_id = staff_store_id());
 
 -- staff / table_sessions: アプリからは未使用。ポリシー0件のまま（＝全ロール完全拒否）が最も安全。
 -- table_sessionsへのアクセスは has_table_session()/customer_store_id()関数(SECURITY DEFINER)経由のみ。

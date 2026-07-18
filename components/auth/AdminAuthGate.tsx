@@ -119,6 +119,7 @@ function LoginForm({ initialError }: { initialError?: string }) {
         alignItems: "center",
         justifyContent: "center",
         background: "var(--app-bg)",
+        color: "var(--text)",
         padding: "20px",
         fontFamily:
           "-apple-system, BlinkMacSystemFont, 'Hiragino Sans', var(--font-noto-sans-jp), 'Noto Sans JP', sans-serif",

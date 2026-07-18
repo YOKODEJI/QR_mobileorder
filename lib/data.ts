@@ -500,6 +500,20 @@ export async function dbCancelUnit(tableId: string, menuItemId: string, orders: 
   );
 }
 
+/** 会計履歴を全消去（自店舗分のみ）。取り消せないため呼び出し側で複数回確認すること。
+ *  何件・誰が・いつ消したかはDB側(checkout_deletion_log)に必ず記録される。
+ *  失敗時はnull、成功時は削除した件数を返す。 */
+export async function dbClearCheckoutHistory(): Promise<number | null> {
+  const sb = getSupabase();
+  if (!sb) return null;
+  const { data, error } = await sb.rpc("clear_checkout_history");
+  if (error) {
+    console.error("dbClearCheckoutHistory:", error.message);
+    return null;
+  }
+  return (data as number) ?? 0;
+}
+
 export async function dbInsertCall(tableId: string): Promise<boolean> {
   const sb = getSupabase();
   if (!sb || !STORE_ID) return true;

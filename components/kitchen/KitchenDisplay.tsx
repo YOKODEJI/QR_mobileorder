@@ -25,7 +25,6 @@ export default function KitchenDisplay() {
       confirmStatus: st.confirmStatus,
       connected: st.connected,
       highlightId: st.highlightId,
-      menu: st.menu,
       orders: st.orders,
       settings: st.settings,
       soundOn: st.soundOn,
@@ -36,11 +35,6 @@ export default function KitchenDisplay() {
   );
   const accent = s.settings.theme;
   const now = useNow();
-
-  const photoById: Record<string, string> = {};
-  s.menu.forEach((m) => {
-    if (m.photo) photoById[m.id] = m.photo;
-  });
 
   // FIFO: 提供前を先に、各グループ内は古い順（先に入った注文を先に作る）
   const sorted = [...s.orders].sort((a, b) => {
@@ -283,14 +277,6 @@ export default function KitchenDisplay() {
                           padding: "6px 0",
                         }}
                       >
-                        {photoById[it.menuItemId] && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={photoById[it.menuItemId]}
-                            alt=""
-                            style={{ width: "34px", height: "34px", borderRadius: "9px", objectFit: "cover" }}
-                          />
-                        )}
                         <span style={{ flex: 1, fontSize: "17px", fontWeight: 700 }}>{it.name}</span>
                         <span style={{ fontSize: "20px", fontWeight: 800, color: accent }}>
                           ×{it.qty}

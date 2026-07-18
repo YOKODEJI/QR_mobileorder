@@ -45,8 +45,19 @@ export function dateTimeLabel(iso: string): string {
   );
 }
 
-/** 「M/D」形式（日付見出し用） */
+const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+/** 「YYYY/M/D(曜)」形式（日付見出し用。会計履歴の日付グループなど） */
 export function dateLabel(iso: string): string {
   const d = new Date(iso);
-  return d.getMonth() + 1 + "/" + d.getDate();
+  return (
+    d.getFullYear() +
+    "/" +
+    (d.getMonth() + 1) +
+    "/" +
+    d.getDate() +
+    "(" +
+    WEEKDAYS[d.getDay()] +
+    ")"
+  );
 }

@@ -185,6 +185,7 @@ interface AppState {
   openSession: () => Promise<void>; // 現在の卓の session_token を取得
   loadTableTokens: () => Promise<void>; // 管理QR画面用に qr_token 群を取得
   regenerateToken: (id: string) => void; // QR再発行（印刷QR無効化）
+  clearCheckoutHistory: () => void; // 会計履歴の全消去（取り消せない・3段階確認）
 
   // ---- ヘルパー ----
   yen: (n: number) => string;
@@ -617,6 +618,50 @@ export const useAppStore = create<AppState>((set, get) => ({
         },
       },
     }));
+  },
+
+  // 会計履歴の全消去。注文中のテーブル/メニュー/在庫には影響しない。
+  // 取り消せない操作のため3段階で確認する（誤タップの連鎖を防ぐため文言を変える）。
+  clearCheckoutHistory: () => {
+    const doClear = async () => {
+      get().closeDialog();
+      const count = await db.dbClearCheckoutHistory();
+      if (count == null) {
+        get().pushToast("消去に失敗しました。もう一度お試しください。");
+        return;
+      }
+      set({ checkouts: [] });
+      get().pushToast(`会計履歴を${count}件消去しました。`);
+    };
+    set({
+      dialog: {
+        title: "会計履歴を全て消去しますか？",
+        body: "過去の会計記録（レシート履歴）がすべて削除されます。注文中のテーブル・メニュー・在庫には影響しません。",
+        confirmText: "次へ",
+        danger: true,
+        onConfirm: () => {
+          set({
+            dialog: {
+              title: "本当によろしいですか？",
+              body: "この操作は取り消せません。削除した履歴は二度と表示できなくなります。",
+              confirmText: "次へ",
+              danger: true,
+              onConfirm: () => {
+                set({
+                  dialog: {
+                    title: "最終確認（3回目）",
+                    body: "会計履歴を完全に消去します。よろしければ実行してください。",
+                    confirmText: "完全に消去する",
+                    danger: true,
+                    onConfirm: doClear,
+                  },
+                });
+              },
+            },
+          });
+        },
+      },
+    });
   },
 
   // ---- ヘルパー ----

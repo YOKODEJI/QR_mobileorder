@@ -329,6 +329,35 @@ begin
 end $$;
 
 
+-- ---- 会計履歴の全消去（自店舗分のみ）。件数を記録してから削除する ----
+-- 設定画面の奥（3回確認）からのみ呼ばれる想定。取り消せない操作の代わりに、
+-- 「何件・誰が・いつ消したか」をcheckout_deletion_logへ必ず記録する。
+create or replace function clear_checkout_history()
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_store uuid;
+  v_count int;
+begin
+  v_store := staff_store_id();
+  if v_store is null then
+    raise exception 'forbidden: not staff';
+  end if;
+
+  select count(*) into v_count from checkouts where store_id = v_store;
+
+  insert into checkout_deletion_log (store_id, deleted_count, deleted_by)
+    values (v_store, v_count, auth.uid());
+
+  delete from checkouts where store_id = v_store;
+
+  return v_count;
+end $$;
+
+
 -- ============================================================
 -- 実行権限（ステップ5 RLS厳格化とセット。詳細は step5-rls.sql 参照）
 --   place_order: submit_order Edge Function(service_role)経由のみ。
@@ -352,3 +381,6 @@ grant  execute on function regenerate_table_token(uuid, uuid) to authenticated;
 
 revoke execute on function cancel_order_item(uuid, uuid) from public, anon;
 grant  execute on function cancel_order_item(uuid, uuid) to authenticated;
+
+revoke execute on function clear_checkout_history() from public, anon;
+grant  execute on function clear_checkout_history() to authenticated;

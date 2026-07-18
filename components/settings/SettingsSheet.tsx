@@ -16,6 +16,7 @@ export default function SettingsSheet() {
   const settings = useAppStore((s) => s.settings);
   const setSetting = useAppStore((s) => s.setSetting);
   const closeSettings = useAppStore((s) => s.closeSettings);
+  const clearCheckoutHistory = useAppStore((s) => s.clearCheckoutHistory);
 
   // 見た目(ライト/ダーク/自動)はこの端末だけのローカル設定(localStorage)。
   // 店舗全体の設定ではないため useAppStore/DB は経由しない。
@@ -146,8 +147,8 @@ export default function SettingsSheet() {
           })}
         </div>
 
-        {/* 画面の見た目（この端末だけのローカル設定。店舗全体の設定ではない） */}
-        <div style={labelStyle}>画面の見た目</div>
+        {/* 表示モード（この端末だけのローカル設定。店舗全体の設定ではない） */}
+        <div style={labelStyle}>表示モード</div>
         <div
           style={{
             background: "var(--surface)",
@@ -336,6 +337,31 @@ export default function SettingsSheet() {
         <div style={{ ...labelStyle, marginTop: "20px" }}>QRコード管理</div>
         <div style={{ background: "var(--surface)", borderRadius: "14px", padding: "16px" }}>
           <QrCodes />
+        </div>
+
+        {/* 危険な操作（設定の一番奥。取り消せない操作のみ。誤タップ防止のため控えめな表示） */}
+        <div style={{ ...labelStyle, marginTop: "28px" }}>危険な操作</div>
+        <div style={{ background: "var(--surface)", borderRadius: "14px", padding: "14px 16px" }}>
+          <div style={{ fontSize: "13px", fontWeight: 700 }}>会計履歴を全て消去</div>
+          <div style={{ fontSize: "12px", color: "var(--text-2)", marginTop: "3px", marginBottom: "10px", lineHeight: 1.5 }}>
+            過去の会計記録（レシート履歴）だけを削除します。注文中のテーブル・メニュー・在庫には影響しません。取り消せません。
+          </div>
+          <button
+            onClick={clearCheckoutHistory}
+            style={{
+              border: "1px solid var(--red-bg)",
+              background: "transparent",
+              color: "var(--red)",
+              borderRadius: "999px",
+              padding: "8px 16px",
+              fontSize: "13px",
+              fontWeight: 700,
+              fontFamily: "inherit",
+              cursor: "pointer",
+            }}
+          >
+            会計履歴を全て消去…
+          </button>
         </div>
       </div>
     </div>
