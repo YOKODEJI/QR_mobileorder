@@ -4,6 +4,7 @@ import { create } from "zustand";
 import * as db from "@/lib/data";
 import { isSupabaseConfigured, ORDER_VIA_FUNCTION } from "@/lib/supabase";
 import { computeCheckoutBreakdown } from "@/lib/pricing";
+import { deletePhoto } from "@/lib/storage";
 
 /** 新規エンティティのID: 未設定uuid。Supabase書き込みが返すidがあればそちらを優先 */
 function newId(): string {
@@ -251,6 +252,8 @@ interface AppState {
   addItem: () => void;
   setPhoto: (id: string, url: string) => void;
   removePhoto: (id: string) => void;
+  confirmRemovePhoto: (id: string) => void; // メニュー写真の削除（1回確認）
+  confirmRemoveStorePhoto: (which: "headerPhoto" | "footerPhoto") => void; // 店舗写真の削除（1回確認）
   // カテゴリ管理
   setNewCategoryName: (v: string) => void;
   addCategory: () => void;
@@ -1311,6 +1314,41 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ menu: prevMenu });
       get().pushToast("写真の削除に失敗しました。もう一度お試しください。");
     }
+  },
+  confirmRemovePhoto: (id) => {
+    const item = get().menu.find((m) => m.id === id);
+    if (!item) return;
+    set({
+      dialog: {
+        title: "写真を削除しますか？",
+        body: `「${item.name}」の写真を削除します。元に戻せません。`,
+        confirmText: "削除する",
+        danger: true,
+        onConfirm: () => {
+          get().closeDialog();
+          if (item.photo) deletePhoto(item.photo);
+          get().removePhoto(id);
+        },
+      },
+    });
+  },
+  confirmRemoveStorePhoto: (which) => {
+    const s = get();
+    const url = s.settings[which];
+    const label = which === "headerPhoto" ? "ヘッダー" : "フッター";
+    set({
+      dialog: {
+        title: `${label}写真を削除しますか？`,
+        body: "客用ページの写真を削除します。元に戻せません。",
+        confirmText: "削除する",
+        danger: true,
+        onConfirm: () => {
+          get().closeDialog();
+          if (url) deletePhoto(url);
+          get().setSetting(which, null);
+        },
+      },
+    });
   },
 
   // ---- カテゴリ管理 ----

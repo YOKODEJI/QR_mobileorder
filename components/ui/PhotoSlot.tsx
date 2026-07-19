@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { uploadPhoto, deletePhoto } from "@/lib/storage";
+import { uploadPhoto, deletePhoto, resizeImage } from "@/lib/storage";
 
 /* クリック / ドラッグ&ドロップで画像を設定できる汎用スロット。
    Supabase設定時はStorageへアップロードして公開URLを保持、未設定時はローカルbase64のまま動く。 */
@@ -40,14 +40,15 @@ export default function PhotoSlot({
       if (prev && prev !== url) deletePhoto(prev); // 差し替え前の画像は掃除（失敗しても無視）
       return;
     }
-    // 未設定（ローカル開発）はこれまで通りbase64で保持
+    // 未設定（ローカル開発）はこれまで通りbase64で保持（縮小してから保持しDBの肥大化を防ぐ）
+    const resized = await resizeImage(f);
     const r = new FileReader();
     r.onload = () => {
       const url = r.result as string;
       if (onChange) onChange(url);
       else setLocal(url);
     };
-    r.readAsDataURL(f);
+    r.readAsDataURL(resized);
   };
 
   return (

@@ -94,7 +94,7 @@ export default function CheckoutHistory() {
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ fontSize: "11px", color: "var(--text-2)" }}>本日 {todayCount}件</div>
-          <div style={{ fontSize: "23px", fontWeight: 800, color: accent }}>{s.yen(todayTotal)}</div>
+          <div style={{ fontSize: "23px", fontWeight: 800, color: accent, fontVariantNumeric: "tabular-nums" }}>{s.yen(todayTotal)}</div>
         </div>
       </div>
 

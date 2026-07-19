@@ -228,7 +228,7 @@ export default function KitchenDisplay() {
                     </span>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       {elapsed != null && cooking && (
-                        <span style={{ fontSize: "14px", fontWeight: 800 }}>
+                        <span style={{ fontSize: "14px", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
                           {urgent ? "⚠ " : ""}
                           {elapsed}分
                         </span>
@@ -278,7 +278,7 @@ export default function KitchenDisplay() {
                         }}
                       >
                         <span style={{ flex: 1, fontSize: "17px", fontWeight: 700 }}>{it.name}</span>
-                        <span style={{ fontSize: "20px", fontWeight: 800, color: accent }}>
+                        <span style={{ fontSize: "20px", fontWeight: 800, color: accent, fontVariantNumeric: "tabular-nums" }}>
                           ×{it.qty}
                         </span>
                       </div>

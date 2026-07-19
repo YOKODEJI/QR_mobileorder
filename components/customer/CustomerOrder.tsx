@@ -110,7 +110,7 @@ export default function CustomerOrder() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={m.photo}
-                    alt=""
+                    alt={m.name}
                     style={{
                       width: "62px",
                       height: "62px",
@@ -122,7 +122,7 @@ export default function CustomerOrder() {
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: "15px", fontWeight: 700, color: "var(--text)" }}>{m.name}</div>
-                  <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-2)" }}>
+                  <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-2)", fontVariantNumeric: "tabular-nums" }}>
                     {s.yen(m.price)}
                   </div>
                 </div>
@@ -140,12 +140,12 @@ export default function CustomerOrder() {
                     売切
                   </span>
                 ) : qty === 0 ? (
-                  <button onClick={() => s.addCart(m.id)} style={addBtnStyle(accent)}>
+                  <button onClick={() => s.addCart(m.id)} style={addBtnStyle(accent)} aria-label={`${m.name}をカートに追加`}>
                     追加
                   </button>
                 ) : (
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <button onClick={() => s.removeCart(m.id)} style={stepSubStyle(accent)}>
+                    <button onClick={() => s.removeCart(m.id)} style={stepSubStyle(accent)} aria-label={`${m.name}を1つ減らす`}>
                       −
                     </button>
                     <span
@@ -157,12 +157,13 @@ export default function CustomerOrder() {
                         textAlign: "center",
                         color: "var(--text)",
                         display: "inline-block",
+                        fontVariantNumeric: "tabular-nums",
                         animation: "pop .22s var(--ease-spring)",
                       }}
                     >
                       {qty}
                     </span>
-                    <button onClick={() => s.addCart(m.id)} style={stepAddStyle(accent)}>
+                    <button onClick={() => s.addCart(m.id)} style={stepAddStyle(accent)} aria-label={`${m.name}を1つ増やす`}>
                       ＋
                     </button>
                   </div>
@@ -291,7 +292,7 @@ export default function CustomerOrder() {
             marginBottom: "7px",
           }}
         >
-          <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-2)" }}>
+          <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-2)", fontVariantNumeric: "tabular-nums" }}>
             {cartCount}点
           </span>
           <span
@@ -301,6 +302,7 @@ export default function CustomerOrder() {
               fontWeight: 800,
               color: "var(--text)",
               display: "inline-block",
+              fontVariantNumeric: "tabular-nums",
               animation: cartTotal > 0 ? "pop .22s var(--ease-spring)" : undefined,
             }}
           >

@@ -6,7 +6,6 @@ import Toggle from "@/components/ui/Toggle";
 import PhotoSlot from "@/components/ui/PhotoSlot";
 import QrCodes from "@/components/qr/QrCodes";
 import SegmentedControl from "@/components/ui/SegmentedControl";
-import { deletePhoto } from "@/lib/storage";
 import { getStoredThemeMode, setThemeMode, type ThemeMode } from "@/lib/themeMode";
 
 const SWATCHES = ["#cf4b2c", "#e0902a", "#248a3d", "#0a84ff", "#8a4fd0"];
@@ -17,6 +16,7 @@ export default function SettingsSheet() {
   const setSetting = useAppStore((s) => s.setSetting);
   const closeSettings = useAppStore((s) => s.closeSettings);
   const clearCheckoutHistory = useAppStore((s) => s.clearCheckoutHistory);
+  const confirmRemoveStorePhoto = useAppStore((s) => s.confirmRemoveStorePhoto);
 
   // 見た目(ライト/ダーク/自動)はこの端末だけのローカル設定(localStorage)。
   // 店舗全体の設定ではないため useAppStore/DB は経由しない。
@@ -80,11 +80,12 @@ export default function SettingsSheet() {
           </div>
           <button
             onClick={closeSettings}
+            aria-label="設定を閉じる"
             style={{
               border: "none",
               background: "var(--control-tint)",
-              width: "30px",
-              height: "30px",
+              width: "40px",
+              height: "40px",
               borderRadius: "50%",
               fontSize: "15px",
               cursor: "pointer",
@@ -206,13 +207,7 @@ export default function SettingsSheet() {
                 folder="header"
               />
               {settings.headerPhoto && (
-                <button
-                  onClick={() => {
-                    deletePhoto(settings.headerPhoto);
-                    setSetting("headerPhoto", null);
-                  }}
-                  style={removeBtn}
-                >
+                <button onClick={() => confirmRemoveStorePhoto("headerPhoto")} style={removeBtn}>
                   写真を削除
                 </button>
               )}
@@ -245,13 +240,7 @@ export default function SettingsSheet() {
                 folder="footer"
               />
               {settings.footerPhoto && (
-                <button
-                  onClick={() => {
-                    deletePhoto(settings.footerPhoto);
-                    setSetting("footerPhoto", null);
-                  }}
-                  style={removeBtn}
-                >
+                <button onClick={() => confirmRemoveStorePhoto("footerPhoto")} style={removeBtn}>
                   写真を削除
                 </button>
               )}

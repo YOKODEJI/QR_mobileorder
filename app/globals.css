@@ -136,8 +136,11 @@
 /* ============================================================
    全ボタン共通のバネ的な押し込みフィードバック。
    個々のinline styleを触らずに全画面へ一括適用する。
+   touch-action: manipulation はモバイルブラウザの標準300msタップ遅延
+   （ダブルタップズーム判定待ち）を無くし、体感速度を上げる。
    ============================================================ */
 button {
+  touch-action: manipulation;
   transition: transform 0.15s var(--ease-spring), opacity 0.15s ease;
 }
 button:active:not(:disabled) {

@@ -7,7 +7,7 @@ import type { MenuItem } from "@/store/useAppStore";
 import ChipRow from "@/components/ui/ChipRow";
 import Picker from "@/components/ui/Picker";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { uploadPhoto, deletePhoto } from "@/lib/storage";
+import { uploadPhoto, deletePhoto, resizeImage } from "@/lib/storage";
 
 function DragDots() {
   return (
@@ -28,7 +28,7 @@ function DragDots() {
 
 function PhotoCell({ item }: { item: MenuItem }) {
   const setPhoto = useAppStore((s) => s.setPhoto);
-  const removePhoto = useAppStore((s) => s.removePhoto);
+  const confirmRemovePhoto = useAppStore((s) => s.confirmRemovePhoto);
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -44,9 +44,10 @@ function PhotoCell({ item }: { item: MenuItem }) {
       if (prev) deletePhoto(prev);
       return;
     }
+    const resized = await resizeImage(f);
     const r = new FileReader();
     r.onload = () => setPhoto(item.id, r.result as string);
-    r.readAsDataURL(f);
+    r.readAsDataURL(resized);
   };
 
   if (uploading) {
@@ -81,25 +82,23 @@ function PhotoCell({ item }: { item: MenuItem }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={item.photo}
-          alt=""
+          alt={item.name}
           style={{ width: "54px", height: "54px", borderRadius: "13px", objectFit: "cover", display: "block" }}
         />
         <button
-          onClick={() => {
-            deletePhoto(item.photo);
-            removePhoto(item.id);
-          }}
+          onClick={() => confirmRemovePhoto(item.id)}
+          aria-label={`${item.name}の写真を削除`}
           style={{
             position: "absolute",
-            top: "-6px",
-            right: "-6px",
-            width: "20px",
-            height: "20px",
+            top: "-10px",
+            right: "-10px",
+            width: "28px",
+            height: "28px",
             borderRadius: "50%",
             border: "none",
             background: "var(--red)",
             color: "#fff",
-            fontSize: "11px",
+            fontSize: "12px",
             cursor: "pointer",
             lineHeight: 1,
           }}
@@ -336,9 +335,10 @@ export default function MenuManagement() {
                 {s.deleteMode ? (
                   <button
                     onClick={() => s.toggleSelect(m.id)}
+                    aria-label={selected ? `${m.name}の選択を解除` : `${m.name}を選択`}
                     style={{
-                      width: "26px",
-                      height: "26px",
+                      width: "32px",
+                      height: "32px",
                       borderRadius: "50%",
                       border: selected ? "none" : "2px solid var(--soldout-bg)",
                       background: selected ? accent : "var(--surface)",
@@ -396,6 +396,7 @@ export default function MenuManagement() {
                     type="number"
                     value={m.price}
                     onChange={(e) => s.setPrice(m.id, e.target.value)}
+                    aria-label={`${m.name}の価格`}
                     style={{
                       width: "90px",
                       padding: "8px 10px",
@@ -406,6 +407,7 @@ export default function MenuManagement() {
                       fontSize: "15px",
                       fontWeight: 700,
                       fontFamily: "inherit",
+                      fontVariantNumeric: "tabular-nums",
                     }}
                   />
                 </div>
@@ -414,7 +416,8 @@ export default function MenuManagement() {
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
                   <button
                     onClick={() => s.bumpStock(m.id, -1)}
-                    style={{ width: "32px", height: "32px", borderRadius: "9px", border: "none", background: "var(--hairline)", color: "var(--text-2)", fontSize: "18px", cursor: "pointer", lineHeight: 1 }}
+                    aria-label={`${m.name}の在庫を1減らす`}
+                    style={{ width: "38px", height: "38px", borderRadius: "10px", border: "none", background: "var(--hairline)", color: "var(--text-2)", fontSize: "18px", cursor: "pointer", lineHeight: 1 }}
                   >
                     −
                   </button>
@@ -422,6 +425,7 @@ export default function MenuManagement() {
                     type="number"
                     value={m.stock}
                     onChange={(e) => s.setStock(m.id, e.target.value)}
+                    aria-label={`${m.name}の在庫数`}
                     style={{
                       width: "46px",
                       padding: "7px 4px",
@@ -432,11 +436,13 @@ export default function MenuManagement() {
                       fontSize: "14px",
                       fontWeight: 700,
                       fontFamily: "inherit",
+                      fontVariantNumeric: "tabular-nums",
                     }}
                   />
                   <button
                     onClick={() => s.bumpStock(m.id, 1)}
-                    style={{ width: "32px", height: "32px", borderRadius: "9px", border: "none", background: accent, color: "#fff", fontSize: "18px", cursor: "pointer", lineHeight: 1 }}
+                    aria-label={`${m.name}の在庫を1増やす`}
+                    style={{ width: "38px", height: "38px", borderRadius: "10px", border: "none", background: accent, color: "#fff", fontSize: "18px", cursor: "pointer", lineHeight: 1 }}
                   >
                     ＋
                   </button>
@@ -539,8 +545,8 @@ export default function MenuManagement() {
                     onClick={() => s.confirmDeleteCategory(c)}
                     aria-label={c + "を削除"}
                     style={{
-                      width: "20px",
-                      height: "20px",
+                      width: "28px",
+                      height: "28px",
                       borderRadius: "50%",
                       border: "none",
                       background: accent,

@@ -288,8 +288,8 @@ export default function StaffCheckout() {
                             }}
                             aria-label="テーブルを削除"
                             style={{
-                              width: "32px",
-                              height: "32px",
+                              width: "40px",
+                              height: "40px",
                               flexShrink: 0,
                               borderRadius: "50%",
                               border: "1px solid var(--red-bg)",
@@ -420,7 +420,7 @@ export default function StaffCheckout() {
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={photoById[it.menuItemId]}
-                          alt=""
+                          alt={it.name}
                           style={{ width: "40px", height: "40px", borderRadius: "10px", objectFit: "cover" }}
                         />
                       )}
@@ -600,7 +600,7 @@ export default function StaffCheckout() {
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={photoById[m.id]}
-                            alt=""
+                            alt={m.name}
                             style={{ width: "38px", height: "38px", borderRadius: "9px", objectFit: "cover" }}
                           />
                         )}
