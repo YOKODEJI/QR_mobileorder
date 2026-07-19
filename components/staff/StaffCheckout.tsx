@@ -574,6 +574,7 @@ export default function StaffCheckout() {
               )}
 
               <button
+                disabled={s.orderEditMode}
                 onClick={() => s.confirmCheckout(discountType, discountNum, chargeEnabled)}
                 style={{
                   width: "100%",
@@ -581,19 +582,21 @@ export default function StaffCheckout() {
                   padding: "15px",
                   borderRadius: "16px",
                   border: "none",
-                  background: accent,
-                  color: "#fff",
+                  background: s.orderEditMode ? "var(--soldout-bg)" : accent,
+                  color: s.orderEditMode ? "var(--soldout-text)" : "#fff",
                   fontSize: "16px",
                   fontWeight: 700,
                   fontFamily: "inherit",
-                  cursor: "pointer",
-                  boxShadow: "inset 0 1px 0 rgba(255,255,255,.3)",
+                  cursor: s.orderEditMode ? "not-allowed" : "pointer",
+                  boxShadow: s.orderEditMode ? "none" : "inset 0 1px 0 rgba(255,255,255,.3)",
                 }}
               >
                 お会計する（セッションを締める）
               </button>
-              <div style={{ fontSize: "11px", color: "var(--text-2)", marginTop: "8px", textAlign: "center" }}>
-                決済は既存レジで実施。ここではセッションを締めるだけです。
+              <div style={{ fontSize: "11px", color: s.orderEditMode ? "var(--red)" : "var(--text-2)", marginTop: "8px", textAlign: "center", fontWeight: s.orderEditMode ? 700 : 400 }}>
+                {s.orderEditMode
+                  ? "注文編集を「完了」してからお会計できます。"
+                  : "決済は既存レジで実施。ここではセッションを締めるだけです。"}
               </div>
 
               {/* 代理注文 */}

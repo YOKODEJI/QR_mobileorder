@@ -938,6 +938,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     const s = get();
     const t = s.selectedStaffTable;
     if (t == null) return;
+    // 注文編集を完了させてからでないと会計させない（編集中の数量変更と競合させないため）
+    if (s.orderEditMode) {
+      get().pushToast("注文編集を「完了」してからお会計してください。");
+      return;
+    }
     const subtotal = s.orders
       .filter((o) => o.table === t)
       .reduce(
