@@ -1094,6 +1094,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   // 「−」(cancelUnit)の対称操作。代理注文と同じplace_order経路で1個ぶんの新規伝票を追加する
   // （在庫チェック/減算がRPC側でアトミックに行われる既存の仕組みをそのまま再利用する）。
+  // cancelUnitと同様、まずローカルを楽観更新してからバックグラウンドで永続化する
+  // （awaitしてから更新すると「＋」だけ体感ラグが出るため）。
   addUnit: async (menuItemId, idem) => {
     const s = get();
     const t = s.selectedStaffTable;
@@ -1103,37 +1105,40 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().pushToast("在庫がないため追加できません。");
       return;
     }
+    const prevMenu = s.menu;
     const items: OrderItem[] = [{ menuItemId, name: m.name, price: m.price, qty: 1 }];
     const key = idem ?? newId();
-    const configured = isSupabaseConfigured();
-    let id: string | null = null;
-    if (configured) {
-      const res = await placeOrder(t, items, true, key, s.menu, null);
-      if (!res.ok) {
-        set({
-          dialog: orderErrorDialog(res, () => {
-            get().closeDialog();
-            get().addUnit(menuItemId, key);
-          }),
-        });
-        return;
-      }
-      id = res.id;
-    } else {
-      id = newId();
-    }
+    const tempId = newId();
     set((st) => ({
       orders: [
-        { id: id!, table: t, createdAt: new Date().toISOString(), status: "cooking", items, proxy: true },
+        { id: tempId, table: t, createdAt: new Date().toISOString(), status: "cooking", items, proxy: true },
         ...st.orders,
       ],
       menu: decrementStock(st.menu, items),
-      highlightId: id,
+      highlightId: tempId,
     }));
     playBeep(get().soundOn);
     setTimeout(() => {
-      if (get().highlightId === id) set({ highlightId: null });
+      if (get().highlightId === tempId) set({ highlightId: null });
     }, 2600);
+    if (!isSupabaseConfigured()) return;
+    const res = await placeOrder(t, items, true, key, prevMenu, null);
+    if (!res.ok) {
+      set((st) => ({
+        orders: st.orders.filter((o) => o.id !== tempId),
+        menu: prevMenu,
+        dialog: orderErrorDialog(res, () => {
+          get().closeDialog();
+          get().addUnit(menuItemId, key);
+        }),
+      }));
+      return;
+    }
+    // 確定したサーバー側idへ差し替え（提供済み操作等が本物のorder idを必要とするため）
+    set((st) => ({
+      orders: st.orders.map((o) => (o.id === tempId ? { ...o, id: res.id } : o)),
+      highlightId: st.highlightId === tempId ? res.id : st.highlightId,
+    }));
   },
   setTableEditMode: (v) =>
     set({
