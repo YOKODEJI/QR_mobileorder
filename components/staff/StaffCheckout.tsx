@@ -13,6 +13,7 @@ export default function StaffCheckout() {
     useShallow((st) => ({
       addStaff: st.addStaff,
       addTable: st.addTable,
+      addUnit: st.addUnit,
       avail: st.avail,
       cancelUnit: st.cancelUnit,
       confirmCheckout: st.confirmCheckout,
@@ -438,6 +439,7 @@ export default function StaffCheckout() {
                         {s.orderEditMode && (
                           <button
                             onClick={() => s.cancelUnit(it.menuItemId)}
+                            aria-label={`${it.name}を1つ取消`}
                             style={{
                               width: "34px",
                               height: "34px",
@@ -454,9 +456,29 @@ export default function StaffCheckout() {
                             −
                           </button>
                         )}
-                        <span style={{ fontSize: "15px", fontWeight: 800, minWidth: "16px", textAlign: "center" }}>
+                        <span style={{ fontSize: "15px", fontWeight: 800, minWidth: "16px", textAlign: "center", fontVariantNumeric: "tabular-nums" }}>
                           {it.qty}
                         </span>
+                        {s.orderEditMode && (
+                          <button
+                            onClick={() => s.addUnit(it.menuItemId)}
+                            aria-label={`${it.name}を1つ追加`}
+                            style={{
+                              width: "34px",
+                              height: "34px",
+                              borderRadius: "10px",
+                              border: "none",
+                              background: "var(--green-bg)",
+                              color: "var(--green-dark)",
+                              fontSize: "20px",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              lineHeight: 1,
+                            }}
+                          >
+                            ＋
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}

@@ -228,6 +228,7 @@ interface AppState {
   confirmCheckout: (discountType: DiscountType, discountValue: number, chargeEnabled: boolean) => void;
   checkout: (discountType: DiscountType, discountValue: number, chargeEnabled: boolean) => void;
   cancelUnit: (menuItemId: string) => void;
+  addUnit: (menuItemId: string, idem?: string) => void;
   setOrderEditMode: (v: boolean) => void;
   confirmFinishOrderEdit: () => void;
   setTableEditMode: (v: boolean) => void;
@@ -1090,6 +1091,49 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ orders: prevOrders, menu: prevMenu });
       get().pushToast("取消の保存に失敗しました。もう一度お試しください。");
     }
+  },
+  // 「−」(cancelUnit)の対称操作。代理注文と同じplace_order経路で1個ぶんの新規伝票を追加する
+  // （在庫チェック/減算がRPC側でアトミックに行われる既存の仕組みをそのまま再利用する）。
+  addUnit: async (menuItemId, idem) => {
+    const s = get();
+    const t = s.selectedStaffTable;
+    if (t == null) return;
+    const m = s.menu.find((x) => x.id === menuItemId);
+    if (!m || m.soldOut || m.stock <= 0) {
+      get().pushToast("在庫がないため追加できません。");
+      return;
+    }
+    const items: OrderItem[] = [{ menuItemId, name: m.name, price: m.price, qty: 1 }];
+    const key = idem ?? newId();
+    const configured = isSupabaseConfigured();
+    let id: string | null = null;
+    if (configured) {
+      const res = await placeOrder(t, items, true, key, s.menu, null);
+      if (!res.ok) {
+        set({
+          dialog: orderErrorDialog(res, () => {
+            get().closeDialog();
+            get().addUnit(menuItemId, key);
+          }),
+        });
+        return;
+      }
+      id = res.id;
+    } else {
+      id = newId();
+    }
+    set((st) => ({
+      orders: [
+        { id: id!, table: t, createdAt: new Date().toISOString(), status: "cooking", items, proxy: true },
+        ...st.orders,
+      ],
+      menu: decrementStock(st.menu, items),
+      highlightId: id,
+    }));
+    playBeep(get().soundOn);
+    setTimeout(() => {
+      if (get().highlightId === id) set({ highlightId: null });
+    }, 2600);
   },
   setTableEditMode: (v) =>
     set({
