@@ -97,22 +97,16 @@ create table if not exists menu_items (
     on delete restrict
 );
 
--- ---- 商品オプション（トッピング等。step14） ----------------
--- 候補は店舗共通のリストで持ち、どの商品に出すかを menu_item_options で紐付ける
--- （同じ「大盛り +100円」を複数商品で使い回せる）。
-create table if not exists menu_options (
-  id          uuid primary key default gen_random_uuid(),
-  store_id    uuid not null references stores(id) on delete cascade,
-  name        text not null,
-  price_delta int  not null default 0, -- 追加料金（円）。0円やマイナス（値引き）も可
-  sort        int  not null default 0,
-  constraint menu_options_store_name_key unique (store_id, name)
-);
-
+-- ---- 商品オプション（トッピング等。step14→step15で商品ごとの個別設定に変更） ----
+-- オプションは「その商品が持つもの」。商品ごとに名前と追加料金を設定する
+-- （「ラーメンの大盛り +100円」と「カレーの大盛り +200円」を同時に持てる）。
 create table if not exists menu_item_options (
-  menu_item_id uuid not null references menu_items(id)   on delete cascade,
-  option_id    uuid not null references menu_options(id) on delete cascade,
-  primary key (menu_item_id, option_id)
+  id           uuid primary key default gen_random_uuid(),
+  menu_item_id uuid not null references menu_items(id) on delete cascade,
+  name         text not null,
+  price_delta  int  not null default 0, -- 追加料金（円）。0円やマイナス（値引き）も可
+  sort         int  not null default 0,
+  constraint menu_item_options_item_name_key unique (menu_item_id, name)
 );
 
 -- ---- 注文（伝票） ------------------------------------------
@@ -182,8 +176,7 @@ create table if not exists checkout_deletion_log (
 
 -- ---- インデックス ------------------------------------------
 create index if not exists idx_menu_store   on menu_items(store_id, sort);
-create index if not exists idx_menu_options_store on menu_options(store_id, sort);
-create index if not exists idx_menu_item_options_item on menu_item_options(menu_item_id);
+create index if not exists idx_menu_item_options_item on menu_item_options(menu_item_id, sort);
 create index if not exists idx_tables_store  on tables(store_id, sort);
 create index if not exists idx_orders_store  on orders(store_id, status, created_at);
 create index if not exists idx_orderitems    on order_items(order_id);
@@ -211,7 +204,7 @@ declare t text;
 begin
   foreach t in array array[
     'orders','order_items','menu_items','tables','staff_calls','checkouts','categories',
-    'menu_options','menu_item_options'
+    'menu_item_options'
   ]
   loop
     if not exists (
@@ -249,7 +242,6 @@ alter table tables          enable row level security;
 alter table table_sessions  enable row level security;
 alter table categories      enable row level security;
 alter table menu_items      enable row level security;
-alter table menu_options    enable row level security;
 alter table menu_item_options enable row level security;
 alter table orders          enable row level security;
 alter table order_items     enable row level security;
@@ -353,16 +345,8 @@ create policy menu_items_select_customer      on menu_items for select to authen
 create policy menu_items_write_authenticated  on menu_items for all to authenticated
   using (store_id = staff_store_id()) with check (store_id = staff_store_id());
 
--- menu_options / menu_item_options: menu_items と同じ扱い（閲覧は誰でも、CRUDは自店舗スタッフのみ）
-create policy menu_options_select_anon          on menu_options for select to anon using (true);
-create policy menu_options_select_authenticated on menu_options for select to authenticated
-  using (store_id = staff_store_id());
-create policy menu_options_select_customer      on menu_options for select to authenticated
-  using (coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false));
-create policy menu_options_write_authenticated  on menu_options for all to authenticated
-  using (store_id = staff_store_id()) with check (store_id = staff_store_id());
-
--- 中間テーブルは store_id を持たないため、親(menu_items)の店舗で判定する
+-- menu_item_options: menu_items と同じ扱い（閲覧は誰でも、CRUDは自店舗スタッフのみ）。
+-- store_id 列を持たないため、親(menu_items)の店舗で判定する
 create policy menu_item_options_select_anon on menu_item_options for select to anon using (true);
 create policy menu_item_options_select_authenticated on menu_item_options for select to authenticated
   using (exists (select 1 from menu_items m where m.id = menu_item_id and m.store_id = staff_store_id()));

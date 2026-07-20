@@ -145,8 +145,8 @@ interface AppState {
   // 業務データ
   orders: Order[];
   menu: MenuItem[];
-  options: MenuOption[]; // 店舗共通のオプション候補（並び順のまま）
-  itemOptionIds: Record<string, string[]>; // 商品id → その商品に出すオプションid群
+  // 商品id → その商品が持つオプション（並び順のまま）。オプションは商品ごとの個別設定。
+  itemOptions: Record<string, MenuOption[]>;
   categories: string[]; // 動的カテゴリ一覧（並び順のまま）
   newCategoryName: string;
   editingCategoryName: string | null; // リネーム中のカテゴリ（旧名で識別）
@@ -193,8 +193,7 @@ interface AppState {
     categories: string[];
     tables: TableRec[];
     menu: MenuItem[];
-    options: MenuOption[];
-    itemOptionIds: Record<string, string[]>;
+    itemOptions: Record<string, MenuOption[]>;
     orders: Order[];
     calls: StaffCall[];
     checkouts: CheckoutRecord[];
@@ -275,12 +274,11 @@ interface AppState {
   removePhoto: (id: string) => void;
   confirmRemovePhoto: (id: string) => void; // メニュー写真の削除（1回確認）
   confirmRemoveStorePhoto: (which: "headerPhoto" | "footerPhoto") => void; // 店舗写真の削除（1回確認）
-  // オプション管理（店舗共通の候補 + 商品への紐付け）
-  addOption: (name: string, priceDelta: number) => void;
-  updateOption: (id: string, patch: { name?: string; priceDelta?: number }) => void;
-  confirmDeleteOption: (id: string) => void; // 候補の削除（1回確認）
-  deleteOption: (id: string) => void;
-  toggleItemOption: (menuItemId: string, optionId: string) => void;
+  // オプション管理（商品ごとの個別設定）
+  addOption: (menuItemId: string, name: string, priceDelta: number) => void;
+  updateOption: (menuItemId: string, id: string, patch: { name?: string; priceDelta?: number }) => void;
+  confirmDeleteOption: (menuItemId: string, id: string) => void; // 削除（1回確認）
+  deleteOption: (menuItemId: string, id: string) => void;
   // カテゴリ管理
   setNewCategoryName: (v: string) => void;
   addCategory: () => void;
@@ -338,16 +336,17 @@ function playBeep(soundOn: boolean) {
 function buildItems(
   cart: Record<string, number>,
   menu: MenuItem[],
-  options: MenuOption[] = []
+  itemOptions: Record<string, MenuOption[]> = {}
 ): OrderItem[] {
   return Object.keys(cart)
     .map((key): OrderItem | null => {
       const { menuItemId, optionIds } = parseCartKey(key);
       const m = menu.find((x) => x.id === menuItemId);
       if (!m) return null;
-      // 候補から消えたオプションIDは黙って落とす（DB側でも紐付け検証が入る）
+      // 消えたオプションIDは黙って落とす（DB側でも所有チェックが入る）
+      const avail = itemOptions[menuItemId] ?? [];
       const sel: SelectedOption[] = optionIds
-        .map((oid) => options.find((o) => o.id === oid))
+        .map((oid) => avail.find((o) => o.id === oid))
         .filter((o): o is MenuOption => !!o)
         .map((o) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta }));
       return { menuItemId, name: m.name, qty: cart[key], price: m.price, options: sel };
@@ -521,8 +520,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       ],
     },
   ],
-  options: [],
-  itemOptionIds: {},
+  itemOptions: {},
   menu: [
     { id: "beer", name: "生ビール", cat: "ドリンク", price: 550, soldOut: false, stock: 80, photo: null },
     { id: "high", name: "ハイボール", cat: "ドリンク", price: 450, soldOut: false, stock: 80, photo: null },
@@ -630,8 +628,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         },
         tables: snap.tables,
         menu: snap.menu,
-        options: snap.options,
-        itemOptionIds: snap.itemOptionIds,
+        itemOptions: snap.itemOptions,
         categories: snap.categories.length > 0 ? snap.categories : s.categories,
         newCat: snap.categories.includes(s.newCat) ? s.newCat : (snap.categories[0] ?? s.newCat),
         orders: snap.orders,
@@ -777,7 +774,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   // ---- 注文 ----
   confirmOrder: () => {
     const s = get();
-    const items = buildItems(s.cart, s.menu, s.options);
+    const items = buildItems(s.cart, s.menu, s.itemOptions);
     if (items.length === 0 || s.submitting) return;
     let total = 0;
     let count = 0;
@@ -806,7 +803,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   submitOrder: (idem) => {
     const s = get();
-    const items = buildItems(s.cart, s.menu, s.options);
+    const items = buildItems(s.cart, s.menu, s.itemOptions);
     if (items.length === 0) return;
     const tableId = s.customerTableId;
     const configured = isSupabaseConfigured();
@@ -855,7 +852,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const s = get();
     const t = s.selectedStaffTable;
     if (t == null) return;
-    const items = buildItems(s.staffCart, s.menu, s.options);
+    const items = buildItems(s.staffCart, s.menu, s.itemOptions);
     if (items.length === 0) return;
     const configured = isSupabaseConfigured();
     const key = idem ?? newId();
@@ -1454,89 +1451,85 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
     });
   },
-  addOption: async (name, priceDelta) => {
+  addOption: async (menuItemId, name, priceDelta) => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    const s = get();
-    if (s.options.some((o) => o.name === trimmed)) {
-      get().pushToast("同じ名前のオプションが既にあります。");
+    const current = get().itemOptions[menuItemId] ?? [];
+    if (current.some((o) => o.name === trimmed)) {
+      get().pushToast("この商品に同じ名前のオプションが既にあります。");
       return;
     }
-    const sort = s.options.length;
+    // current.length だと削除後に既存と同じ sort が振られ並びが不安定になるため、最大値+1
+    const sort = current.reduce((mx, o) => Math.max(mx, o.sort), -1) + 1;
     const tempId = newId();
-    set((st) => ({
-      options: [...st.options, { id: tempId, name: trimmed, priceDelta, sort }],
-    }));
+    const setList = (list: MenuOption[]) =>
+      set((st) => ({ itemOptions: { ...st.itemOptions, [menuItemId]: list } }));
+    setList([...current, { id: tempId, name: trimmed, priceDelta, sort }]);
     if (!isSupabaseConfigured()) return;
-    const id = await db.dbInsertOption(trimmed, priceDelta, sort);
+    const id = await db.dbInsertItemOption(menuItemId, trimmed, priceDelta, sort);
     if (!id) {
-      set((st) => ({ options: st.options.filter((o) => o.id !== tempId) }));
+      setList(current);
       get().pushToast("オプションの追加に失敗しました。もう一度お試しください。");
       return;
     }
-    // 採番された本物のidへ差し替え（紐付けの保存に必要）
-    set((st) => ({ options: st.options.map((o) => (o.id === tempId ? { ...o, id } : o)) }));
+    // 採番された本物のidへ差し替え（以降の編集・削除に必要）
+    set((st) => ({
+      itemOptions: {
+        ...st.itemOptions,
+        [menuItemId]: (st.itemOptions[menuItemId] ?? []).map((o) =>
+          o.id === tempId ? { ...o, id } : o
+        ),
+      },
+    }));
   },
-  updateOption: async (id, patch) => {
-    const prev = get().options;
-    set((s) => ({
-      options: s.options.map((o) => (o.id === id ? { ...o, ...patch } : o)),
+  updateOption: async (menuItemId, id, patch) => {
+    const prev = get().itemOptions;
+    set((st) => ({
+      itemOptions: {
+        ...st.itemOptions,
+        [menuItemId]: (st.itemOptions[menuItemId] ?? []).map((o) =>
+          o.id === id ? { ...o, ...patch } : o
+        ),
+      },
     }));
     const dbPatch: { name?: string; price_delta?: number } = {};
     if (patch.name !== undefined) dbPatch.name = patch.name;
     if (patch.priceDelta !== undefined) dbPatch.price_delta = patch.priceDelta;
-    const success = await db.dbUpdateOption(id, dbPatch);
+    const success = await db.dbUpdateItemOption(id, dbPatch);
     if (!success) {
-      set({ options: prev });
+      set({ itemOptions: prev });
       get().pushToast("オプションの保存に失敗しました。もう一度お試しください。");
     }
   },
-  confirmDeleteOption: (id) => {
-    const opt = get().options.find((o) => o.id === id);
+  confirmDeleteOption: (menuItemId, id) => {
+    const opt = (get().itemOptions[menuItemId] ?? []).find((o) => o.id === id);
     if (!opt) return;
-    const usedBy = Object.values(get().itemOptionIds).filter((ids) => ids.includes(id)).length;
     set({
       dialog: {
         title: "オプションを削除しますか？",
-        body:
-          `「${opt.name}」を削除します。` +
-          (usedBy > 0 ? `\n${usedBy}件の商品から外れます。` : "") +
-          "\n既に確定した注文の内容は変わりません。",
+        body: `「${opt.name}」を削除します。
+既に確定した注文の内容は変わりません。`,
         confirmText: "削除する",
         danger: true,
         onConfirm: () => {
           get().closeDialog();
-          get().deleteOption(id);
+          get().deleteOption(menuItemId, id);
         },
       },
     });
   },
-  deleteOption: async (id) => {
-    const prevOptions = get().options;
-    const prevLinks = get().itemOptionIds;
-    // 紐付けはDB側の ON DELETE CASCADE で外れるので、ローカルも同じ形にする
-    const links: Record<string, string[]> = {};
-    for (const [itemId, ids] of Object.entries(prevLinks)) {
-      links[itemId] = ids.filter((x) => x !== id);
-    }
-    set({ options: prevOptions.filter((o) => o.id !== id), itemOptionIds: links });
-    const success = await db.dbDeleteOption(id);
+  deleteOption: async (menuItemId, id) => {
+    const prev = get().itemOptions;
+    set((st) => ({
+      itemOptions: {
+        ...st.itemOptions,
+        [menuItemId]: (st.itemOptions[menuItemId] ?? []).filter((o) => o.id !== id),
+      },
+    }));
+    const success = await db.dbDeleteItemOption(id);
     if (!success) {
-      set({ options: prevOptions, itemOptionIds: prevLinks });
+      set({ itemOptions: prev });
       get().pushToast("オプションの削除に失敗しました。もう一度お試しください。");
-    }
-  },
-  toggleItemOption: async (menuItemId, optionId) => {
-    const prev = get().itemOptionIds;
-    const current = prev[menuItemId] ?? [];
-    const next = current.includes(optionId)
-      ? current.filter((x) => x !== optionId)
-      : [...current, optionId];
-    set({ itemOptionIds: { ...prev, [menuItemId]: next } });
-    const success = await db.dbSetItemOptions(menuItemId, next);
-    if (!success) {
-      set({ itemOptionIds: prev });
-      get().pushToast("オプションの紐付けに失敗しました。もう一度お試しください。");
     }
   },
   confirmRemoveStorePhoto: (which) => {

@@ -26,36 +26,56 @@ function DragDots() {
   );
 }
 
-/* 商品ごとに「どのオプションを出すか」を選ぶボタン + モーダル。
-   行が横に長くなりすぎないよう、一覧はモーダルに逃がしている。 */
+/* 商品ごとのオプション編集ボタン + モーダル。
+   オプションは商品ごとの個別設定なので、この中で追加・編集・削除まで完結させる。
+   行が横に長くなりすぎないよう、編集UIはモーダルに逃がしている。 */
 function ItemOptionsButton({ item, accent }: { item: MenuItem; accent: string }) {
-  const options = useAppStore((s) => s.options);
-  const itemOptionIds = useAppStore((s) => s.itemOptionIds);
-  const toggleItemOption = useAppStore((s) => s.toggleItemOption);
+  const options = useAppStore((s) => s.itemOptions[item.id]);
+  const addOption = useAppStore((s) => s.addOption);
+  const updateOption = useAppStore((s) => s.updateOption);
+  const confirmDeleteOption = useAppStore((s) => s.confirmDeleteOption);
   const [open, setOpen] = useState(false);
-  const selected = itemOptionIds[item.id] ?? [];
+  const [name, setName] = useState("");
+  const [delta, setDelta] = useState("");
+  const list = options ?? [];
+
+  const submit = () => {
+    if (!name.trim()) return;
+    addOption(item.id, name, parseInt(delta, 10) || 0);
+    setName("");
+    setDelta("");
+  };
+
+  const insetInput: React.CSSProperties = {
+    padding: "10px 12px",
+    borderRadius: "11px",
+    border: "none",
+    background: "var(--hairline)",
+    fontSize: "15px",
+    fontFamily: "inherit",
+    color: "var(--text)",
+  };
 
   return (
     <>
       <button
         onClick={() => setOpen(true)}
-        disabled={options.length === 0}
-        aria-label={`${item.name}のオプションを選ぶ`}
+        aria-label={`${item.name}のオプションを設定`}
         style={{
           borderRadius: "999px",
           padding: "8px 14px",
           fontSize: "13px",
           fontWeight: 700,
           fontFamily: "inherit",
-          cursor: options.length === 0 ? "default" : "pointer",
+          cursor: "pointer",
           flexShrink: 0,
           whiteSpace: "nowrap",
           border: "1px solid var(--hairline)",
           background: "var(--surface)",
-          color: options.length === 0 ? "var(--text-3)" : selected.length > 0 ? accent : "var(--text-2)",
+          color: list.length > 0 ? accent : "var(--text-2)",
         }}
       >
-        オプション{selected.length > 0 ? ` ${selected.length}` : ""}
+        オプション{list.length > 0 ? ` ${list.length}` : ""}
       </button>
 
       {open && (
@@ -76,8 +96,8 @@ function ItemOptionsButton({ item, accent }: { item: MenuItem; accent: string })
             onClick={(e) => e.stopPropagation()}
             style={{
               width: "100%",
-              maxWidth: "380px",
-              maxHeight: "70vh",
+              maxWidth: "420px",
+              maxHeight: "78vh",
               overflowY: "auto",
               background: "var(--surface)",
               borderRadius: "22px",
@@ -86,59 +106,134 @@ function ItemOptionsButton({ item, accent }: { item: MenuItem; accent: string })
               animation: "pop .18s var(--ease-spring)",
             }}
           >
-            <div style={{ fontSize: "17px", fontWeight: 800, color: "var(--text)" }}>{item.name}</div>
-            <div style={{ fontSize: "12px", color: "var(--text-2)", margin: "4px 0 14px" }}>
-              この商品の注文時に選べるオプションにチェックを入れてください。
+            <div style={{ fontSize: "17px", fontWeight: 800, color: "var(--text)" }}>
+              {item.name} のオプション
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              {options.map((o) => {
-                const on = selected.includes(o.id);
-                return (
-                  <button
+            <div style={{ fontSize: "12px", color: "var(--text-2)", margin: "4px 0 14px" }}>
+              この商品の注文時に選べる選択肢です。追加料金は0円やマイナス（値引き）も設定できます。
+            </div>
+
+            <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "14px" }}>
+              <input
+                placeholder="オプション名（例: 大盛り）"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submit();
+                }}
+                style={{ ...insetInput, flex: "2 1 120px", minWidth: 0 }}
+              />
+              <input
+                type="number"
+                placeholder="料金"
+                value={delta}
+                onChange={(e) => setDelta(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submit();
+                }}
+                style={{ ...insetInput, width: "84px", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
+              />
+              <button
+                onClick={submit}
+                style={{
+                  borderRadius: "999px",
+                  padding: "10px 18px",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  fontFamily: "inherit",
+                  cursor: "pointer",
+                  border: "none",
+                  background: accent,
+                  color: "#fff",
+                  flexShrink: 0,
+                }}
+              >
+                追加
+              </button>
+            </div>
+
+            {list.length === 0 ? (
+              <div style={{ fontSize: "13px", color: "var(--text-2)", padding: "8px 0 4px" }}>
+                まだオプションがありません。この商品はそのまま注文されます。
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {list.map((o) => (
+                  <div
                     key={o.id}
-                    onClick={() => toggleItemOption(item.id, o.id)}
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: "10px",
-                      padding: "10px 12px",
-                      borderRadius: "12px",
-                      border: "none",
-                      background: on ? "var(--chip-tint)" : "transparent",
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                      textAlign: "left",
-                      width: "100%",
+                      gap: "8px",
+                      background: "var(--inset)",
+                      borderRadius: "13px",
+                      padding: "8px 10px",
                     }}
                   >
-                    <span
+                    <input
+                      value={o.name}
+                      onChange={(e) => updateOption(item.id, o.id, { name: e.target.value })}
+                      aria-label="オプション名"
                       style={{
-                        width: "22px",
-                        height: "22px",
-                        borderRadius: "7px",
-                        flexShrink: 0,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        border: on ? "none" : "2px solid var(--soldout-bg)",
-                        background: on ? accent : "transparent",
+                        flex: 1,
+                        minWidth: "60px",
+                        padding: "8px 10px",
+                        borderRadius: "10px",
+                        border: "none",
+                        background: "var(--surface)",
+                        fontSize: "15px",
+                        fontWeight: 600,
+                        fontFamily: "inherit",
+                        color: "var(--text)",
+                      }}
+                    />
+                    <div style={{ display: "flex", alignItems: "center", gap: "2px", flexShrink: 0 }}>
+                      <span style={{ fontSize: "14px", color: "var(--text-2)" }}>¥</span>
+                      <input
+                        type="number"
+                        value={o.priceDelta}
+                        onChange={(e) =>
+                          updateOption(item.id, o.id, { priceDelta: parseInt(e.target.value, 10) || 0 })
+                        }
+                        aria-label={`${o.name}の追加料金`}
+                        style={{
+                          width: "80px",
+                          padding: "8px 8px",
+                          borderRadius: "10px",
+                          border: "none",
+                          background: "var(--surface)",
+                          textAlign: "right",
+                          fontSize: "15px",
+                          fontWeight: 700,
+                          fontFamily: "inherit",
+                          fontVariantNumeric: "tabular-nums",
+                          color: "var(--text)",
+                        }}
+                      />
+                    </div>
+                    <button
+                      onClick={() => confirmDeleteOption(item.id, o.id)}
+                      aria-label={`${o.name}を削除`}
+                      style={{
+                        width: "28px",
+                        height: "28px",
+                        borderRadius: "50%",
+                        border: "none",
+                        background: accent,
                         color: "#fff",
-                        fontSize: "13px",
+                        fontSize: "14px",
+                        cursor: "pointer",
+                        flexShrink: 0,
                         lineHeight: 1,
                       }}
                     >
-                      {on ? "✓" : ""}
-                    </span>
-                    <span style={{ flex: 1, fontSize: "15px", fontWeight: 600, color: "var(--text)" }}>
-                      {o.name}
-                    </span>
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-2)", fontVariantNumeric: "tabular-nums" }}>
-                      {o.priceDelta === 0 ? "±0" : (o.priceDelta > 0 ? "+" : "−") + "¥" + Math.abs(o.priceDelta)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <button
               onClick={() => setOpen(false)}
               style={{
@@ -161,162 +256,6 @@ function ItemOptionsButton({ item, accent }: { item: MenuItem; accent: string })
         </div>
       )}
     </>
-  );
-}
-
-/* 店舗共通のオプション候補（名前 + 追加料金）のCRUD。 */
-function OptionsCard({ accent }: { accent: string }) {
-  const options = useAppStore((s) => s.options);
-  const addOption = useAppStore((s) => s.addOption);
-  const updateOption = useAppStore((s) => s.updateOption);
-  const confirmDeleteOption = useAppStore((s) => s.confirmDeleteOption);
-  const [name, setName] = useState("");
-  const [delta, setDelta] = useState("");
-
-  const insetInput: React.CSSProperties = {
-    padding: "11px 13px",
-    borderRadius: "12px",
-    border: "none",
-    background: "var(--hairline)",
-    fontSize: "15px",
-    fontFamily: "inherit",
-    color: "var(--text)",
-  };
-
-  const submit = () => {
-    if (!name.trim()) return;
-    addOption(name, parseInt(delta, 10) || 0);
-    setName("");
-    setDelta("");
-  };
-
-  return (
-    <div style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", padding: "20px 22px", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)" }}>
-      <div style={{ fontSize: "17px", fontWeight: 800, marginBottom: "4px" }}>オプション管理</div>
-      <div style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "14px" }}>
-        「大盛り +100円」のような選択肢を作り、上のメニュー一覧の「オプション」から商品ごとに割り当てます。
-        追加料金は0円やマイナス（値引き）も設定できます。
-      </div>
-
-      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", marginBottom: "16px" }}>
-        <input
-          placeholder="オプション名（例: 大盛り）"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") submit();
-          }}
-          style={{ ...insetInput, flex: "2 1 180px" }}
-        />
-        <input
-          type="number"
-          placeholder="追加料金"
-          value={delta}
-          onChange={(e) => setDelta(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") submit();
-          }}
-          style={{ ...insetInput, width: "110px", fontVariantNumeric: "tabular-nums" }}
-        />
-        <button
-          onClick={submit}
-          style={{
-            borderRadius: "999px",
-            padding: "11px 22px",
-            fontSize: "14px",
-            fontWeight: 700,
-            fontFamily: "inherit",
-            cursor: "pointer",
-            border: "none",
-            background: accent,
-            color: "#fff",
-          }}
-        >
-          追加
-        </button>
-      </div>
-
-      {options.length === 0 ? (
-        <div style={{ fontSize: "13px", color: "var(--text-2)", padding: "8px 0" }}>
-          まだオプションがありません。
-        </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          {options.map((o) => (
-            <div
-              key={o.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                background: "var(--surface)",
-                borderRadius: "14px",
-                padding: "10px 12px",
-                boxShadow: "0 1px 5px rgba(0,0,0,.05)",
-              }}
-            >
-              <input
-                value={o.name}
-                onChange={(e) => updateOption(o.id, { name: e.target.value })}
-                aria-label="オプション名"
-                style={{
-                  flex: 1,
-                  minWidth: "100px",
-                  padding: "8px 10px",
-                  borderRadius: "10px",
-                  border: "none",
-                  background: "var(--hairline)",
-                  fontSize: "15px",
-                  fontWeight: 600,
-                  fontFamily: "inherit",
-                  color: "var(--text)",
-                }}
-              />
-              <div style={{ display: "flex", alignItems: "center", gap: "3px", flexShrink: 0 }}>
-                <span style={{ fontSize: "14px", color: "var(--text-2)" }}>¥</span>
-                <input
-                  type="number"
-                  value={o.priceDelta}
-                  onChange={(e) => updateOption(o.id, { priceDelta: parseInt(e.target.value, 10) || 0 })}
-                  aria-label={`${o.name}の追加料金`}
-                  style={{
-                    width: "90px",
-                    padding: "8px 10px",
-                    borderRadius: "10px",
-                    border: "none",
-                    background: "var(--hairline)",
-                    textAlign: "right",
-                    fontSize: "15px",
-                    fontWeight: 700,
-                    fontFamily: "inherit",
-                    fontVariantNumeric: "tabular-nums",
-                    color: "var(--text)",
-                  }}
-                />
-              </div>
-              <button
-                onClick={() => confirmDeleteOption(o.id)}
-                aria-label={`${o.name}を削除`}
-                style={{
-                  width: "28px",
-                  height: "28px",
-                  borderRadius: "50%",
-                  border: "none",
-                  background: accent,
-                  color: "#fff",
-                  fontSize: "14px",
-                  cursor: "pointer",
-                  flexShrink: 0,
-                  lineHeight: 1,
-                }}
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -763,9 +702,6 @@ export default function MenuManagement() {
           })}
         </div>
       </div>
-
-      {/* オプション管理 */}
-      <OptionsCard accent={accent} />
 
       {/* カテゴリ管理 */}
       <div style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", padding: "20px 22px", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)" }}>

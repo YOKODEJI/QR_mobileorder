@@ -31,8 +31,8 @@ $$;
 -- ---- 注文確定: 冪等 + 在庫の原子的減算 + トークン検証 + レート制限 ----
 -- p_items 形式: [{"menuItemId":"<uuid>","qty":2,"optionIds":["<uuid>",...]}, ...]
 --   optionIds は任意。追加料金(price_delta)はクライアントから受け取らず必ずサーバーが
---   menu_options から引く。さらに menu_item_options との突合で「その商品に紐付いた
---   オプションか」も検証する（無関係な商品に値引きオプションを付ける改ざんを封じる）。
+--   menu_item_options から引く。オプションは商品ごとの所有なので menu_item_id の一致で
+--   「その商品が持つオプションか」を検証する（無関係な商品に値引きオプションを付ける改ざんを封じる）。
 -- p_token: 客の session_token（open_session で配布）。客注文(p_proxy=false)では必須。
 --          スタッフ代理注文(p_proxy=true)は認証済み経路のため検証をスキップ。
 -- 旧シグネチャ(p_token 無し)を破棄してから再定義（オーバーロード回避）。
@@ -107,17 +107,15 @@ begin
       raise exception 'out of stock: %', v_menu.name;
     end if;
 
-    -- オプション検証: 送られたIDが全て「自店舗のもの」かつ「この商品に紐付いている」こと。
+    -- オプション検証: 送られたIDが全て「この商品が持つオプション」であること。
     -- 1つでも不正/重複があれば注文ごと拒否する（黙って落とすと厨房が違う物を作るため）。
     v_optreq := (
       select count(*) from jsonb_array_elements_text(coalesce(v_item->'optionIds', '[]'::jsonb))
     );
     if v_optreq > 0 then
       select count(*) into v_optok
-      from menu_options o
-      join menu_item_options mio
-        on mio.option_id = o.id and mio.menu_item_id = v_menu.id
-      where o.store_id = p_store
+      from menu_item_options o
+      where o.menu_item_id = v_menu.id
         and o.id in (
           select x::uuid from jsonb_array_elements_text(v_item->'optionIds') as x
         );
@@ -147,8 +145,8 @@ begin
                  jsonb_build_object('id', o.id, 'name', o.name, 'priceDelta', o.price_delta)
                  order by o.id
                )
-        from menu_options o
-        where o.store_id = p_store
+        from menu_item_options o
+        where o.menu_item_id = m.id
           and o.id in (
             select x::uuid from jsonb_array_elements_text(coalesce(i->'optionIds', '[]'::jsonb)) as x
           )

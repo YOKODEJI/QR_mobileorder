@@ -17,8 +17,7 @@ export default function StaffCheckout() {
       addStaff: st.addStaff,
       addTable: st.addTable,
       addUnit: st.addUnit,
-      itemOptionIds: st.itemOptionIds,
-      options: st.options,
+      itemOptions: st.itemOptions,
       avail: st.avail,
       cancelUnit: st.cancelUnit,
       confirmCheckout: st.confirmCheckout,
@@ -132,11 +131,8 @@ export default function StaffCheckout() {
 
   const [proxyOptionItem, setProxyOptionItem] = useState<MenuItem | null>(null);
 
-  /** その商品に紐付いたオプション候補（管理画面での並び順のまま） */
-  const optionsFor = (id: string) => {
-    const ids = s.itemOptionIds[id] ?? [];
-    return s.options.filter((o) => ids.includes(o.id));
-  };
+  /** その商品が持つオプション（管理画面での並び順のまま） */
+  const optionsFor = (id: string) => s.itemOptions[id] ?? [];
 
   /** 代理注文カート内の「この商品の行」一覧（オプションの組み合わせごとに1行） */
   const staffRowsFor = (id: string) =>
@@ -146,7 +142,7 @@ export default function StaffCheckout() {
       .map((r) => ({
         ...r,
         qty: s.staffCart[r.key],
-        opts: s.options.filter((o) => r.optionIds.includes(o.id)),
+        opts: (s.itemOptions[id] ?? []).filter((o) => r.optionIds.includes(o.id)),
       }));
 
   // 追加直後の卓は視認性のため先頭にピン留め（確定すると本来の並び＝末尾へ）

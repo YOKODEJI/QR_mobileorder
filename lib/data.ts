@@ -28,8 +28,7 @@ export interface Snapshot {
   categories: string[];
   tables: TableRec[];
   menu: MenuItem[];
-  options: MenuOption[];
-  itemOptionIds: Record<string, string[]>;
+  itemOptions: Record<string, MenuOption[]>;
   orders: Order[];
   calls: StaffCall[];
   checkouts: CheckoutRecord[];
@@ -121,58 +120,42 @@ export async function fetchMenu(): Promise<MenuItem[] | null> {
   }));
 }
 
-/** 店舗共通のオプション候補のみ取得（Realtime差分更新用の1テーブル分）。
- *  失敗しても null を返さず空配列で返す。オプションは「あれば使う」追加機能であり、
+/** 商品ごとのオプションを取得し、商品idをキーにまとめる（Realtime差分更新用の1テーブル分）。
+ *  失敗しても null を返さず空で返す。オプションは「あれば使う」追加機能であり、
  *  ここで null を返すと loadSnapshot 全体が失敗扱いになって、メニュー・注文・会計まで
- *  同期が止まってしまうため（step14未適用の環境でも他機能は動き続ける必要がある）。 */
-export async function fetchOptions(): Promise<MenuOption[]> {
-  const sb = getSupabase();
-  if (!sb || !STORE_ID) return [];
-  const { data, error } = await sb
-    .from("menu_options")
-    .select("id,name,price_delta,sort")
-    .eq("store_id", STORE_ID)
-    .order("sort");
-  if (error) {
-    console.error("fetchOptions:", error.message);
-    return [];
-  }
-  return (data ?? []).map((o) => ({
-    id: o.id as string,
-    name: o.name as string,
-    priceDelta: (o.price_delta as number) ?? 0,
-    sort: (o.sort as number) ?? 0,
-  }));
-}
-
-/** 商品→オプションの紐付けを取得し、商品idをキーにまとめる。
- *  fetchOptions と同じ理由で、失敗時も null ではなく空オブジェクトを返す。 */
-export async function fetchItemOptionIds(): Promise<Record<string, string[]>> {
+ *  同期が止まってしまうため（step15未適用の環境でも他機能は動き続ける必要がある）。 */
+export async function fetchItemOptions(): Promise<Record<string, MenuOption[]>> {
   const sb = getSupabase();
   if (!sb || !STORE_ID) return {};
-  // 中間テーブルは store_id を持たないため、自店舗の商品idで絞り込む
+  // store_id 列を持たないため、自店舗の商品idで絞り込む
   const { data: items, error: e1 } = await sb
     .from("menu_items")
     .select("id")
     .eq("store_id", STORE_ID);
   if (e1) {
-    console.error("fetchItemOptionIds(menu):", e1.message);
+    console.error("fetchItemOptions(menu):", e1.message);
     return {};
   }
   const ids = (items ?? []).map((m) => m.id as string);
   if (ids.length === 0) return {};
   const { data, error } = await sb
     .from("menu_item_options")
-    .select("menu_item_id,option_id")
-    .in("menu_item_id", ids);
+    .select("id,menu_item_id,name,price_delta,sort")
+    .in("menu_item_id", ids)
+    .order("sort");
   if (error) {
-    console.error("fetchItemOptionIds:", error.message);
+    console.error("fetchItemOptions:", error.message);
     return {};
   }
-  const map: Record<string, string[]> = {};
+  const map: Record<string, MenuOption[]> = {};
   for (const r of data ?? []) {
     const k = r.menu_item_id as string;
-    (map[k] ||= []).push(r.option_id as string);
+    (map[k] ||= []).push({
+      id: r.id as string,
+      name: r.name as string,
+      priceDelta: (r.price_delta as number) ?? 0,
+      sort: (r.sort as number) ?? 0,
+    });
   }
   return map;
 }
@@ -261,21 +244,20 @@ export async function loadSnapshot(): Promise<Snapshot | null> {
   const sb = getSupabase();
   if (!sb || !STORE_ID) return null;
 
-  const [store, categories, tables, menu, options, itemOptionIds, orders, calls, checkouts] =
+  const [store, categories, tables, menu, itemOptions, orders, calls, checkouts] =
     await Promise.all([
       fetchStoreSettings(),
       fetchCategories(),
       fetchTables(),
       fetchMenu(),
-      fetchOptions(),
-      fetchItemOptionIds(),
+      fetchItemOptions(),
       fetchOrders(),
       fetchCalls(),
       fetchCheckouts(),
     ]);
 
   // どれか1つでも取得失敗したら（部分的に古いデータのまま反映せず）全体を失敗扱いにする
-  // options/itemOptionIds は失敗しても空で返る設計なので、ここでの判定対象に含めない
+  // itemOptions は失敗しても空で返る設計なので、ここでの判定対象に含めない
   if (
     !store || categories == null || tables == null || menu == null ||
     orders == null || calls == null || checkouts == null
@@ -283,7 +265,7 @@ export async function loadSnapshot(): Promise<Snapshot | null> {
     return null;
   }
 
-  return { ...store, categories, tables, menu, options, itemOptionIds, orders, calls, checkouts };
+  return { ...store, categories, tables, menu, itemOptions, orders, calls, checkouts };
 }
 
 /** Realtimeで変化があったテーブル名（"orders"等）を都度通知する。
@@ -291,7 +273,7 @@ export async function loadSnapshot(): Promise<Snapshot | null> {
 export function subscribeRealtime(onChange: (table: string) => void): () => void {
   const sb = getSupabase();
   if (!sb) return () => {};
-  const tables = ["stores", "categories", "tables", "menu_items", "menu_options", "menu_item_options", "orders", "order_items", "staff_calls", "checkouts"];
+  const tables = ["stores", "categories", "tables", "menu_items", "menu_item_options", "orders", "order_items", "staff_calls", "checkouts"];
   let channel = sb.channel("qr-order-changes");
   for (const t of tables) {
     channel = channel.on("postgres_changes", { event: "*", schema: "public", table: t }, () => onChange(t));
@@ -651,51 +633,42 @@ export async function dbReorderMenu(idsInOrder: string[]): Promise<boolean> {
   return results.every(Boolean);
 }
 
-/* ---- オプション管理 ---- */
-/** オプション候補を追加。成功時は採番されたidを返す（失敗時null） */
-export async function dbInsertOption(name: string, priceDelta: number, sort: number): Promise<string | null> {
+/* ---- オプション管理（商品ごとの個別設定） ---- */
+/** 商品にオプションを追加。成功時は採番されたidを返す（失敗時null） */
+export async function dbInsertItemOption(
+  menuItemId: string,
+  name: string,
+  priceDelta: number,
+  sort: number
+): Promise<string | null> {
   const sb = getSupabase();
-  if (!sb || !STORE_ID) return null;
+  if (!sb) return null;
   const { data, error } = await sb
-    .from("menu_options")
-    .insert({ store_id: STORE_ID, name, price_delta: priceDelta, sort })
+    .from("menu_item_options")
+    .insert({ menu_item_id: menuItemId, name, price_delta: priceDelta, sort })
     .select("id")
     .single();
   if (error || !data) {
-    console.error("dbInsertOption:", error?.message);
+    console.error("dbInsertItemOption:", error?.message);
     return null;
   }
   return data.id as string;
 }
 
-export async function dbUpdateOption(id: string, patch: { name?: string; price_delta?: number }): Promise<boolean> {
+export async function dbUpdateItemOption(
+  id: string,
+  patch: { name?: string; price_delta?: number }
+): Promise<boolean> {
   const sb = getSupabase();
   if (!sb) return true;
-  return ok(sb.from("menu_options").update(patch).eq("id", id), "dbUpdateOption");
+  return ok(sb.from("menu_item_options").update(patch).eq("id", id), "dbUpdateItemOption");
 }
 
-/** オプション候補を削除。menu_item_options は ON DELETE CASCADE で自動的に外れる。
- *  既存注文の order_items.options はスナップショットなので影響を受けない。 */
-export async function dbDeleteOption(id: string): Promise<boolean> {
+/** オプションを削除。既存注文の order_items.options はスナップショットなので影響を受けない。 */
+export async function dbDeleteItemOption(id: string): Promise<boolean> {
   const sb = getSupabase();
   if (!sb) return true;
-  return ok(sb.from("menu_options").delete().eq("id", id), "dbDeleteOption");
-}
-
-/** ある商品に出すオプションの紐付けを、渡された集合そのものに置き換える */
-export async function dbSetItemOptions(menuItemId: string, optionIds: string[]): Promise<boolean> {
-  const sb = getSupabase();
-  if (!sb) return true;
-  const del = await sb.from("menu_item_options").delete().eq("menu_item_id", menuItemId);
-  if (del.error) {
-    console.error("dbSetItemOptions(delete):", del.error.message);
-    return false;
-  }
-  if (optionIds.length === 0) return true;
-  return ok(
-    sb.from("menu_item_options").insert(optionIds.map((option_id) => ({ menu_item_id: menuItemId, option_id }))),
-    "dbSetItemOptions(insert)"
-  );
+  return ok(sb.from("menu_item_options").delete().eq("id", id), "dbDeleteItemOption");
 }
 
 /* ---- カテゴリ管理 ---- */

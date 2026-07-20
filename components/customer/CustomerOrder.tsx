@@ -30,9 +30,8 @@ export default function CustomerOrder() {
       customerTableId: st.customerTableId,
       dismissSuccess: st.dismissSuccess,
       justOrdered: st.justOrdered,
-      itemOptionIds: st.itemOptionIds,
+      itemOptions: st.itemOptions,
       menu: st.menu,
-      options: st.options,
       orders: st.orders,
       removeCart: st.removeCart,
       setCustomerCat: st.setCustomerCat,
@@ -54,11 +53,8 @@ export default function CustomerOrder() {
 
   const [optionItem, setOptionItem] = useState<MenuItem | null>(null);
 
-  /** その商品に紐付いたオプション候補（管理画面での並び順のまま） */
-  const optionsFor = (id: string) => {
-    const ids = s.itemOptionIds[id] ?? [];
-    return s.options.filter((o) => ids.includes(o.id));
-  };
+  /** その商品が持つオプション（管理画面での並び順のまま） */
+  const optionsFor = (id: string) => s.itemOptions[id] ?? [];
 
   /** カート内の「この商品の行」一覧（オプションの組み合わせごとに1行） */
   const cartRowsFor = (id: string) =>
@@ -68,7 +64,7 @@ export default function CustomerOrder() {
       .map((r) => ({
         ...r,
         qty: s.cart[r.key],
-        opts: s.options.filter((o) => r.optionIds.includes(o.id)),
+        opts: (s.itemOptions[id] ?? []).filter((o) => r.optionIds.includes(o.id)),
       }));
 
   const cartCount = Object.values(s.cart).reduce((a, b) => a + b, 0);
@@ -76,7 +72,7 @@ export default function CustomerOrder() {
     const { menuItemId, optionIds } = parseCartKey(key);
     const m = s.menu.find((x) => x.id === menuItemId);
     if (!m) return sum;
-    const opts = s.options.filter((o) => optionIds.includes(o.id));
+    const opts = (s.itemOptions[menuItemId] ?? []).filter((o) => optionIds.includes(o.id));
     return sum + lineTotal({ price: m.price, qty: s.cart[key], options: opts });
   }, 0);
 
