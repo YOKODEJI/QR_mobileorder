@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
+import type { MenuItem, SelectedOption } from "@/store/useAppStore";
 import ChipRow from "@/components/ui/ChipRow";
+import OptionSheet from "@/components/ui/OptionSheet";
 import Toggle from "@/components/ui/Toggle";
 import { proxyCardStyle, proxyAddStyle, proxySubStyle, addBtnStyle } from "@/lib/styles";
 import { computeCheckoutBreakdown, type DiscountType } from "@/lib/pricing";
+import { cartKey, parseCartKey, lineTotal, unitPrice, optionsLabel } from "@/lib/options";
 
 export default function StaffCheckout() {
   const s = useAppStore(
@@ -14,6 +17,8 @@ export default function StaffCheckout() {
       addStaff: st.addStaff,
       addTable: st.addTable,
       addUnit: st.addUnit,
+      itemOptionIds: st.itemOptionIds,
+      options: st.options,
       avail: st.avail,
       cancelUnit: st.cancelUnit,
       confirmCheckout: st.confirmCheckout,
@@ -57,7 +62,7 @@ export default function StaffCheckout() {
   const tableTotal = (id: string) =>
     s.orders
       .filter((o) => o.table === id)
-      .reduce((sum, o) => sum + o.items.reduce((t, it) => t + it.price * it.qty, 0), 0);
+      .reduce((sum, o) => sum + o.items.reduce((t, it) => t + lineTotal(it), 0), 0);
   const tableCount = (id: string) =>
     s.orders
       .filter((o) => o.table === id)
@@ -76,21 +81,39 @@ export default function StaffCheckout() {
     setChargeEnabled(true);
   }, [sel]);
 
-  // 明細を商品ID＋単価で集約（名前一致に依存しない。会期中の値変更にも安全）
+  // 明細を「商品ID＋単価＋オプションの組み合わせ」で集約
+  // （名前一致に依存しない。会期中の値変更にも安全。
+  //   集約キーにオプションを含めないと「ネギ増し+50円」と「チーズ+50円」のように
+  //   合計額が同じ別物が1行に合成されてしまう）
   const agg: Record<
     string,
-    { menuItemId: string; name: string; price: number; qty: number; proxy: boolean }
+    {
+      menuItemId: string;
+      name: string;
+      price: number;
+      qty: number;
+      proxy: boolean;
+      options: SelectedOption[];
+    }
   > = {};
   selOrders.forEach((o) => {
     o.items.forEach((it) => {
-      const k = it.menuItemId + ":" + it.price;
+      const opts = it.options ?? [];
+      const k = cartKey(it.menuItemId, opts.map((x) => x.id)) + ":" + it.price;
       if (!agg[k])
-        agg[k] = { menuItemId: it.menuItemId, name: it.name, price: it.price, qty: 0, proxy: false };
+        agg[k] = {
+          menuItemId: it.menuItemId,
+          name: it.name,
+          price: it.price,
+          qty: 0,
+          proxy: false,
+          options: opts,
+        };
       agg[k].qty += it.qty;
       if (o.proxy) agg[k].proxy = true;
     });
   });
-  const aggList = Object.values(agg);
+  const aggList = Object.entries(agg).map(([key, v]) => ({ key, ...v }));
   const selTotal = sel != null ? tableTotal(sel) : 0;
   const discountNum = parseFloat(discountValue) || 0;
   const breakdown = computeCheckoutBreakdown(
@@ -106,6 +129,25 @@ export default function StaffCheckout() {
     (m) => s.proxyCat === "すべて" || m.cat === s.proxyCat
   );
   const proxyCount = Object.values(s.staffCart).reduce((a, b) => a + b, 0);
+
+  const [proxyOptionItem, setProxyOptionItem] = useState<MenuItem | null>(null);
+
+  /** その商品に紐付いたオプション候補（管理画面での並び順のまま） */
+  const optionsFor = (id: string) => {
+    const ids = s.itemOptionIds[id] ?? [];
+    return s.options.filter((o) => ids.includes(o.id));
+  };
+
+  /** 代理注文カート内の「この商品の行」一覧（オプションの組み合わせごとに1行） */
+  const staffRowsFor = (id: string) =>
+    Object.keys(s.staffCart)
+      .map((key) => ({ key, ...parseCartKey(key) }))
+      .filter((r) => r.menuItemId === id)
+      .map((r) => ({
+        ...r,
+        qty: s.staffCart[r.key],
+        opts: s.options.filter((o) => r.optionIds.includes(o.id)),
+      }));
 
   // 追加直後の卓は視認性のため先頭にピン留め（確定すると本来の並び＝末尾へ）
   const orderedTables = (() => {
@@ -406,7 +448,7 @@ export default function StaffCheckout() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   {aggList.map((it) => (
                     <div
-                      key={it.menuItemId + ":" + it.price}
+                      key={it.key}
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -427,18 +469,23 @@ export default function StaffCheckout() {
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: "15px", fontWeight: 700 }}>{it.name}</div>
+                        {optionsLabel(it.options) && (
+                          <div style={{ fontSize: "12px", fontWeight: 600, color: accent }}>
+                            {optionsLabel(it.options)}
+                          </div>
+                        )}
                         <div style={{ fontSize: "11px", color: "var(--text-2)" }}>
-                          {s.yen(it.price)} × {it.qty}
+                          {s.yen(unitPrice(it.price, it.options))} × {it.qty}
                           {it.proxy ? " · 代理あり" : ""}
                         </div>
                       </div>
-                      <span style={{ fontSize: "15px", fontWeight: 800 }}>
-                        {s.yen(it.price * it.qty)}
+                      <span style={{ fontSize: "15px", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+                        {s.yen(lineTotal(it))}
                       </span>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         {s.orderEditMode && (
                           <button
-                            onClick={() => s.cancelUnit(it.menuItemId)}
+                            onClick={() => s.cancelUnit(it.menuItemId, it.options)}
                             aria-label={`${it.name}を1つ取消`}
                             style={{
                               width: "34px",
@@ -461,7 +508,7 @@ export default function StaffCheckout() {
                         </span>
                         {s.orderEditMode && (
                           <button
-                            onClick={() => s.addUnit(it.menuItemId)}
+                            onClick={() => s.addUnit(it.menuItemId, it.options)}
                             aria-label={`${it.name}を1つ追加`}
                             style={{
                               width: "34px",
@@ -617,10 +664,16 @@ export default function StaffCheckout() {
                   }}
                 >
                   {proxyFiltered.map((m) => {
-                    const qty = s.staffCart[m.id] || 0;
+                    const opts = optionsFor(m.id);
+                    const hasOptions = opts.length > 0;
+                    const rows = hasOptions ? staffRowsFor(m.id) : [];
+                    const qty = hasOptions
+                      ? rows.reduce((a, r) => a + r.qty, 0)
+                      : s.staffCart[cartKey(m.id)] || 0;
                     const orderable = s.avail(m);
                     return (
-                      <div key={m.id} style={proxyCardStyle(!orderable)}>
+                      <div key={m.id} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <div style={proxyCardStyle(!orderable)}>
                         {photoById[m.id] && (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
@@ -635,26 +688,86 @@ export default function StaffCheckout() {
                         </div>
                         {!orderable ? (
                           <span style={{ fontSize: "11px", color: "var(--text-2)", fontWeight: 700 }}>売切</span>
+                        ) : hasOptions ? (
+                          // オプション有り: 選択シートを開く（組み合わせごとに別行になる）
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            {qty > 0 && (
+                              <span style={{ fontSize: "13px", fontWeight: 800, color: "var(--text-2)", fontVariantNumeric: "tabular-nums" }}>
+                                計{qty}
+                              </span>
+                            )}
+                            <button
+                              onClick={() => setProxyOptionItem(m)}
+                              style={proxyAddStyle(accent)}
+                              aria-label={`${m.name}のオプションを選んで追加`}
+                            >
+                              ＋
+                            </button>
+                          </div>
                         ) : qty === 0 ? (
                           <button
                             onClick={() => s.addStaff(m.id)}
                             style={proxyAddStyle(accent)}
+                            aria-label={`${m.name}を追加`}
                           >
                             ＋
                           </button>
                         ) : (
                           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            <button onClick={() => s.removeStaff(m.id)} style={proxySubStyle(accent)}>
+                            <button onClick={() => s.removeStaff(m.id)} style={proxySubStyle(accent)} aria-label={`${m.name}を1つ減らす`}>
                               −
                             </button>
-                            <span style={{ fontSize: "14px", fontWeight: 800, minWidth: "14px", textAlign: "center" }}>
+                            <span style={{ fontSize: "14px", fontWeight: 800, minWidth: "14px", textAlign: "center", fontVariantNumeric: "tabular-nums" }}>
                               {qty}
                             </span>
-                            <button onClick={() => s.addStaff(m.id)} style={proxyAddStyle(accent)}>
+                            <button onClick={() => s.addStaff(m.id)} style={proxyAddStyle(accent)} aria-label={`${m.name}を1つ増やす`}>
                               ＋
                             </button>
                           </div>
                         )}
+                      </div>
+
+                      {/* オプションの組み合わせごとの内訳 */}
+                      {rows.map((r) => {
+                        const label = optionsLabel(r.opts) || "オプションなし";
+                        return (
+                          <div
+                            key={r.key}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              padding: "6px 10px",
+                              borderRadius: "11px",
+                              background: "var(--chip-tint)",
+                            }}
+                          >
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--text)" }}>{label}</div>
+                              <div style={{ fontSize: "11px", color: "var(--text-2)", fontVariantNumeric: "tabular-nums" }}>
+                                {s.yen(unitPrice(m.price, r.opts))}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => s.removeStaff(m.id, r.optionIds)}
+                              style={proxySubStyle(accent)}
+                              aria-label={`${m.name}（${label}）を1つ減らす`}
+                            >
+                              −
+                            </button>
+                            <span style={{ fontSize: "13px", fontWeight: 800, minWidth: "14px", textAlign: "center", fontVariantNumeric: "tabular-nums" }}>
+                              {r.qty}
+                            </span>
+                            <button
+                              onClick={() => s.addStaff(m.id, r.optionIds)}
+                              style={proxyAddStyle(accent)}
+                              aria-label={`${m.name}（${label}）を1つ増やす`}
+                            >
+                              ＋
+                            </button>
+                          </div>
+                        );
+                      })}
                       </div>
                     );
                   })}
@@ -683,6 +796,23 @@ export default function StaffCheckout() {
           )}
         </div>
       </div>
+
+      {/* 代理注文のオプション選択シート */}
+      {proxyOptionItem && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 50 }}>
+          <OptionSheet
+            item={proxyOptionItem}
+            options={optionsFor(proxyOptionItem.id)}
+            accent={accent}
+            yen={s.yen}
+            onClose={() => setProxyOptionItem(null)}
+            onAdd={(ids) => {
+              s.addStaff(proxyOptionItem.id, ids);
+              setProxyOptionItem(null);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

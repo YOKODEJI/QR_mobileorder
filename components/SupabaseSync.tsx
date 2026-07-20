@@ -9,6 +9,8 @@ import {
   fetchCategories,
   fetchTables,
   fetchMenu,
+  fetchOptions,
+  fetchItemOptionIds,
   fetchOrders,
   fetchCalls,
   fetchCheckouts,
@@ -22,6 +24,8 @@ const TABLE_TO_SLICE: Record<string, string> = {
   categories: "categories",
   tables: "tables",
   menu_items: "menu",
+  menu_options: "options",
+  menu_item_options: "options",
   orders: "orders",
   order_items: "orders", // 明細もordersと同じ区分（orders側にJOINして取得するため）
   staff_calls: "calls",
@@ -57,15 +61,20 @@ export default function SupabaseSync() {
       pendingSlices.current = new Set();
       if (slices.size === 0) return;
 
-      const [store, categories, tables, menu, orders, calls, checkouts] = await Promise.all([
-        slices.has("store") ? fetchStoreSettings() : null,
-        slices.has("categories") ? fetchCategories() : null,
-        slices.has("tables") ? fetchTables() : null,
-        slices.has("menu") ? fetchMenu() : null,
-        slices.has("orders") ? fetchOrders() : null,
-        slices.has("calls") ? fetchCalls() : null,
-        slices.has("checkouts") ? fetchCheckouts() : null,
-      ]);
+      // メニューが増減すると紐付けの対象商品も変わるため、options は menu 変更時も取り直す
+      const needOptions = slices.has("options") || slices.has("menu");
+      const [store, categories, tables, menu, options, itemOptionIds, orders, calls, checkouts] =
+        await Promise.all([
+          slices.has("store") ? fetchStoreSettings() : null,
+          slices.has("categories") ? fetchCategories() : null,
+          slices.has("tables") ? fetchTables() : null,
+          slices.has("menu") ? fetchMenu() : null,
+          needOptions ? fetchOptions() : null,
+          needOptions ? fetchItemOptionIds() : null,
+          slices.has("orders") ? fetchOrders() : null,
+          slices.has("calls") ? fetchCalls() : null,
+          slices.has("checkouts") ? fetchCheckouts() : null,
+        ]);
       if (cancelled) return;
 
       // 変わっていない区分は現在のstateをそのまま使う（取得もしない＝差分更新の要）
@@ -83,6 +92,8 @@ export default function SupabaseSync() {
         categories: categories ?? cur.categories,
         tables: tables ?? cur.tables,
         menu: menu ?? cur.menu,
+        options: options ?? cur.options,
+        itemOptionIds: itemOptionIds ?? cur.itemOptionIds,
         orders: orders ?? cur.orders,
         calls: calls ?? cur.calls,
         checkouts: checkouts ?? cur.checkouts,

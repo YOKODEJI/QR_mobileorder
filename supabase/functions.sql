@@ -4,8 +4,35 @@
 -- Edge Function から service_role で呼び出す想定（docs/04 B-1/3/4）。
 -- ============================================================
 
+-- ---- オプション(step14)のヘルパー ----
+-- order_items.options は [{"id","name","priceDelta"}] の形（id昇順で正規化して保存）。
+-- price は本体単価のみを持ち、実売価は price + options_delta(options) で求める
+-- （本体売上とオプション売上を後から分離できるようにするため）。
+create or replace function options_delta(p jsonb)
+returns int
+language sql
+immutable
+as $$
+  select coalesce(sum((t.x ->> 'priceDelta')::int), 0)::int
+  from (select jsonb_array_elements(coalesce(p, '[]'::jsonb)) as x) t;
+$$;
+
+-- 選択オプションの正規化キー（id昇順のカンマ連結）。
+-- 「同じ組み合わせを違う順で選んだだけ」を同一視するための比較用。
+create or replace function options_key(p jsonb)
+returns text
+language sql
+immutable
+as $$
+  select coalesce(string_agg(t.x, ',' order by t.x), '')
+  from (select jsonb_array_elements(coalesce(p, '[]'::jsonb)) ->> 'id' as x) t;
+$$;
+
 -- ---- 注文確定: 冪等 + 在庫の原子的減算 + トークン検証 + レート制限 ----
--- p_items 形式: [{"menuItemId":"<uuid>","qty":2}, ...]
+-- p_items 形式: [{"menuItemId":"<uuid>","qty":2,"optionIds":["<uuid>",...]}, ...]
+--   optionIds は任意。追加料金(price_delta)はクライアントから受け取らず必ずサーバーが
+--   menu_options から引く。さらに menu_item_options との突合で「その商品に紐付いた
+--   オプションか」も検証する（無関係な商品に値引きオプションを付ける改ざんを封じる）。
 -- p_token: 客の session_token（open_session で配布）。客注文(p_proxy=false)では必須。
 --          スタッフ代理注文(p_proxy=true)は認証済み経路のため検証をスキップ。
 -- 旧シグネチャ(p_token 無し)を破棄してから再定義（オーバーロード回避）。
@@ -30,6 +57,8 @@ declare
   v_qty      int;
   v_session  text;
   v_recent   int;
+  v_optreq   int;
+  v_optok    int;
 begin
   if p_items is null or jsonb_array_length(p_items) = 0 then
     raise exception 'no items';
@@ -77,18 +106,55 @@ begin
     if v_menu.sold_out or v_menu.stock < v_qty then
       raise exception 'out of stock: %', v_menu.name;
     end if;
+
+    -- オプション検証: 送られたIDが全て「自店舗のもの」かつ「この商品に紐付いている」こと。
+    -- 1つでも不正/重複があれば注文ごと拒否する（黙って落とすと厨房が違う物を作るため）。
+    v_optreq := (
+      select count(*) from jsonb_array_elements_text(coalesce(v_item->'optionIds', '[]'::jsonb))
+    );
+    if v_optreq > 0 then
+      select count(*) into v_optok
+      from menu_options o
+      join menu_item_options mio
+        on mio.option_id = o.id and mio.menu_item_id = v_menu.id
+      where o.store_id = p_store
+        and o.id in (
+          select x::uuid from jsonb_array_elements_text(v_item->'optionIds') as x
+        );
+      if v_optok <> v_optreq then
+        raise exception 'invalid option for item: %', v_menu.name;
+      end if;
+    end if;
+
     update menu_items set stock = stock - v_qty where id = v_menu.id;
   end loop;
 
-  -- 注文＋明細（当時の name/price をスナップショット）
+  -- 注文＋明細（当時の name/price/options をスナップショット）
   insert into orders (store_id, table_id, status, proxy, idempotency_key)
     values (p_store, p_table, 'cooking', coalesce(p_proxy, false), p_idem)
     returning id into v_order;
 
-  insert into order_items (order_id, menu_item_id, name, price, qty)
-    select v_order, m.id, m.name, m.price, (i->>'qty')::int
+  insert into order_items (order_id, menu_item_id, name, price, qty, options)
+    select
+      v_order,
+      m.id,
+      m.name,
+      m.price,                       -- 本体単価のみ（オプション料金は options 側に持つ）
+      (i->>'qty')::int,
+      coalesce((
+        -- id昇順で正規化して保存（順序違いで別行に見えるのを防ぐ）
+        select jsonb_agg(
+                 jsonb_build_object('id', o.id, 'name', o.name, 'priceDelta', o.price_delta)
+                 order by o.id
+               )
+        from menu_options o
+        where o.store_id = p_store
+          and o.id in (
+            select x::uuid from jsonb_array_elements_text(coalesce(i->'optionIds', '[]'::jsonb)) as x
+          )
+      ), '[]'::jsonb)
     from jsonb_array_elements(p_items) as i
-    join menu_items m on m.id = (i->>'menuItemId')::uuid;
+    join menu_items m on m.id = (i->>'menuItemId')::uuid and m.store_id = p_store;
 
   return v_order;
 end $$;
@@ -138,18 +204,21 @@ begin
   select * into v_store from stores where id = p_store;
   select name into v_name from tables where id = p_table and store_id = p_store;
 
-  -- その卓の注文明細を menu_item + price で集約
+  -- その卓の注文明細を menu_item + price + options で集約
+  -- （「ネギ増し+50円」と「チーズ+50円」は合計額が同じでも別行として扱う）
   with agg as (
-    select oi.menu_item_id, oi.name, oi.price, sum(oi.qty)::int as qty
+    select oi.menu_item_id, oi.name, oi.price, oi.options, sum(oi.qty)::int as qty
     from orders o
     join order_items oi on oi.order_id = o.id
     where o.store_id = p_store and o.table_id = p_table
-    group by oi.menu_item_id, oi.name, oi.price
+    group by oi.menu_item_id, oi.name, oi.price, oi.options
   )
   select
-    coalesce(jsonb_agg(jsonb_build_object('menuItemId', menu_item_id, 'name', name, 'price', price, 'qty', qty)), '[]'::jsonb),
+    coalesce(jsonb_agg(jsonb_build_object(
+      'menuItemId', menu_item_id, 'name', name, 'price', price, 'qty', qty, 'options', options
+    )), '[]'::jsonb),
     coalesce(sum(qty), 0)::int,
-    coalesce(sum(qty * price), 0)::int
+    coalesce(sum(qty * (price + options_delta(options))), 0)::int
   into v_items, v_count, v_subtotal
   from agg;
 
@@ -286,9 +355,14 @@ end $$;
 -- 従来はクライアントが「select→(update qtyまたはdelete)→在庫update」を3回の別
 -- リクエストに分けて行っており、同時操作でズレる理論上の余地があった。1回のRPC
 -- 呼び出しで、行ロックを取りながらトランザクション内で完結させる。
+-- p_options: 取消対象のオプション組み合わせ(step14)。「ラーメン(ネギ増し)」と
+--   「ラーメン(大盛り)」が同居しても、どちらを消すか一意に決まるようにする。
+-- 旧2引数版は残すと「デフォルト引数付き3引数版」と曖昧になるため必ず破棄する。
+drop function if exists cancel_order_item(uuid, uuid);
 create or replace function cancel_order_item(
   p_order      uuid,
-  p_menu_item  uuid
+  p_menu_item  uuid,
+  p_options    jsonb default '[]'::jsonb
 ) returns void
 language plpgsql
 security definer
@@ -308,7 +382,9 @@ begin
   end if;
 
   select * into v_row from order_items
-    where order_id = p_order and menu_item_id = p_menu_item
+    where order_id = p_order
+      and menu_item_id = p_menu_item
+      and options_key(options) = options_key(p_options)
     order by id limit 1
     for update;
   if not found then
@@ -379,8 +455,8 @@ grant  execute on function close_table(uuid, uuid, text, numeric, boolean) to au
 revoke execute on function regenerate_table_token(uuid, uuid) from public, anon;
 grant  execute on function regenerate_table_token(uuid, uuid) to authenticated;
 
-revoke execute on function cancel_order_item(uuid, uuid) from public, anon;
-grant  execute on function cancel_order_item(uuid, uuid) to authenticated;
+revoke execute on function cancel_order_item(uuid, uuid, jsonb) from public, anon;
+grant  execute on function cancel_order_item(uuid, uuid, jsonb) to authenticated;
 
 revoke execute on function clear_checkout_history() from public, anon;
 grant  execute on function clear_checkout_history() to authenticated;

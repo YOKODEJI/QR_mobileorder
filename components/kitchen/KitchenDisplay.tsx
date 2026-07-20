@@ -4,6 +4,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import { hm, elapsedMin, useNow } from "@/lib/time";
 import { BellIcon, BellSlashIcon, WarningIcon } from "@/components/ui/Icon";
+import { optionsLabel } from "@/lib/options";
 
 /** 提供前伝票の経過時間による色エスカレーション */
 function ticketHeaderColor(
@@ -277,7 +278,14 @@ export default function KitchenDisplay() {
                           padding: "6px 0",
                         }}
                       >
-                        <span style={{ flex: 1, fontSize: "17px", fontWeight: 700 }}>{it.name}</span>
+                        <span style={{ flex: 1, fontSize: "17px", fontWeight: 700 }}>
+                          {it.name}
+                          {optionsLabel(it.options) && (
+                            <span style={{ display: "block", fontSize: "14px", fontWeight: 700, color: "var(--red-dark)" }}>
+                              {optionsLabel(it.options)}
+                            </span>
+                          )}
+                        </span>
                         <span style={{ fontSize: "20px", fontWeight: 800, color: accent, fontVariantNumeric: "tabular-nums" }}>
                           ×{it.qty}
                         </span>

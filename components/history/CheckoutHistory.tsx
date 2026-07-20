@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import { dateLabel, dateTimeLabel } from "@/lib/time";
+import { lineTotal, optionsLabel } from "@/lib/options";
 import type { CheckoutRecord } from "@/store/useAppStore";
 
 const DISCOUNT_LABEL = { percent: "%割引", amount: "円引き" } as const;
@@ -179,9 +180,13 @@ export default function CheckoutHistory() {
                                 }}
                               >
                                 <span>
-                                  {it.name} <span style={{ color: "var(--text-3)" }}>×{it.qty}</span>
+                                  {it.name}
+                                  {optionsLabel(it.options) && (
+                                    <span style={{ color: "var(--text-3)" }}>（{optionsLabel(it.options)}）</span>
+                                  )}{" "}
+                                  <span style={{ color: "var(--text-3)" }}>×{it.qty}</span>
                                 </span>
-                                <span>{s.yen(it.price * it.qty)}</span>
+                                <span style={{ fontVariantNumeric: "tabular-nums" }}>{s.yen(lineTotal(it))}</span>
                               </div>
                             ))}
                             {(r.discountAmount > 0 || r.chargeAmount > 0 || r.taxAmount > 0) && (
