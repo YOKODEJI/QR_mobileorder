@@ -83,6 +83,7 @@ export default function SupabaseSync() {
         showFooterPhoto: store?.showFooterPhoto ?? cur.settings.showFooterPhoto,
         headerPhoto: store?.headerPhoto ?? cur.settings.headerPhoto,
         footerPhoto: store?.footerPhoto ?? cur.settings.footerPhoto,
+        pwaIconUrl: store?.pwaIconUrl ?? cur.settings.pwaIconUrl,
         taxMode: store?.taxMode ?? cur.settings.taxMode,
         taxRate: store?.taxRate ?? cur.settings.taxRate,
         chargeRate: store?.chargeRate ?? cur.settings.chargeRate,

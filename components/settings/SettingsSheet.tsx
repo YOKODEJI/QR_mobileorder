@@ -322,6 +322,27 @@ export default function SettingsSheet() {
           会計時に自動で反映されます。チャージ料は0%で無しになります。
         </div>
 
+        {/* アプリアイコン（この管理画面をホーム画面に追加した際のアイコン） */}
+        <div style={{ ...labelStyle, marginTop: "20px" }}>アプリアイコン</div>
+        <div style={{ background: "var(--surface)", borderRadius: "14px", padding: "16px" }}>
+          <PhotoSlot
+            height={110}
+            radius={12}
+            label="正方形の画像をタップ／ドロップで追加"
+            value={settings.pwaIconUrl}
+            onChange={(url) => setSetting("pwaIconUrl", url)}
+            folder="pwa-icon"
+          />
+          {settings.pwaIconUrl && (
+            <button onClick={() => confirmRemoveStorePhoto("pwaIconUrl")} style={removeBtn}>
+              画像を削除
+            </button>
+          )}
+        </div>
+        <div style={{ fontSize: "12px", color: "var(--text-2)", margin: "10px 8px 0", lineHeight: 1.5 }}>
+          スタッフがこの管理画面をホーム画面に追加した際のアイコンです。正方形の画像を推奨します。未設定の間は仮アイコンが使われます。
+        </div>
+
         {/* QRコード管理 */}
         <div style={{ ...labelStyle, marginTop: "20px" }}>QRコード管理</div>
         <div style={{ background: "var(--surface)", borderRadius: "14px", padding: "16px" }}>

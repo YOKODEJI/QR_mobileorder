@@ -22,6 +22,7 @@ export interface Snapshot {
   showFooterPhoto: boolean;
   headerPhoto: string | null;
   footerPhoto: string | null;
+  pwaIconUrl: string | null;
   taxMode: TaxMode | null;
   taxRate: number | null;
   chargeRate: number | null;
@@ -41,12 +42,16 @@ export interface StoreSettingsSlice {
   showFooterPhoto: boolean;
   headerPhoto: string | null;
   footerPhoto: string | null;
+  pwaIconUrl: string | null;
   taxMode: TaxMode | null;
   taxRate: number | null;
   chargeRate: number | null;
 }
 
-/** 店舗設定のみ取得（Realtime差分更新用の1テーブル分） */
+/** 店舗設定のみ取得（Realtime差分更新用の1テーブル分）。
+ *  pwa_icon_url は別クエリで取得する（step16未適用のDBでは列が存在せず
+ *  selectごと失敗するため、混ぜると「PWAアイコンが無いだけ」で店舗設定
+ *  全体＝メニュー/注文/会計の同期まで止まってしまう。分離して耐障害にする）。 */
 export async function fetchStoreSettings(): Promise<StoreSettingsSlice | null> {
   const sb = getSupabase();
   if (!sb || !STORE_ID) return null;
@@ -66,10 +71,19 @@ export async function fetchStoreSettings(): Promise<StoreSettingsSlice | null> {
     showFooterPhoto: data?.show_footer_photo ?? false,
     headerPhoto: (data?.header_photo_url as string | null) ?? null,
     footerPhoto: (data?.footer_photo_url as string | null) ?? null,
+    pwaIconUrl: await fetchPwaIconUrl(),
     taxMode: (data?.tax_mode as TaxMode | null) ?? null,
     taxRate: (data?.tax_rate as number | null) ?? null,
     chargeRate: (data?.charge_rate as number | null) ?? null,
   };
+}
+
+async function fetchPwaIconUrl(): Promise<string | null> {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return null;
+  const { data, error } = await sb.from("stores").select("pwa_icon_url").eq("id", STORE_ID).single();
+  if (error) return null; // 列未追加(step16未適用)や通信失敗はPWAアイコン無しとして扱う
+  return (data?.pwa_icon_url as string | null) ?? null;
 }
 
 /** カテゴリ一覧のみ取得（Realtime差分更新用の1テーブル分） */

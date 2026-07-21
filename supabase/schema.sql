@@ -22,6 +22,7 @@ create table if not exists stores (
   show_footer_photo boolean not null default false,
   header_photo_url  text,
   footer_photo_url  text,
+  pwa_icon_url      text, -- PWAアイコン（管理画面をホーム画面に追加した際のアイコン。step16）
   tax_mode          text not null default 'inclusive',
   tax_rate          numeric not null default 10,
   charge_rate       numeric not null default 0,

@@ -4,17 +4,31 @@ import path from "path";
 import { ImageResponse } from "next/og";
 import { fetchStoreSettings } from "@/lib/data";
 
-// manifest.webmanifest が参照するインストールアイコン。
-// public/logo.png が置かれていればそれをそのまま返し、無ければ
-// 店舗テーマ色を背景に店名の頭文字を配した仮アイコンを都度生成する
-// （ロゴ未用意の間もインストール自体は試せるようにするためのフォールバック。
-//  logo.png を置くだけで次回アクセスから自動的に切り替わる＝コード変更不要）。
+// manifest.webmanifest が参照するインストールアイコン。優先順位は
+//   1) 設定画面からアップロードされた店舗アイコン(stores.pwa_icon_url)
+//   2) public/logo.png（手動配置。当面のフォールバック用に残している）
+//   3) 店舗テーマ色を背景に店名の頭文字を配した仮アイコンをその場で生成
+// のいずれも無ければ最終的に3にたどり着くため、未設定でもインストール自体は試せる。
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ size: string }> }
 ) {
   const { size } = await params;
   const px = size === "512" ? 512 : 192;
+  const store = await fetchStoreSettings();
+
+  if (store?.pwaIconUrl) {
+    const res = await fetch(store.pwaIconUrl).catch(() => null);
+    if (res?.ok) {
+      const buf = await res.arrayBuffer();
+      return new Response(buf, {
+        headers: {
+          "Content-Type": res.headers.get("Content-Type") ?? "image/jpeg",
+          "Cache-Control": "public, max-age=300",
+        },
+      });
+    }
+  }
 
   const logoPath = path.join(process.cwd(), "public", "logo.png");
   if (existsSync(logoPath)) {
@@ -24,7 +38,6 @@ export async function GET(
     });
   }
 
-  const store = await fetchStoreSettings();
   const initial = (store?.storeName ?? "Q").trim().charAt(0) || "Q";
   const theme = store?.theme ?? "#cf4b2c";
 

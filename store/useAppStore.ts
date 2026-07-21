@@ -100,6 +100,7 @@ export interface Settings {
   showFooterPhoto: boolean;
   headerPhoto: string | null;
   footerPhoto: string | null;
+  pwaIconUrl: string | null; // PWAアイコン（管理画面をホーム画面に追加した際のアイコン）
   taxMode: TaxMode;
   taxRate: number; // 外税のときの消費税率（%）
   chargeRate: number; // チャージ料（%）。0なら無し
@@ -187,6 +188,7 @@ interface AppState {
     showFooterPhoto: boolean;
     headerPhoto: string | null;
     footerPhoto: string | null;
+    pwaIconUrl: string | null;
     taxMode: TaxMode | null;
     taxRate: number | null;
     chargeRate: number | null;
@@ -273,7 +275,7 @@ interface AppState {
   setPhoto: (id: string, url: string) => void;
   removePhoto: (id: string) => void;
   confirmRemovePhoto: (id: string) => void; // メニュー写真の削除（1回確認）
-  confirmRemoveStorePhoto: (which: "headerPhoto" | "footerPhoto") => void; // 店舗写真の削除（1回確認）
+  confirmRemoveStorePhoto: (which: "headerPhoto" | "footerPhoto" | "pwaIconUrl") => void; // 店舗写真/PWAアイコンの削除（1回確認）
   // オプション管理（商品ごとの個別設定）
   addOption: (menuItemId: string, name: string, priceDelta: number) => void;
   updateOption: (menuItemId: string, id: string, patch: { name?: string; priceDelta?: number }) => void;
@@ -468,6 +470,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     showFooterPhoto: false,
     headerPhoto: null,
     footerPhoto: null,
+    pwaIconUrl: null,
     taxMode: "inclusive",
     taxRate: 10,
     chargeRate: 0,
@@ -622,6 +625,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           showFooterPhoto: snap.showFooterPhoto,
           headerPhoto: snap.headerPhoto,
           footerPhoto: snap.footerPhoto,
+          pwaIconUrl: snap.pwaIconUrl,
           taxMode: snap.taxMode ?? s.settings.taxMode,
           taxRate: snap.taxRate ?? s.settings.taxRate,
           chargeRate: snap.chargeRate ?? s.settings.chargeRate,
@@ -1535,11 +1539,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   confirmRemoveStorePhoto: (which) => {
     const s = get();
     const url = s.settings[which];
-    const label = which === "headerPhoto" ? "ヘッダー" : "フッター";
+    const label =
+      which === "headerPhoto" ? "ヘッダー写真" : which === "footerPhoto" ? "フッター写真" : "アプリアイコン";
+    const body =
+      which === "pwaIconUrl"
+        ? "ホーム画面追加時のアイコンを削除します。以後は仮アイコンが使われます。"
+        : "客用ページの写真を削除します。元に戻せません。";
     set({
       dialog: {
-        title: `${label}写真を削除しますか？`,
-        body: "客用ページの写真を削除します。元に戻せません。",
+        title: `${label}を削除しますか？`,
+        body,
         confirmText: "削除する",
         danger: true,
         onConfirm: () => {
@@ -1733,6 +1742,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       showFooterPhoto: "show_footer_photo",
       headerPhoto: "header_photo_url",
       footerPhoto: "footer_photo_url",
+      pwaIconUrl: "pwa_icon_url",
       taxMode: "tax_mode",
       taxRate: "tax_rate",
       chargeRate: "charge_rate",
