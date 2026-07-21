@@ -3,9 +3,14 @@
 import { useEffect, useState } from "react";
 import { getSupabase, isSupabaseConfigured, STORE_ID } from "@/lib/supabase";
 import { fetchStoreSettings } from "@/lib/data";
+import { recordActivity, isIdleExpired, clearActivity, IDLE_LIMIT_MS } from "@/lib/idleTimeout";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 
-type AuthState = "loading" | "in" | "out" | "wrong-store";
+type AuthState = "loading" | "in" | "out" | "wrong-store" | "idle-out";
+
+// 操作が無かったか判定する間隔。IDLE_LIMIT_MS(12時間)に対して十分細かく、
+// かつバッテリー消費が気にならない頻度として5分ごと。
+const IDLE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
 /**
  * /admin を保護する認証ゲート。
@@ -15,6 +20,9 @@ type AuthState = "loading" | "in" | "out" | "wrong-store";
  *   強制サインアウトしてアクセス拒否する（staff.user_id→store_id紐付け、
  *   staff_store_id() RPC経由。1つのSupabaseプロジェクトを複数店舗で共有しても、
  *   他店のスタッフ資格情報でこの店舗の管理画面に入れないようにするための多層防御）。
+ * - 12時間操作が無ければ自動的にサインアウトする（lib/idleTimeout.ts）。
+ *   Supabaseのセッション自体は開いていれば自動更新され続けるため、この判定は
+ *   自前でlocalStorageに記録した最終操作時刻を基準に行っている。
  * ※ これはUI層の保護。DBレベルの最終的な制御はRLS（staff_store_id()ベース）で行う。
  */
 export default function AdminAuthGate({ children }: { children: React.ReactNode }) {
@@ -46,6 +54,15 @@ export default function AdminAuthGate({ children }: { children: React.ReactNode 
         if (mounted) setState("wrong-store");
         return;
       }
+      // セッション自体は生きていても、この端末で12時間操作が無ければ
+      // 放置ログアウト扱いにする（ページを開きっぱなしで一晩経った場合等）。
+      if (isIdleExpired()) {
+        clearActivity();
+        await sb.auth.signOut();
+        if (mounted) setState("idle-out");
+        return;
+      }
+      recordActivity();
       setState("in");
     };
 
@@ -59,9 +76,42 @@ export default function AdminAuthGate({ children }: { children: React.ReactNode 
     };
   }, []);
 
+  // ログイン中のみ: 操作を検知して最終操作時刻を更新し、定期的に放置時間を判定する。
+  useEffect(() => {
+    if (state !== "in") return;
+    const sb = getSupabase();
+    if (!sb) return;
+
+    // click/keydown/touchstartだけで十分（マウス移動まで拾うと書き込みが増えすぎる）。
+    const onActivity = () => recordActivity();
+    const events: (keyof WindowEventMap)[] = ["click", "keydown", "touchstart"];
+    events.forEach((e) => window.addEventListener(e, onActivity, { passive: true }));
+
+    const checkIdle = async () => {
+      if (!isIdleExpired()) return;
+      clearActivity();
+      await sb.auth.signOut(); // onAuthStateChangeがidle-outへ遷移させる
+    };
+    const timer = setInterval(checkIdle, IDLE_CHECK_INTERVAL_MS);
+    // タブがバックグラウンドから復帰した瞬間にも判定する
+    // （モバイルではタイマーが止まっている間に12時間経っている場合があるため）。
+    const onVisible = () => {
+      if (document.visibilityState === "visible") checkIdle();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, onActivity));
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [state]);
+
   if (state === "loading") return <LoadingScreen label="認証を確認中…" />;
   if (state === "wrong-store")
     return <LoginForm initialError="このアカウントはこの店舗のスタッフとして登録されていません。" />;
+  if (state === "idle-out")
+    return <LoginForm initialError="12時間操作が無かったため自動的にログアウトしました。もう一度ログインしてください。" />;
   if (state === "out") return <LoginForm />;
   return <>{children}</>;
 }
