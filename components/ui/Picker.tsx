@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 
 /** iOS風のボトムシート・ピッカー（ネイティブ<select>の代わり）。タップで選択肢シートを開く。 */
 export default function Picker({
@@ -44,7 +45,7 @@ export default function Picker({
         <span style={{ fontSize: "9px", color: "var(--text-3)" }}>▾</span>
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
           onClick={() => setOpen(false)}
           style={{
@@ -128,7 +129,8 @@ export default function Picker({
               ))}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

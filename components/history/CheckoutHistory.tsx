@@ -175,28 +175,31 @@ export default function CheckoutHistory() {
                                 style={{
                                   display: "flex",
                                   justifyContent: "space-between",
-                                  fontSize: "13px",
-                                  color: "var(--text-2)",
+                                  fontSize: "15px",
+                                  fontWeight: 600,
+                                  color: "var(--text)",
                                 }}
                               >
                                 <span>
                                   {it.name}
                                   {optionsLabel(it.options) && (
-                                    <span style={{ color: "var(--text-3)" }}>（{optionsLabel(it.options)}）</span>
+                                    <span style={{ color: "var(--text-2)" }}>（{optionsLabel(it.options)}）</span>
                                   )}{" "}
-                                  <span style={{ color: "var(--text-3)" }}>×{it.qty}</span>
+                                  <span style={{ color: "var(--text-2)" }}>×{it.qty}</span>
                                 </span>
-                                <span style={{ fontVariantNumeric: "tabular-nums" }}>{s.yen(lineTotal(it))}</span>
+                                <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>
+                                  {s.yen(lineTotal(it))}
+                                </span>
                               </div>
                             ))}
                             {(r.discountAmount > 0 || r.chargeAmount > 0 || r.taxAmount > 0) && (
-                              <div style={{ marginTop: "6px", paddingTop: "6px", borderTop: "1px dashed var(--hairline)", display: "flex", flexDirection: "column", gap: "3px" }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--text-3)" }}>
+                              <div style={{ marginTop: "6px", paddingTop: "6px", borderTop: "1px dashed var(--hairline)", display: "flex", flexDirection: "column", gap: "4px" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", fontWeight: 600, color: "var(--text-2)" }}>
                                   <span>小計</span>
                                   <span>{s.yen(r.subtotal)}</span>
                                 </div>
                                 {r.discountAmount > 0 && (
-                                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--red)" }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", fontWeight: 600, color: "var(--red)" }}>
                                     <span>
                                       割引{r.discountType ? `（${r.discountValue}${DISCOUNT_LABEL[r.discountType]}）` : ""}
                                     </span>
@@ -204,13 +207,13 @@ export default function CheckoutHistory() {
                                   </div>
                                 )}
                                 {r.chargeAmount > 0 && (
-                                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--text-3)" }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", fontWeight: 600, color: "var(--text-2)" }}>
                                     <span>チャージ料</span>
                                     <span>+{s.yen(r.chargeAmount)}</span>
                                   </div>
                                 )}
                                 {r.taxAmount > 0 && (
-                                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--text-3)" }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", fontWeight: 600, color: "var(--text-2)" }}>
                                     <span>消費税</span>
                                     <span>+{s.yen(r.taxAmount)}</span>
                                   </div>

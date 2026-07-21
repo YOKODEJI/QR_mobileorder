@@ -30,7 +30,6 @@ export default function KitchenDisplay() {
       settings: st.settings,
       soundOn: st.soundOn,
       tableName: st.tableName,
-      toggleConnection: st.toggleConnection,
       toggleSound: st.toggleSound,
     }))
   );
@@ -101,17 +100,6 @@ export default function KitchenDisplay() {
             >
               {s.soundOn ? <BellIcon size={13} /> : <BellSlashIcon size={13} />}
               {s.soundOn ? "通知音 ON" : "通知音 OFF"}
-            </button>
-            <button
-              onClick={s.toggleConnection}
-              style={{
-                ...pill,
-                cursor: "pointer",
-                background: "var(--control-tint)",
-                color: "var(--text-2)",
-              }}
-            >
-              {s.connected ? "切断をシミュレート" : "再接続する"}
             </button>
           </div>
         </div>
@@ -278,6 +266,18 @@ export default function KitchenDisplay() {
                           padding: "6px 0",
                         }}
                       >
+                        <span
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 700,
+                            color: "var(--text-2)",
+                            fontVariantNumeric: "tabular-nums",
+                            minWidth: "16px",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {i + 1}.
+                        </span>
                         <span style={{ flex: 1, fontSize: "17px", fontWeight: 700 }}>
                           {it.name}
                           {optionsLabel(it.options) && (

@@ -26,11 +26,18 @@ export default function AdminShell() {
   const setMgmt = useAppStore((s) => s.setMgmt);
   const openSettings = useAppStore((s) => s.openSettings);
   const loaded = useAppStore((s) => s.loaded);
+  const syncSoundPref = useAppStore((s) => s.syncSoundPref);
   const loading = isSupabaseConfigured() && !loaded;
 
   useEffect(() => {
     document.documentElement.style.setProperty("--accent", theme);
   }, [theme]);
+
+  // 通知音ON/OFFは端末ローカル設定。Zustandの初期値は既定値(ON)固定なので、
+  // マウント時に一度だけlocalStorageの実際の値へ同期する。
+  useEffect(() => {
+    syncSoundPref();
+  }, [syncSoundPref]);
 
   return (
     <div

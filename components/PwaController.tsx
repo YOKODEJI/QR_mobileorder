@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 
-const DISMISS_KEY = "pwaInstallDismissedAt";
-const DISMISS_DAYS = 14; // この期間は再度出さない（毎回出ると邪魔なため）
+// 「閉じる」を押した抑制は、そのタブ/ブラウザセッションの間だけにする（sessionStorage）。
+// localStorageで長期間(日単位)抑制すると、「後で入れよう」と閉じた場合に
+// 本当にインストールするまで案内が二度と出てこないように見えてしまうため。
+// インストール済みならisStandalone()で判定して恒久的に非表示にする。
+const DISMISS_KEY = "pwaInstallDismissedThisSession";
 
 function isIos(): boolean {
   return /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -35,8 +38,7 @@ export default function PwaController() {
 
     if (isStandalone()) return; // 既にインストール済みなら案内不要
 
-    const lastDismissed = Number(localStorage.getItem(DISMISS_KEY) ?? "0");
-    const recentlyDismissed = Date.now() - lastDismissed < DISMISS_DAYS * 86400000;
+    const recentlyDismissed = sessionStorage.getItem(DISMISS_KEY) === "1";
     setDismissed(recentlyDismissed);
     if (recentlyDismissed) return;
 
@@ -49,12 +51,24 @@ export default function PwaController() {
       e.preventDefault();
       setDeferredPrompt(e);
     };
+    // インストールが完了した瞬間（バナー経由でも、ブラウザのアドレスバー等からの
+    // インストールでも発火する）に恒久的に消す。次回起動時はisStandalone()が
+    // trueになるためこのイベントに頼らずとも案内は出ないが、同一セッション中に
+    // 即座に消えるようにするためここでも状態を更新する。
+    const onInstalled = () => {
+      setDismissed(true);
+      setDeferredPrompt(null);
+    };
     window.addEventListener("beforeinstallprompt", onPrompt);
-    return () => window.removeEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
   }, []);
 
   const dismiss = () => {
-    localStorage.setItem(DISMISS_KEY, String(Date.now()));
+    sessionStorage.setItem(DISMISS_KEY, "1");
     setDismissed(true);
     setDeferredPrompt(null);
     setShowIosHint(false);
@@ -65,7 +79,7 @@ export default function PwaController() {
     // Chrome/Edge等のprompt()はChromiumの型のみが持つ独自メソッド（DOM標準Eventにはない）
     await (deferredPrompt as Event & { prompt: () => Promise<void> }).prompt();
     setDeferredPrompt(null);
-    localStorage.setItem(DISMISS_KEY, String(Date.now()));
+    sessionStorage.setItem(DISMISS_KEY, "1");
   };
 
   if (dismissed || (!deferredPrompt && !showIosHint)) return null;

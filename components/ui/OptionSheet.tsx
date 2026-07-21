@@ -70,7 +70,7 @@ export default function OptionSheet({
         />
         <div style={{ fontSize: "19px", fontWeight: 800, color: "var(--text)" }}>{item.name}</div>
         <div style={{ fontSize: "13px", color: "var(--text-2)", margin: "2px 0 14px" }}>
-          オプションを選んでください（いくつでも選べます）
+          オプションを選んでください（複数選択できます）
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>

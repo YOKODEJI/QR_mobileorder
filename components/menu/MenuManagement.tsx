@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useSwipeCategory } from "@/lib/useSwipeCategory";
 import { useAppStore } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import type { MenuItem } from "@/store/useAppStore";
@@ -78,7 +80,10 @@ function ItemOptionsButton({ item, accent }: { item: MenuItem; accent: string })
         オプション{list.length > 0 ? ` ${list.length}` : ""}
       </button>
 
-      {open && (
+      {/* backdrop-filterを持つ祖先(ガラスカード)があると、position:fixedの基準点が
+          ビューポートではなくその祖先になってしまう(CSS仕様)。ボタン自体はカードの
+          中にあるため、body直下へPortalで逃がして常に画面中央に出す。 */}
+      {open && createPortal(
         <div
           onClick={() => setOpen(false)}
           style={{
@@ -253,7 +258,8 @@ function ItemOptionsButton({ item, accent }: { item: MenuItem; accent: string })
               閉じる
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
@@ -423,6 +429,13 @@ export default function MenuManagement() {
     (m) => s.adminCat === "すべて" || m.cat === s.adminCat
   );
 
+  const adminCatFilters = ["すべて", ...s.categories];
+  const adminSwipe = useSwipeCategory({
+    categories: adminCatFilters,
+    current: s.adminCat,
+    onChange: s.setAdminCat,
+  });
+
   const insetInput: React.CSSProperties = {
     padding: "11px 13px",
     borderRadius: "12px",
@@ -490,7 +503,11 @@ export default function MenuManagement() {
       </div>
 
       {/* メニュー管理 */}
-      <div style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", overflow: "hidden", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)" }}>
+      <div
+        onTouchStart={adminSwipe.onTouchStart}
+        onTouchEnd={adminSwipe.onTouchEnd}
+        style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", overflow: "hidden", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)" }}
+      >
         <div style={{ padding: "18px 22px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", flexWrap: "wrap" }}>
           <div>
             <div style={{ fontSize: "19px", fontWeight: 800 }}>メニュー管理</div>

@@ -102,7 +102,9 @@ export default function SupabaseSync() {
     const debounced = (table: string) => {
       pendingSlices.current.add(TABLE_TO_SLICE[table] ?? table);
       if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(partialReload, 250);
+      // orders/order_itemsの連続イベントを1回のfetchにまとめる待ち時間。
+      // 短すぎるとイベントが分裂してfetch回数が増え、長すぎると体感ラグになる。
+      timer.current = setTimeout(partialReload, 150);
     };
     const unsubRealtime = subscribeRealtime(debounced);
     const unsubConn = subscribeConnection(setConnected);

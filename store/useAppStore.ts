@@ -5,6 +5,7 @@ import * as db from "@/lib/data";
 import { isSupabaseConfigured, ORDER_VIA_FUNCTION } from "@/lib/supabase";
 import { computeCheckoutBreakdown } from "@/lib/pricing";
 import { deletePhoto } from "@/lib/storage";
+import { getStoredSoundOn, setStoredSoundOn } from "@/lib/soundPref";
 import {
   cartKey,
   parseCartKey,
@@ -242,7 +243,7 @@ interface AppState {
   // ---- 厨房 ----
   confirmStatus: (o: Order) => void;
   toggleSound: () => void;
-  toggleConnection: () => void;
+  syncSoundPref: () => void; // localStorageの端末別設定をstoreへ反映（マウント時に1回）
 
   // ---- 会計 / テーブル ----
   selectStaffTable: (id: string) => void;
@@ -581,7 +582,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     },
   ],
   connected: true,
-  soundOn: false,
+  soundOn: true, // 既定はON。実際の値はAdminShellマウント時にsyncSoundPref()でlocalStorageから同期する
   highlightId: null,
   submitting: false,
   justOrdered: false,
@@ -805,7 +806,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
     });
   },
-  submitOrder: (idem) => {
+  submitOrder: async (idem) => {
     const s = get();
     const items = buildItems(s.cart, s.menu, s.itemOptions);
     if (items.length === 0) return;
@@ -813,44 +814,42 @@ export const useAppStore = create<AppState>((set, get) => ({
     const configured = isSupabaseConfigured();
     const key = idem ?? newId(); // 再試行時は同じキーを使い二重注文を防ぐ
     set({ submitting: true });
-    setTimeout(async () => {
-      let id: string | null = null;
-      if (configured) {
-        // セッション未取得なら開始（客ページ=URLのk / デモ=取得済みqr_token）
-        if (!get().sessionToken) await get().openSession();
-        const res = await placeOrder(tableId, items, false, key, get().menu, get().sessionToken);
-        if (!res.ok) {
-          // セッション切れ（会計後 等）は次回に再取得できるようクリア
-          if (res.code === "session") set({ sessionToken: null });
-          set({
-            submitting: false,
-            dialog: orderErrorDialog(res, () => {
-              get().closeDialog();
-              get().submitOrder(key);
-            }),
-          });
-          return;
-        }
-        id = res.id;
-      } else {
-        id = newId();
+    let id: string | null = null;
+    if (configured) {
+      // セッション未取得なら開始（客ページ=URLのk / デモ=取得済みqr_token）
+      if (!get().sessionToken) await get().openSession();
+      const res = await placeOrder(tableId, items, false, key, get().menu, get().sessionToken);
+      if (!res.ok) {
+        // セッション切れ（会計後 等）は次回に再取得できるようクリア
+        if (res.code === "session") set({ sessionToken: null });
+        set({
+          submitting: false,
+          dialog: orderErrorDialog(res, () => {
+            get().closeDialog();
+            get().submitOrder(key);
+          }),
+        });
+        return;
       }
-      set((st) => ({
-        orders: [
-          { id: id!, table: tableId, createdAt: new Date().toISOString(), status: "cooking", items },
-          ...st.orders,
-        ],
-        menu: decrementStock(st.menu, items),
-        cart: {},
-        submitting: false,
-        justOrdered: true,
-        highlightId: id,
-      }));
-      playBeep(get().soundOn);
-      setTimeout(() => {
-        if (get().highlightId === id) set({ highlightId: null });
-      }, 2600);
-    }, 800);
+      id = res.id;
+    } else {
+      id = newId();
+    }
+    set((st) => ({
+      orders: [
+        { id: id!, table: tableId, createdAt: new Date().toISOString(), status: "cooking", items },
+        ...st.orders,
+      ],
+      menu: decrementStock(st.menu, items),
+      cart: {},
+      submitting: false,
+      justOrdered: true,
+      highlightId: id,
+    }));
+    playBeep(get().soundOn);
+    setTimeout(() => {
+      if (get().highlightId === id) set({ highlightId: null });
+    }, 2600);
   },
   submitProxy: async (idem) => {
     const s = get();
@@ -980,8 +979,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
     });
   },
-  toggleSound: () => set((s) => ({ soundOn: !s.soundOn })),
-  toggleConnection: () => set((s) => ({ connected: !s.connected })),
+  toggleSound: () =>
+    set((s) => {
+      const next = !s.soundOn;
+      setStoredSoundOn(next);
+      return { soundOn: next };
+    }),
+  syncSoundPref: () => set({ soundOn: getStoredSoundOn() }),
 
   // ---- 会計 / テーブル ----
   selectStaffTable: (id) => set({ selectedStaffTable: id, orderEditMode: false }),

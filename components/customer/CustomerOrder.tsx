@@ -10,6 +10,7 @@ import { BellIcon, CheckIcon } from "@/components/ui/Icon";
 import { hm, useNow } from "@/lib/time";
 import { priceWithTax } from "@/lib/pricing";
 import { cartKey, parseCartKey, lineTotal, unitPrice, optionsLabel } from "@/lib/options";
+import { useSwipeCategory } from "@/lib/useSwipeCategory";
 import {
   itemCardStyle,
   addBtnStyle,
@@ -25,6 +26,7 @@ export default function CustomerOrder() {
       confirmCallStaff: st.confirmCallStaff,
       calls: st.calls,
       cart: st.cart,
+      categories: st.categories,
       confirmOrder: st.confirmOrder,
       customerCat: st.customerCat,
       customerTableId: st.customerTableId,
@@ -50,6 +52,13 @@ export default function CustomerOrder() {
   const filtered = s.menu.filter(
     (m) => s.customerCat === "すべて" || m.cat === s.customerCat
   );
+
+  const catFilters = ["すべて", ...s.categories];
+  const swipe = useSwipeCategory({
+    categories: catFilters,
+    current: s.customerCat,
+    onChange: s.setCustomerCat,
+  });
 
   const [optionItem, setOptionItem] = useState<MenuItem | null>(null);
 
@@ -98,13 +107,18 @@ export default function CustomerOrder() {
       {/* スクロール領域（ヘッダー/カートバーの下を流れる＝ガラスの奥行きの源。
           パディングは下の実測ヘッダー/カート高さ+余白のおおよその値） */}
       <div
+        onTouchStart={swipe.onTouchStart}
+        onTouchEnd={swipe.onTouchEnd}
         style={{
           position: "absolute",
           inset: 0,
-          overflowY: "auto",
+          overflowY: "scroll",
+          // 品数の少ないカテゴリでスクロールバーが消えるとコンテンツ幅が変わり、
+          // カテゴリ切替のたびに要素が左右にずれて見える。常にバー分の余白を確保する。
+          scrollbarGutter: "stable",
         }}
       >
-        <div style={{ height: "88px", flexShrink: 0 }} />
+        <div style={{ height: "68px", flexShrink: 0 }} />
 
         {s.settings.showHeaderPhoto && s.settings.headerPhoto && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -296,10 +310,10 @@ export default function CustomerOrder() {
           )}
         </div>
 
-        <div style={{ height: "136px", flexShrink: 0 }} />
+        <div style={{ height: "126px", flexShrink: 0 }} />
       </div>
 
-      {/* 浮遊ヘッダー（ガラス） */}
+      {/* 浮遊ヘッダー（ガラス）。履歴/呼出を横並びの1行にして縦を圧縮している */}
       <div
         style={{
           position: "absolute",
@@ -308,8 +322,8 @@ export default function CustomerOrder() {
           right: 0,
           zIndex: 10,
           margin: "8px",
-          padding: "10px 14px 10px",
-          borderRadius: "24px",
+          padding: "8px 14px",
+          borderRadius: "22px",
           background: "var(--glass)",
           backdropFilter: "blur(26px) saturate(180%)",
           WebkitBackdropFilter: "blur(26px) saturate(180%)",
@@ -317,16 +331,25 @@ export default function CustomerOrder() {
           boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div>
-            <div style={{ fontSize: "12px", color: "var(--text-2)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: "10px", color: "var(--text-2)", whiteSpace: "nowrap" }}>
               ようこそ {s.settings.storeName} へ
             </div>
-            <div style={{ fontSize: "25px", fontWeight: 800, color: "var(--text)" }}>
+            <div
+              style={{
+                fontSize: "20px",
+                fontWeight: 800,
+                color: "var(--text)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
               {s.tableName(s.customerTableId)}
             </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-end" }}>
+          <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
             <button
               onClick={() => s.toggleHistory(true)}
               style={{
@@ -334,7 +357,7 @@ export default function CustomerOrder() {
                 background: "var(--control-tint)",
                 color: "var(--text)",
                 borderRadius: "999px",
-                padding: "6px 12px",
+                padding: "7px 12px",
                 fontSize: "13px",
                 fontWeight: 700,
                 fontFamily: "inherit",
@@ -355,7 +378,7 @@ export default function CustomerOrder() {
                 background: called ? "var(--control-tint)" : accent,
                 color: called ? "var(--text-2)" : "var(--accent-ink)",
                 borderRadius: "999px",
-                padding: "6px 12px",
+                padding: "7px 12px",
                 fontSize: "13px",
                 fontWeight: 700,
                 fontFamily: "inherit",
@@ -364,7 +387,7 @@ export default function CustomerOrder() {
                 boxShadow: called ? undefined : "inset 0 1px 0 rgba(255,255,255,.3)",
               }}
             >
-              {called ? "✓ 呼び出し中" : (<><BellIcon size={13} />スタッフ呼出</>)}
+              {called ? "✓ 呼び出し中" : (<><BellIcon size={13} />呼出</>)}
             </button>
           </div>
         </div>
@@ -385,15 +408,15 @@ export default function CustomerOrder() {
           WebkitBackdropFilter: "blur(30px) saturate(190%)",
           border: "1px solid var(--glass-edge)",
           boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)",
-          padding: "8px 14px 12px",
+          padding: "6px 14px 10px",
         }}
       >
         <div
           style={{
             textAlign: "center",
-            fontSize: "11px",
+            fontSize: "10px",
             color: "var(--text-2)",
-            marginBottom: "5px",
+            marginBottom: "3px",
           }}
         >
           変更・キャンセルはスタッフにお声がけください
@@ -403,7 +426,7 @@ export default function CustomerOrder() {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            marginBottom: "7px",
+            marginBottom: "5px",
           }}
         >
           <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-2)", fontVariantNumeric: "tabular-nums" }}>
@@ -442,7 +465,7 @@ export default function CustomerOrder() {
         >
           {s.submitting ? "送信中…" : "注文する"}
         </button>
-        <div style={{ textAlign: "center", fontSize: "10px", color: "var(--text-3)", marginTop: "6px" }}>
+        <div style={{ textAlign: "center", fontSize: "10px", color: "var(--text-3)", marginTop: "4px" }}>
           {s.settings.taxMode === "exclusive"
             ? `表示価格は税抜です（税込 ${s.yen(priceWithTax(cartTotal, "exclusive", s.settings.taxRate))}）`
             : "表示価格は税込です"}

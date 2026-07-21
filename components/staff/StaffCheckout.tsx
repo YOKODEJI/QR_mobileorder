@@ -10,6 +10,7 @@ import Toggle from "@/components/ui/Toggle";
 import { proxyCardStyle, proxyAddStyle, proxySubStyle, addBtnStyle } from "@/lib/styles";
 import { computeCheckoutBreakdown, type DiscountType } from "@/lib/pricing";
 import { cartKey, parseCartKey, lineTotal, unitPrice, optionsLabel } from "@/lib/options";
+import { useSwipeCategory } from "@/lib/useSwipeCategory";
 
 export default function StaffCheckout() {
   const s = useAppStore(
@@ -33,6 +34,7 @@ export default function StaffCheckout() {
       menu: st.menu,
       orderEditMode: st.orderEditMode,
       orders: st.orders,
+      categories: st.categories,
       proxyCat: st.proxyCat,
       removeStaff: st.removeStaff,
       saveEditTable: st.saveEditTable,
@@ -128,6 +130,12 @@ export default function StaffCheckout() {
     (m) => s.proxyCat === "すべて" || m.cat === s.proxyCat
   );
   const proxyCount = Object.values(s.staffCart).reduce((a, b) => a + b, 0);
+  const proxyCatFilters = ["すべて", ...s.categories];
+  const proxySwipe = useSwipeCategory({
+    categories: proxyCatFilters,
+    current: s.proxyCat,
+    onChange: s.setProxyCat,
+  });
 
   const [proxyOptionItem, setProxyOptionItem] = useState<MenuItem | null>(null);
 
@@ -652,6 +660,8 @@ export default function StaffCheckout() {
                   <ChipRow value={s.proxyCat} onChange={s.setProxyCat} accent={accent} />
                 </div>
                 <div
+                  onTouchStart={proxySwipe.onTouchStart}
+                  onTouchEnd={proxySwipe.onTouchEnd}
                   style={{
                     display: "grid",
                     gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))",
