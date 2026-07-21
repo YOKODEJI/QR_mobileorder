@@ -3,11 +3,19 @@
 import { useRef } from "react";
 
 /** 横スクロール可能な要素の内側から始まったタッチかどうかを判定する。
- *  メニュー管理の行(.menu-rows)のように、そのタッチ自体を消費すべき
- *  横スクロール領域では、カテゴリスワイプを発火させない。 */
+ *  メニュー管理の行(.menu-rows)やカテゴリのチップ行(ChipRow)のように、
+ *  そのタッチ自体を消費すべき横スクロール領域では、カテゴリスワイプを発火させない。
+ *
+ *  ChipRowには明示的な `data-hscroll` を付けてあるので最優先でそれを見る
+ *  （scrollWidth/clientWidthの比較だけに頼ると、初回描画直後でレイアウトが
+ *  確定しきっていない・境界値で丸めが効く等のタイミング次第で誤判定しうるため、
+ *  「そこは常に横スクロール領域である」と分かっている場所は目印で確実に判定する）。
+ *  それ以外(.menu-rowsなど、目印を付けていない汎用の横スクロール領域)は
+ *  従来通りoverflow-x + scrollWidthの実測で判定する。 */
 function startedInsideHorizontalScroller(target: EventTarget | null): boolean {
   let el = target instanceof HTMLElement ? target : null;
   while (el) {
+    if (el.hasAttribute("data-hscroll")) return true;
     const style = getComputedStyle(el);
     const scrollable = style.overflowX === "auto" || style.overflowX === "scroll";
     if (scrollable && el.scrollWidth > el.clientWidth + 1) return true;

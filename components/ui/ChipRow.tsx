@@ -21,6 +21,10 @@ export default function ChipRow({
   const filters: CatFilter[] = ["すべて", ...categories];
   return (
     <div
+      // カテゴリ切替スワイプ(lib/useSwipeCategory.ts)の除外判定に使う目印。
+      // このチップ行自体が横スクロールするため、カテゴリ切替スワイプの対象から
+      // 明示的に除外し、チップ行内でのドラッグは常にチップ行自身の横スクロールに使わせる。
+      data-hscroll={wrap ? undefined : "true"}
       style={{
         display: "flex",
         flexWrap: wrap ? "wrap" : "nowrap",
