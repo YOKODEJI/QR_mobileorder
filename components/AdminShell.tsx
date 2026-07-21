@@ -70,13 +70,25 @@ export default function AdminShell() {
           zIndex: 30,
         }}
       >
-        <div style={{ display: "flex", alignItems: "baseline", gap: "9px", padding: "12px 22px 0" }}>
-          <span style={{ fontWeight: 800, fontSize: "21px", letterSpacing: "-.02em" }}>
-            {storeName}
-          </span>
-          <span style={{ fontSize: "12px", color: "var(--text-2)" }}>管理ツール</span>
-        </div>
-        <div style={{ display: "flex", justifyContent: "center", padding: "12px 14px 10px" }}>
+        {/* 店名/タブ/ログアウト・設定を1つの折り返し可能な横並びにして縦を圧縮する。
+            幅が十分あれば1行(3列相当)に収まり、狭い画面では自然に2列・1列へ折り返す。 */}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "10px",
+            padding: "10px 16px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "baseline", gap: "8px", flexShrink: 0 }}>
+            <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-.02em", whiteSpace: "nowrap" }}>
+              {storeName}
+            </span>
+            <span style={{ fontSize: "11px", color: "var(--text-2)", whiteSpace: "nowrap" }}>管理ツール</span>
+          </div>
+
           <SegmentedControl
             segments={[
               { value: "kitchen", label: "厨房" },
@@ -87,45 +99,48 @@ export default function AdminShell() {
             value={mgmtTab}
             onChange={setMgmt}
           />
-        </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", padding: "0 22px 12px" }}>
-          {isSupabaseConfigured() && (
+
+          <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+            {isSupabaseConfigured() && (
+              <button
+                onClick={() => getSupabase()?.auth.signOut()}
+                style={{
+                  padding: "7px 14px",
+                  borderRadius: "999px",
+                  border: "none",
+                  background: "var(--control-tint)",
+                  color: "var(--text-2)",
+                  fontFamily: "inherit",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                ログアウト
+              </button>
+            )}
             <button
-              onClick={() => getSupabase()?.auth.signOut()}
+              onClick={openSettings}
               style={{
-                padding: "8px 14px",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "7px 14px",
                 borderRadius: "999px",
                 border: "none",
                 background: "var(--control-tint)",
-                color: "var(--text-2)",
+                color: "var(--text)",
                 fontFamily: "inherit",
                 fontSize: "13px",
                 fontWeight: 600,
                 cursor: "pointer",
+                whiteSpace: "nowrap",
               }}
             >
-              ログアウト
+              <GearIcon size={15} />設定
             </button>
-          )}
-          <button
-            onClick={openSettings}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "8px 14px",
-              borderRadius: "999px",
-              border: "none",
-              background: "var(--control-tint)",
-              color: "var(--text)",
-              fontFamily: "inherit",
-              fontSize: "13px",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            <GearIcon size={15} />設定
-          </button>
+          </div>
         </div>
       </header>
 

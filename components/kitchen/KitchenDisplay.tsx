@@ -11,7 +11,7 @@ function ticketHeaderColor(
   status: "cooking" | "served",
   elapsed: number | null
 ): string {
-  if (status === "served") return "var(--green)"; // 提供済み: 緑
+  if (status === "served") return "#8e8e93"; // 提供済み: 落ち着いたグレー（iOS systemGray）
   if (elapsed == null) return "#2c2c2e"; // 未計測: 落ち着いた黒
   if (elapsed >= 15) return "var(--red)"; // 15分超: 赤（急げ）
   if (elapsed >= 8) return "#e0902a"; // 8分超: 琥珀
