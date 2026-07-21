@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>オフラインです</title>
+<style>
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    background: #f2f2f7; color: #000;
+    padding: 24px; text-align: center;
+  }
+  .card { max-width: 320px; }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+  p { font-size: 14px; color: rgba(60,60,67,.6); margin: 0 0 20px; }
+  button {
+    border: none; border-radius: 14px; padding: 12px 24px;
+    font-size: 15px; font-weight: 700; font-family: inherit;
+    background: #cf4b2c; color: #fff; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>オフラインです</h1>
+    <p>電波状況を確認して、もう一度お試しください。<br />注文・会計のデータは失われていません。</p>
+    <button onclick="location.reload()">再読み込み</button>
+  </div>
+</body>
+</html>
