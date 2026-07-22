@@ -26,6 +26,14 @@ create table if not exists stores (
   tax_mode          text not null default 'inclusive',
   tax_rate          numeric not null default 10,
   charge_rate       numeric not null default 0,
+  -- Square会計連携の土台(step18)。店舗ごとのON/OFFと資格情報は「よこでじ」が
+  -- SQL Editorから直接設定する運用で、店舗スタッフの設定画面には一切出さない。
+  -- square_access_tokenは列レベルGRANTでanon/authenticated双方から読めなくしてある
+  -- （下部のGRANT参照。実際の読み取りはEdge Functionがservice_roleで行う）。
+  square_enabled      boolean not null default false,
+  square_environment  text not null default 'sandbox', -- 'sandbox' | 'production'
+  square_location_id  text,
+  square_access_token text,
   created_at        timestamptz not null default now()
 );
 
@@ -309,6 +317,30 @@ create policy stores_select_customer      on stores for select to authenticated
   using (coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false));
 create policy stores_update_authenticated on stores for update to authenticated
   using (id = staff_store_id()) with check (id = staff_store_id());
+
+-- stores列レベルGRANT(step18): square_*列(資格情報)はanon/authenticatedどちらからも
+-- 読み書きできないようにする。設定画面が実際に触る列だけを明示的に許可し直す
+-- （tables.qr_token/session_tokenと同じ、列を封鎖してからの再GRANT方式）。
+revoke select on stores from anon;
+grant select (
+  id, name, theme, show_header_photo, show_footer_photo,
+  header_photo_url, footer_photo_url, pwa_icon_url,
+  tax_mode, tax_rate, charge_rate, created_at
+) on stores to anon;
+
+revoke select on stores from authenticated;
+grant select (
+  id, name, theme, show_header_photo, show_footer_photo,
+  header_photo_url, footer_photo_url, pwa_icon_url,
+  tax_mode, tax_rate, charge_rate, created_at
+) on stores to authenticated;
+
+revoke update on stores from authenticated;
+grant update (
+  name, theme, show_header_photo, show_footer_photo,
+  header_photo_url, footer_photo_url, pwa_icon_url,
+  tax_mode, tax_rate, charge_rate
+) on stores to authenticated;
 
 -- categories: 閲覧は誰でも、増減は自店舗スタッフのみ
 create policy categories_select_anon          on categories for select to anon using (true);

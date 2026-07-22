@@ -613,6 +613,20 @@ export async function dbCloseTableGate(tableId: string): Promise<boolean> {
   return ok(sb.rpc("close_table_gate", { p_store: STORE_ID, p_table: tableId }), "dbCloseTableGate");
 }
 
+/** Square会計連携の土台（ベストエフォート）。会計確定の直後に呼ぶ。
+ *  実際に同期するかはEdge Function側がstores.square_enabledで判定するため、
+ *  呼び出し側(checkoutアクション)は店舗ごとの連携有無を一切意識しなくてよい。
+ *  失敗しても会計自体には一切影響させない（例外を投げず、ログだけ残す）。 */
+export async function dbSyncSquare(checkoutId: string): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) return;
+  try {
+    await sb.functions.invoke("square_sync", { body: { checkoutId } });
+  } catch (e) {
+    console.error("dbSyncSquare:", e);
+  }
+}
+
 /** 会計済み・未提供の繰越伝票を提供完了として削除する（step17。在庫は戻さない） */
 export async function dbFinishCheckedOutOrder(orderId: string): Promise<boolean> {
   const sb = getSupabase();

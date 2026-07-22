@@ -124,7 +124,7 @@ export interface DialogSpec {
 /* ============================================================
    状態 + アクション
    ============================================================ */
-interface AppState {
+export interface AppState {
   // ナビ
   topTab: "customer" | "mgmt";
   mgmtTab: "kitchen" | "staff" | "menu" | "history";
@@ -1186,6 +1186,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       selectedStaffTable: null,
       orderEditMode: false,
     }));
+    // Square会計連携の土台(ベストエフォート)。店舗ごとの連携有無はEdge Function側の
+    // stores.square_enabledで判定するため、ここでは常に一律で呼ぶだけでよい。
+    // awaitせず結果を待たない＝失敗しても会計フロー自体には一切影響しない。
+    db.dbSyncSquare(record.id);
   },
   cancelUnit: async (menuItemId, options = []) => {
     const t = get().selectedStaffTable;

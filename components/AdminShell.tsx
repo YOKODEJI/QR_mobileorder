@@ -14,9 +14,14 @@ import MenuManagement from "@/components/menu/MenuManagement";
 import CheckoutHistory from "@/components/history/CheckoutHistory";
 import SupabaseSync from "@/components/SupabaseSync";
 import LoadingScreen from "@/components/ui/LoadingScreen";
+import { useSwipeCategory } from "@/lib/useSwipeCategory";
+import type { AppState } from "@/store/useAppStore";
 
 const FONT =
   "-apple-system, BlinkMacSystemFont, 'Hiragino Sans', var(--font-noto-sans-jp), 'Noto Sans JP', sans-serif";
+
+// SegmentedControlの並び順と一致させる（左右スワイプでの前後移動がタブ表示順と揃うように）
+const MGMT_TABS: AppState["mgmtTab"][] = ["kitchen", "staff", "menu", "history"];
 
 /** 管理ツールの独立ページ（ログイン必須にする対象。厨房/会計/メニュー/履歴+設定を集約） */
 export default function AdminShell() {
@@ -28,6 +33,12 @@ export default function AdminShell() {
   const loaded = useAppStore((s) => s.loaded);
   const syncSoundPref = useAppStore((s) => s.syncSoundPref);
   const loading = isSupabaseConfigured() && !loaded;
+
+  const tabSwipe = useSwipeCategory({
+    categories: MGMT_TABS,
+    current: mgmtTab,
+    onChange: (v) => setMgmt(v as AppState["mgmtTab"]),
+  });
 
   useEffect(() => {
     document.documentElement.style.setProperty("--accent", theme);
@@ -144,7 +155,11 @@ export default function AdminShell() {
         </div>
       </header>
 
-      <main style={{ flex: 1, display: "flex", flexDirection: "column", position: "relative", zIndex: 1 }}>
+      <main
+        onTouchStart={tabSwipe.onTouchStart}
+        onTouchEnd={tabSwipe.onTouchEnd}
+        style={{ flex: 1, display: "flex", flexDirection: "column", position: "relative", zIndex: 1 }}
+      >
         {loading ? (
           <LoadingScreen />
         ) : (
