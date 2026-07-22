@@ -86,7 +86,9 @@ export default function CustomerOrder() {
   }, 0);
 
   // このテーブルの注文履歴合計
-  const myOrders = s.orders.filter((o) => o.table === s.customerTableId);
+  // 会計済み・未提供の繰越伝票(checkedOutAt)は前のお客様の支払い済み分。
+  // 次に同じ卓に座ったお客様の履歴に混ざらないよう必ず除外する(step17)
+  const myOrders = s.orders.filter((o) => o.table === s.customerTableId && !o.checkedOutAt);
   const historyTotal = myOrders.reduce(
     (sum, o) => sum + o.items.reduce((t, it) => t + lineTotal(it), 0),
     0

@@ -102,12 +102,16 @@ export async function fetchCategories(): Promise<string[] | null> {
 export async function fetchTables(): Promise<TableRec[] | null> {
   const sb = getSupabase();
   if (!sb || !STORE_ID) return null;
-  const { data, error } = await sb.from("tables").select("id,name,sort").eq("store_id", STORE_ID).order("sort");
+  const { data, error } = await sb.from("tables").select("id,name,sort,open_since").eq("store_id", STORE_ID).order("sort");
   if (error) {
     console.error("fetchTables:", error.message);
     return null;
   }
-  return (data ?? []).map((t) => ({ id: t.id as string, name: t.name as string }));
+  return (data ?? []).map((t) => ({
+    id: t.id as string,
+    name: t.name as string,
+    openSince: (t.open_since as string | null) ?? null,
+  }));
 }
 
 /** メニュー一覧のみ取得（Realtime差分更新用の1テーブル分） */
@@ -180,7 +184,7 @@ export async function fetchOrders(): Promise<Order[] | null> {
   if (!sb || !STORE_ID) return null;
   const { data, error } = await sb
     .from("orders")
-    .select("id,table_id,status,proxy,created_at, order_items(menu_item_id,name,price,qty,options)")
+    .select("id,table_id,status,proxy,created_at,checked_out_at, order_items(menu_item_id,name,price,qty,options)")
     .eq("store_id", STORE_ID)
     .order("created_at", { ascending: true });
   if (error) {
@@ -193,6 +197,7 @@ export async function fetchOrders(): Promise<Order[] | null> {
     createdAt: o.created_at as string,
     status: o.status as Order["status"],
     proxy: (o.proxy as boolean) || undefined,
+    checkedOutAt: (o.checked_out_at as string | null) ?? undefined,
     items: ((o.order_items ?? []) as Array<Record<string, unknown>>).map((it) => ({
       menuItemId: (it.menu_item_id as string) ?? "",
       name: it.name as string,
@@ -372,7 +377,7 @@ export async function dbInsertOrder(
 
 export type SubmitResult =
   | { ok: true; orderId: string }
-  | { ok: false; code: "out_of_stock" | "session" | "rate_limited" | "error"; message: string };
+  | { ok: false; code: "out_of_stock" | "session" | "rate_limited" | "closed" | "error"; message: string };
 
 /** Edge Function `submit_order` 経由で注文（冪等・在庫の原子的減算・スナップショットをサーバで保証） */
 export async function dbSubmitOrderViaFunction(
@@ -404,11 +409,13 @@ export async function dbSubmitOrderViaFunction(
     }
     const code = /out of stock/i.test(msg)
       ? "out_of_stock"
-      : /session expired|invalid token/i.test(msg)
-        ? "session"
-        : /too many requests/i.test(msg)
-          ? "rate_limited"
-          : "error";
+      : /table closed/i.test(msg)
+        ? "closed"
+        : /session expired|invalid token/i.test(msg)
+          ? "session"
+          : /too many requests/i.test(msg)
+            ? "rate_limited"
+            : "error";
     return { ok: false, code, message: msg };
   }
   return { ok: true, orderId: (data?.orderId as string) ?? "" };
@@ -425,7 +432,8 @@ export async function dbOpenSession(tableId: string, k: string): Promise<string 
     p_k: k,
   });
   if (error) {
-    console.error("dbOpenSession:", error.message);
+    // 卓が閉じている(来店受付前)のは正常系。UI側はtables.open_sinceで待機画面を出す
+    if (!/table closed/i.test(error.message)) console.error("dbOpenSession:", error.message);
     return null;
   }
   return (data as string) ?? null;
@@ -584,6 +592,32 @@ export async function dbCancelUnit(
 /** SQL側 options_key() と同じ正規化（id昇順のカンマ連結）。取消対象の突合に使う。 */
 function optionsKeyOf(options?: SelectedOption[] | null): string {
   return (options ?? []).map((o) => o.id).sort().join(",");
+}
+
+/** 来店受付: 卓を開く（step17）。成功時は開いた時刻、失敗時はnull */
+export async function dbOpenTable(tableId: string): Promise<string | null> {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return new Date().toISOString(); // 未設定(ローカル開発)は常に成功扱い
+  const { data, error } = await sb.rpc("open_table", { p_store: STORE_ID, p_table: tableId });
+  if (error) {
+    console.error("dbOpenTable:", error.message);
+    return null;
+  }
+  return (data as string) ?? new Date().toISOString();
+}
+
+/** 誤タップで開いた卓を閉じ直す（step17） */
+export async function dbCloseTableGate(tableId: string): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return true;
+  return ok(sb.rpc("close_table_gate", { p_store: STORE_ID, p_table: tableId }), "dbCloseTableGate");
+}
+
+/** 会計済み・未提供の繰越伝票を提供完了として削除する（step17。在庫は戻さない） */
+export async function dbFinishCheckedOutOrder(orderId: string): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb) return true;
+  return ok(sb.rpc("finish_checked_out_order", { p_order: orderId }), "dbFinishCheckedOutOrder");
 }
 
 /** 会計履歴を全消去（自店舗分のみ）。取り消せないため呼び出し側で複数回確認すること。

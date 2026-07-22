@@ -144,6 +144,38 @@ export default function KitchenDisplay() {
           </div>
         )}
 
+        {/* 会計済み未提供の残った卓に新しい注文が入っている(step17の要注意状態) */}
+        {(() => {
+          const conflictTables = [...new Set(
+            s.orders.filter((o) => o.checkedOutAt).map((o) => o.table)
+          )].filter((t) => s.orders.some((o) => o.table === t && !o.checkedOutAt));
+          if (conflictTables.length === 0) return null;
+          return (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                background: "var(--red-bg-2)",
+                border: "1px solid var(--red-bg)",
+                borderRadius: "14px",
+                padding: "12px 16px",
+                marginBottom: "16px",
+              }}
+            >
+              <WarningIcon size={18} style={{ color: "var(--red-dark)", flexShrink: 0 }} />
+              <div>
+                <div style={{ fontWeight: 700, color: "var(--red-dark)", fontSize: "14px" }}>
+                  {conflictTables.map((t) => s.tableName(t)).join("・")}：会計済みの未提供伝票が残ったまま、新しい注文が入っています
+                </div>
+                <div style={{ fontSize: "13px", color: "var(--text-2)" }}>
+                  前のお客様の未提供分（グレーの伝票）を先に提供し、伝票を閉じてください。
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* オフラインバナー */}
         {!s.connected && (
           <div
@@ -185,10 +217,11 @@ export default function KitchenDisplay() {
           >
             {sorted.map((o) => {
               const cooking = o.status === "cooking";
+              const carryOver = !!o.checkedOutAt; // 会計済み・未提供の繰越伝票(step17)
               const highlight = s.highlightId === o.id;
               const elapsed = now > 0 ? elapsedMin(o.createdAt, now) : null;
-              const headerBg = ticketHeaderColor(o.status, elapsed);
-              const urgent = cooking && elapsed != null && elapsed >= 15;
+              const headerBg = carryOver ? "#8e8e93" : ticketHeaderColor(o.status, elapsed);
+              const urgent = !carryOver && cooking && elapsed != null && elapsed >= 15;
               return (
                 <div
                   key={o.id}
@@ -231,7 +264,7 @@ export default function KitchenDisplay() {
                           fontWeight: 700,
                         }}
                       >
-                        {cooking ? "提供前" : "提供済み"}
+                        {carryOver ? "会計済・未提供" : cooking ? "提供前" : "提供済み"}
                       </span>
                     </div>
                   </div>
@@ -307,7 +340,7 @@ export default function KitchenDisplay() {
                         color: cooking ? "#fff" : "var(--text-2)",
                       }}
                     >
-                      {cooking ? "提供済みにする" : "調理中に戻す"}
+                      {carryOver ? "提供完了（伝票を閉じる）" : cooking ? "提供済みにする" : "調理中に戻す"}
                     </button>
                   </div>
                 </div>

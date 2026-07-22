@@ -56,6 +56,7 @@ declare
   v_menu     menu_items%rowtype;
   v_qty      int;
   v_session  text;
+  v_since    timestamptz;
   v_recent   int;
   v_optreq   int;
   v_optok    int;
@@ -72,13 +73,18 @@ begin
     end if;
   end if;
 
+  select session_token, open_since into v_session, v_since
+    from tables where id = p_table and store_id = p_store;
+  if v_session is null then
+    raise exception 'table not found';
+  end if;
+  -- 卓が閉じている（来店受付前/会計後）間は誰の注文も受けない(step17)
+  if v_since is null then
+    raise exception 'table closed';
+  end if;
+
   -- 客注文はセッショントークンを検証（退店客・URL総当たりを封鎖）
   if not coalesce(p_proxy, false) then
-    select session_token into v_session
-      from tables where id = p_table and store_id = p_store;
-    if v_session is null then
-      raise exception 'table not found';
-    end if;
     if p_token is null or p_token <> v_session then
       raise exception 'session expired';  -- 会計後 or 不正トークン
     end if;
@@ -202,13 +208,15 @@ begin
   select * into v_store from stores where id = p_store;
   select name into v_name from tables where id = p_table and store_id = p_store;
 
-  -- その卓の注文明細を menu_item + price + options で集約
+  -- 未会計(checked_out_at is null)の明細のみを集約(step17。繰越分は前回の会計に
+  -- 含まれ支払い済みのため、含めると二重請求になる)。
   -- （「ネギ増し+50円」と「チーズ+50円」は合計額が同じでも別行として扱う）
   with agg as (
     select oi.menu_item_id, oi.name, oi.price, oi.options, sum(oi.qty)::int as qty
     from orders o
     join order_items oi on oi.order_id = o.id
     where o.store_id = p_store and o.table_id = p_table
+      and o.checked_out_at is null
     group by oi.menu_item_id, oi.name, oi.price, oi.options
   )
   select
@@ -221,7 +229,7 @@ begin
   from agg;
 
   if v_count = 0 then
-    return null; -- 注文が無ければ何もしない
+    return null; -- 未会計の注文が無ければ何もしない（繰越分だけの卓を含む）
   end if;
 
   v_discount_amount := case
@@ -257,11 +265,20 @@ begin
 
   select to_jsonb(c) into v_result from checkouts c where c.id = v_checkout;
 
-  delete from orders where store_id = p_store and table_id = p_table;
+  -- 提供済みの伝票は削除、未提供の伝票は checked_out_at を立てて厨房にだけ残す(step17)
+  delete from orders
+    where store_id = p_store and table_id = p_table
+      and checked_out_at is null and status = 'served';
+  update orders set checked_out_at = now()
+    where store_id = p_store and table_id = p_table
+      and checked_out_at is null and status = 'cooking';
+
   delete from staff_calls where store_id = p_store and table_id = p_table and resolved_at is null;
 
-  -- 退店の合図。session_token を更新し、この席の旧トークンでの再注文を無効化する
-  update tables set session_token = encode(gen_random_bytes(12), 'hex')
+  -- 退店の合図。session_tokenを更新し、卓を閉じる（次の「来店受付」まで注文不可）
+  update tables
+    set session_token = encode(gen_random_bytes(12), 'hex'),
+        open_since = null
     where id = p_table and store_id = p_store;
 
   -- 退店した客の閲覧セッション(table_sessions)も失効させる
@@ -286,16 +303,20 @@ security definer
 set search_path = public, extensions  -- gen_random_bytes は extensions スキーマ
 as $$
 declare
-  v_qr   text;
-  v_sess text;
+  v_qr    text;
+  v_sess  text;
+  v_since timestamptz;
 begin
-  select qr_token, session_token into v_qr, v_sess
+  select qr_token, session_token, open_since into v_qr, v_sess, v_since
     from tables where id = p_table and store_id = p_store;
   if v_qr is null then
     raise exception 'table not found';
   end if;
   if p_k is null or p_k <> v_qr then
     raise exception 'invalid token';  -- QRの合言葉が違う（総当たり等）
+  end if;
+  if v_since is null then
+    raise exception 'table closed';  -- 来店受付前（会計後の再アクセス含む。step17）
   end if;
 
   if auth.uid() is not null then
@@ -455,6 +476,84 @@ grant  execute on function regenerate_table_token(uuid, uuid) to authenticated;
 
 revoke execute on function cancel_order_item(uuid, uuid, jsonb) from public, anon;
 grant  execute on function cancel_order_item(uuid, uuid, jsonb) to authenticated;
+
+
+-- ---- 来店受付: 卓を開く（step17。案内時にスタッフが1タップ） ----
+create or replace function open_table(
+  p_store uuid,
+  p_table uuid
+) returns timestamptz
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_since timestamptz;
+begin
+  if p_store <> staff_store_id() then
+    raise exception 'forbidden: store mismatch';
+  end if;
+  update tables set open_since = now()
+    where id = p_table and store_id = p_store
+    returning open_since into v_since;
+  if v_since is null then
+    raise exception 'table not found';
+  end if;
+  return v_since;
+end $$;
+
+revoke execute on function open_table(uuid, uuid) from public, anon;
+grant  execute on function open_table(uuid, uuid) to authenticated;
+
+-- ---- 誤タップで開いた卓を閉じ直す（step17。UI側で確認を挟む） ----
+create or replace function close_table_gate(
+  p_store uuid,
+  p_table uuid
+) returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if p_store <> staff_store_id() then
+    raise exception 'forbidden: store mismatch';
+  end if;
+  update tables set open_since = null
+    where id = p_table and store_id = p_store;
+end $$;
+
+revoke execute on function close_table_gate(uuid, uuid) from public, anon;
+grant  execute on function close_table_gate(uuid, uuid) to authenticated;
+
+-- ---- 繰越伝票の提供完了（step17。厨房から消す。在庫は戻さない） ----
+-- 会計スナップショットに含まれる=支払い済みのため、削除しても売上記録は失われない。
+create or replace function finish_checked_out_order(
+  p_order uuid
+) returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_store uuid;
+  v_co    timestamptz;
+begin
+  select store_id, checked_out_at into v_store, v_co
+    from orders where id = p_order;
+  if v_store is null then
+    return; -- 既に無い＝多端末競合。成功扱い
+  end if;
+  if v_store <> staff_store_id() then
+    raise exception 'forbidden: store mismatch';
+  end if;
+  if v_co is null then
+    raise exception 'order is not checked out'; -- 通常伝票はこの経路で消させない
+  end if;
+  delete from orders where id = p_order;
+end $$;
+
+revoke execute on function finish_checked_out_order(uuid) from public, anon;
+grant  execute on function finish_checked_out_order(uuid) to authenticated;
 
 revoke execute on function clear_checkout_history() from public, anon;
 grant  execute on function clear_checkout_history() to authenticated;

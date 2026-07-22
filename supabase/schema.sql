@@ -49,7 +49,10 @@ create table if not exists tables (
   name          text not null,
   sort          int not null default 0,
   qr_token      text not null default encode(gen_random_bytes(12), 'hex'),
-  session_token text not null default encode(gen_random_bytes(12), 'hex')
+  session_token text not null default encode(gen_random_bytes(12), 'hex'),
+  -- 卓の開閉状態(step17)。null=閉(注文不可)、非null=来店受付した時刻。
+  -- 会計(close_table)で自動的に閉じ、スタッフの「来店受付」(open_table)で開く。
+  open_since    timestamptz
 );
 
 -- ---- 来店セッション（客(anon)の店舗間/卓間読み取り分離の核。Anonymous Auth連携） ----
@@ -117,6 +120,9 @@ create table if not exists orders (
   table_id        uuid not null references tables(id) on delete cascade,
   session_id      uuid references table_sessions(id) on delete set null,
   status          text not null default 'cooking',  -- cooking / served
+  -- 会計済みだが未提供(step17)。非nullの伝票は支払い済みのため、厨房以外の
+  -- どの集計・表示にも含めない。提供完了で finish_checked_out_order が削除する。
+  checked_out_at  timestamptz,
   proxy           boolean not null default false,
   idempotency_key text unique,        -- 二重送信防止（04計画 B-3）
   created_at      timestamptz not null default now(),
@@ -316,9 +322,9 @@ create policy categories_write_authenticated  on categories for all to authentic
 -- （authenticatedロールは本物のスタッフと匿名認証客の両方が使うため列GRANTでは
 -- 区別できない。列を封鎖し、スタッフ向けは fetch_table_tokens() RPC 経由に一本化）。
 revoke select on tables from anon;
-grant select (id, store_id, name, sort) on tables to anon;
+grant select (id, store_id, name, sort, open_since) on tables to anon;
 revoke select on tables from authenticated;
-grant select (id, store_id, name, sort) on tables to authenticated;
+grant select (id, store_id, name, sort, open_since) on tables to authenticated;
 create policy tables_select_anon          on tables for select to anon using (true);
 create policy tables_select_authenticated on tables for select to authenticated using (store_id = staff_store_id());
 create policy tables_select_customer      on tables for select to authenticated

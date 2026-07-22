@@ -12,6 +12,60 @@ import LoadingScreen from "@/components/ui/LoadingScreen";
 const FONT =
   "-apple-system, BlinkMacSystemFont, 'Hiragino Sans', var(--font-noto-sans-jp), 'Noto Sans JP', sans-serif";
 
+/** 卓が閉じている（来店受付前/会計後）間の待機画面(step17)。
+ *  スタッフが「来店受付」するとRealtime経由でtables.open_sinceが更新され、
+ *  客が何もしなくても自動的に注文画面へ切り替わる。 */
+function ClosedTableScreen() {
+  const storeName = useAppStore((s) => s.settings.storeName);
+  return (
+    <div
+      style={{
+        flex: 1,
+        minHeight: "100dvh",
+        position: "relative",
+        overflow: "hidden",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px",
+        background: "var(--app-bg)",
+      }}
+    >
+      <div aria-hidden className="ambient-wash" />
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          width: "360px",
+          maxWidth: "100%",
+          background: "var(--glass-strong)",
+          backdropFilter: "blur(26px) saturate(180%)",
+          WebkitBackdropFilter: "blur(26px) saturate(180%)",
+          border: "1px solid var(--glass-edge)",
+          borderRadius: "22px",
+          padding: "32px 24px",
+          boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)",
+          textAlign: "center",
+        }}
+      >
+        <div style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "6px" }}>
+          {storeName}
+        </div>
+        <div style={{ fontSize: "20px", fontWeight: 800, color: "var(--text)", marginBottom: "12px" }}>
+          ただいま準備中です
+        </div>
+        <div style={{ fontSize: "14px", color: "var(--text-2)", lineHeight: 1.7 }}>
+          スタッフが受付を行うと、この画面が
+          <br />
+          自動的にご注文画面へ切り替わります。
+          <br />
+          お近くのスタッフにお声がけください。
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** 客用の独立ページ（QRの遷移先）。管理系タブは一切表示しない。 */
 export default function CustomerShell({ table }: { table?: string }) {
   const theme = useAppStore((s) => s.settings.theme);
@@ -69,11 +123,19 @@ export default function CustomerShell({ table }: { table?: string }) {
     if (t) setCustomerTable(t.id);
   }, [loading, table, tables, setCustomerTable]);
 
-  // 匿名認証完了・卓が決まり・合言葉があれば来店セッションを開始（session_token 取得）
+  // 卓の開閉状態(step17)。閉じている間は注文UIを出さず待機画面にする。
+  // Supabase未設定(ローカル開発)は常に開扱い。開閉はRealtime(tables)で自動反映される。
+  const currentTable = tables.find((t) => t.id === customerTableId);
+  const tableClosed =
+    isSupabaseConfigured() && !loading && currentTable != null && !currentTable.openSince;
+
+  // 匿名認証完了・卓が決まり・合言葉があり・卓が開いていれば来店セッションを開始
+  // （閉じている間はopen_sessionがサーバー側でも拒否するため呼ばない。
+  //   スタッフが受付するとtableClosedがfalseに変わり、この効果が再実行されて自動接続する）
   useEffect(() => {
-    if (loading || !authReady || !customerToken || !customerTableId) return;
+    if (loading || !authReady || !customerToken || !customerTableId || tableClosed) return;
     openSession();
-  }, [loading, authReady, customerToken, customerTableId, openSession]);
+  }, [loading, authReady, customerToken, customerTableId, tableClosed, openSession]);
 
   return (
     <div
@@ -88,7 +150,7 @@ export default function CustomerShell({ table }: { table?: string }) {
       }}
     >
       <main style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
-        {loading ? <LoadingScreen /> : <CustomerOrder />}
+        {loading ? <LoadingScreen /> : tableClosed ? <ClosedTableScreen /> : <CustomerOrder />}
       </main>
       <SupabaseSync />
       <AlertDialog />

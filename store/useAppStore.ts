@@ -60,11 +60,17 @@ export interface Order {
   status: Status;
   items: OrderItem[];
   proxy?: boolean;
+  /** 会計済みだが未提供(step17)。非nullの伝票は支払い済みのため、厨房以外の
+   *  どの集計・表示にも含めないこと。提供完了で削除される。 */
+  checkedOutAt?: string | null;
 }
 
 export interface TableRec {
   id: string;
   name: string;
+  /** 卓の開閉状態(step17)。null/undefined=閉(注文不可)、文字列=来店受付した時刻。
+   *  Supabase未設定(ローカル開発)では常に開扱い(isSupabaseConfiguredで分岐)。 */
+  openSince?: string | null;
 }
 
 export interface StaffCall {
@@ -255,6 +261,12 @@ interface AppState {
   setOrderEditMode: (v: boolean) => void;
   confirmFinishOrderEdit: () => void;
   setTableEditMode: (v: boolean) => void;
+  // 卓の開閉ゲート(step17)
+  confirmOpenTable: (id: string) => void; // 来店受付（1回確認）
+  openTable: (id: string) => void;
+  confirmCloseTableGate: (id: string) => void; // 誤受付の取消（1回確認）
+  closeTableGate: (id: string) => void;
+  finishCheckedOutOrder: (o: Order) => void; // 繰越伝票の提供完了（confirmStatus経由）
   addTable: () => void;
   startEditTable: (id: string) => void;
   setEditTableName: (v: string) => void;
@@ -407,7 +419,7 @@ function decrementStock(menu: MenuItem[], items: OrderItem[]): MenuItem[] {
 
 type PlaceResult =
   | { ok: true; id: string }
-  | { ok: false; code: "out_of_stock" | "session" | "rate_limited" | "error"; message: string };
+  | { ok: false; code: "out_of_stock" | "session" | "rate_limited" | "closed" | "error"; message: string };
 
 /** 注文の書き込み経路: フラグONならEdge Function、OFFなら直接insert。
  *  token は客の session_token（proxy注文では null）。 */
@@ -431,13 +443,17 @@ async function placeOrder(
 
 /** 注文エラーのダイアログ（売切れ / セッション切れ / レート制限 / 通信失敗）。onConfirmで再試行 */
 function orderErrorDialog(
-  res: { code: "out_of_stock" | "session" | "rate_limited" | "error"; message: string },
+  res: { code: "out_of_stock" | "session" | "rate_limited" | "closed" | "error"; message: string },
   onRetry: () => void
 ): DialogSpec {
   const map = {
     out_of_stock: {
       title: "売り切れです",
       body: "申し訳ありません。ご注文の商品が売り切れになりました。内容を確認して、もう一度お試しください。",
+    },
+    closed: {
+      title: "ご注文を受け付けられません",
+      body: "このテーブルは現在ご利用の受付がされていません。お近くのスタッフにお声がけください。",
     },
     session: {
       title: "お手数ですが読み直してください",
@@ -959,6 +975,22 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // ---- 厨房 ----
   confirmStatus: (o) => {
+    // 会計済み・未提供の繰越伝票(step17): 提供完了=伝票を厨房から消す
+    if (o.checkedOutAt) {
+      set({
+        dialog: {
+          title: get().tableName(o.table) + " の会計済み伝票",
+          body: "この伝票は会計済みです。提供が完了したら伝票を閉じます。よろしいですか？",
+          confirmText: "提供完了にする",
+          danger: false,
+          onConfirm: () => {
+            get().closeDialog();
+            get().finishCheckedOutOrder(o);
+          },
+        },
+      });
+      return;
+    }
     const to = o.status === "cooking" ? "提供済み" : "調理中";
     set({
       dialog: {
@@ -1019,12 +1051,19 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().pushToast("注文編集を「完了」してからお会計してください。");
       return;
     }
-    const subtotal = s.orders
-      .filter((o) => o.table === t)
-      .reduce(
-        (sum, o) => sum + o.items.reduce((x, it) => x + lineTotal(it), 0),
-        0
-      );
+    const tableOrders = s.orders.filter((o) => o.table === t && !o.checkedOutAt);
+    // 未会計の注文が無い（繰越伝票だけが残っている卓を含む）なら会計に進ませない
+    if (tableOrders.length === 0) {
+      get().pushToast("未会計の注文がありません。");
+      return;
+    }
+    const subtotal = tableOrders.reduce(
+      (sum, o) => sum + o.items.reduce((x, it) => x + lineTotal(it), 0),
+      0
+    );
+    const unservedCount = tableOrders
+      .filter((o) => o.status === "cooking")
+      .reduce((c, o) => c + o.items.reduce((x, it) => x + it.qty, 0), 0);
     const b = computeCheckoutBreakdown(
       subtotal,
       discountType,
@@ -1042,6 +1081,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       dialog: {
         title: s.tableName(t) + " のお会計",
         body:
+          (unservedCount > 0
+            ? `⚠ 未提供の商品が ${unservedCount} 点あります。会計後も提供が完了するまで厨房に表示され続けます。\n\n`
+            : "") +
           lines.join("\n") +
           "\n\nこのテーブルのセッションを締めます。よろしいですか？\n\n※決済は既存レジで実施してください。",
         confirmText: "お会計する",
@@ -1057,7 +1099,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const s = get();
     const t = s.selectedStaffTable;
     if (t == null) return;
-    const tableOrders = s.orders.filter((o) => o.table === t);
+    const tableOrders = s.orders.filter((o) => o.table === t && !o.checkedOutAt);
     if (tableOrders.length === 0) {
       set({ selectedStaffTable: null, orderEditMode: false });
       return;
@@ -1131,8 +1173,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     set((st) => ({
       checkouts: [record, ...st.checkouts],
-      orders: st.orders.filter((o) => o.table !== t),
+      // 提供済みは消え、未提供はchecked_out_atが立って厨房にだけ残る(step17)。
+      // DB側(close_table)と同じ形にローカルも合わせる（Realtime再取得でも一致する）。
+      orders: st.orders.flatMap((o) => {
+        if (o.table !== t || o.checkedOutAt) return [o];
+        if (o.status === "served") return [];
+        return [{ ...o, checkedOutAt: new Date().toISOString() }];
+      }),
       calls: st.calls.filter((c) => c.table !== t),
+      // 会計で卓は自動的に閉じる
+      tables: st.tables.map((x) => (x.id === t ? { ...x, openSince: null } : x)),
       selectedStaffTable: null,
       orderEditMode: false,
     }));
@@ -1223,6 +1273,79 @@ export const useAppStore = create<AppState>((set, get) => ({
       orders: st.orders.map((o) => (o.id === tempId ? { ...o, id: res.id } : o)),
       highlightId: st.highlightId === tempId ? res.id : st.highlightId,
     }));
+  },
+  confirmOpenTable: (id) => {
+    const name = get().tableName(id);
+    set({
+      dialog: {
+        title: `${name} の来店受付`,
+        body: "この卓を開いて、QRからのご注文を受け付けます。お客様を案内したらタップしてください。",
+        confirmText: "来店受付する",
+        danger: false,
+        onConfirm: () => {
+          get().closeDialog();
+          get().openTable(id);
+        },
+      },
+    });
+  },
+  openTable: async (id) => {
+    const prevTables = get().tables;
+    set((s) => ({
+      tables: s.tables.map((x) => (x.id === id ? { ...x, openSince: new Date().toISOString() } : x)),
+      selectedStaffTable: id, // 受付した卓をそのまま選択状態に（次の操作＝代理注文/会計へ直行できる）
+    }));
+    const since = await db.dbOpenTable(id);
+    if (!since) {
+      set({ tables: prevTables, selectedStaffTable: null });
+      get().pushToast("来店受付に失敗しました。もう一度お試しください。");
+      return;
+    }
+    set((s) => ({
+      tables: s.tables.map((x) => (x.id === id ? { ...x, openSince: since } : x)),
+    }));
+  },
+  confirmCloseTableGate: (id) => {
+    const s = get();
+    // 注文が入っている卓は閉じさせない（会計で自動的に閉じるのが正規の経路）
+    const hasOrders = s.orders.some((o) => o.table === id && !o.checkedOutAt);
+    if (hasOrders) {
+      get().pushToast("注文が入っているため受付を取り消せません。お会計で締めてください。");
+      return;
+    }
+    set({
+      dialog: {
+        title: `${s.tableName(id)} の受付を取り消しますか？`,
+        body: "誤って受付した場合の取消です。この卓のQRからの注文を再び停止します。",
+        confirmText: "受付を取り消す",
+        danger: true,
+        onConfirm: () => {
+          get().closeDialog();
+          get().closeTableGate(id);
+        },
+      },
+    });
+  },
+  closeTableGate: async (id) => {
+    const prevTables = get().tables;
+    set((s) => ({
+      tables: s.tables.map((x) => (x.id === id ? { ...x, openSince: null } : x)),
+      selectedStaffTable: s.selectedStaffTable === id ? null : s.selectedStaffTable,
+    }));
+    const success = await db.dbCloseTableGate(id);
+    if (!success) {
+      set({ tables: prevTables });
+      get().pushToast("受付の取消に失敗しました。もう一度お試しください。");
+    }
+  },
+  finishCheckedOutOrder: async (o) => {
+    const prevOrders = get().orders;
+    set((s) => ({ orders: s.orders.filter((x) => x.id !== o.id) }));
+    const success = await db.dbFinishCheckedOutOrder(o.id);
+    if (!success) {
+      set({ orders: prevOrders });
+      get().pushToast("伝票を閉じられませんでした。もう一度お試しください。");
+    }
   },
   setTableEditMode: (v) =>
     set({

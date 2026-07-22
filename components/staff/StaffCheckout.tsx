@@ -11,6 +11,7 @@ import { proxyCardStyle, proxyAddStyle, proxySubStyle, addBtnStyle } from "@/lib
 import { computeCheckoutBreakdown, type DiscountType } from "@/lib/pricing";
 import { cartKey, parseCartKey, lineTotal, unitPrice, optionsLabel } from "@/lib/options";
 import { useSwipeCategory } from "@/lib/useSwipeCategory";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 export default function StaffCheckout() {
   const s = useAppStore(
@@ -22,7 +23,9 @@ export default function StaffCheckout() {
       avail: st.avail,
       cancelUnit: st.cancelUnit,
       confirmCheckout: st.confirmCheckout,
+      confirmCloseTableGate: st.confirmCloseTableGate,
       confirmDeleteTable: st.confirmDeleteTable,
+      confirmOpenTable: st.confirmOpenTable,
       confirmFinishOrderEdit: st.confirmFinishOrderEdit,
       dragEndTable: st.dragEndTable,
       dragStartTable: st.dragStartTable,
@@ -55,22 +58,25 @@ export default function StaffCheckout() {
     }))
   );
   const accent = s.settings.theme;
+  const supabaseOn = isSupabaseConfigured();
   const photoById: Record<string, string> = {};
   s.menu.forEach((m) => {
     if (m.photo) photoById[m.id] = m.photo;
   });
 
+  // 会計済み・未提供の繰越伝票(checkedOutAt)は支払い済みのため、
+  // 会計画面のどの集計にも含めない(step17。厨房でのみ表示される)
   const tableTotal = (id: string) =>
     s.orders
-      .filter((o) => o.table === id)
+      .filter((o) => o.table === id && !o.checkedOutAt)
       .reduce((sum, o) => sum + o.items.reduce((t, it) => t + lineTotal(it), 0), 0);
   const tableCount = (id: string) =>
     s.orders
-      .filter((o) => o.table === id)
+      .filter((o) => o.table === id && !o.checkedOutAt)
       .reduce((c, o) => c + o.items.reduce((t, it) => t + it.qty, 0), 0);
 
   const sel = s.selectedStaffTable;
-  const selOrders = sel != null ? s.orders.filter((o) => o.table === sel) : [];
+  const selOrders = sel != null ? s.orders.filter((o) => o.table === sel && !o.checkedOutAt) : [];
 
   // 割引はその場入力、チャージ料は設定の料率を使うがオンオフはその場で選べる（テーブルを切り替えたらリセット）。
   const [discountType, setDiscountType] = useState<DiscountType>(null);
@@ -233,10 +239,19 @@ export default function StaffCheckout() {
               const editing = s.editingTableId === t.id;
               const canDrag = s.tableEditMode && !editing;
               const dragging = s.dragTableId === t.id;
+              // 卓の開閉(step17)。ローカル開発(未設定)は常に開扱い
+              const isOpen = !supabaseOn || !!t.openSince;
+              // 会計済み・未提供の繰越伝票が残っている卓（厨房対応待ち）
+              const hasCarryOver = s.orders.some((o) => o.table === t.id && o.checkedOutAt);
               return (
                 <div
                   key={t.id}
-                  onClick={() => !editing && !s.tableEditMode && s.selectStaffTable(t.id)}
+                  onClick={() => {
+                    if (editing || s.tableEditMode) return;
+                    // 閉じている卓は選択ではなく「来店受付」の確認を出す
+                    if (!isOpen) s.confirmOpenTable(t.id);
+                    else s.selectStaffTable(t.id);
+                  }}
                   draggable={canDrag}
                   onDragStart={() => canDrag && s.dragStartTable(t.id)}
                   onDragEnd={s.dragEndTable}
@@ -301,10 +316,55 @@ export default function StaffCheckout() {
                       </button>
                     </div>
                   ) : (
-                    <div>
-                      <div style={{ fontSize: "15px", fontWeight: 700 }}>{t.name}</div>
+                    <div style={{ opacity: !s.tableEditMode && !isOpen ? 0.62 : 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span style={{ fontSize: "15px", fontWeight: 700 }}>{t.name}</span>
+                        {!s.tableEditMode && (
+                          isOpen ? (
+                            <span
+                              style={{
+                                fontSize: "10px",
+                                fontWeight: 700,
+                                color: "var(--green-dark)",
+                                background: "var(--green-bg)",
+                                borderRadius: "999px",
+                                padding: "2px 8px",
+                              }}
+                            >
+                              受付中
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: "10px",
+                                fontWeight: 700,
+                                color: "var(--soldout-text)",
+                                background: "var(--soldout-bg)",
+                                borderRadius: "999px",
+                                padding: "2px 8px",
+                              }}
+                            >
+                              受付前
+                            </span>
+                          )
+                        )}
+                        {!s.tableEditMode && hasCarryOver && (
+                          <span
+                            style={{
+                              fontSize: "10px",
+                              fontWeight: 700,
+                              color: "var(--red-dark)",
+                              background: "var(--red-bg)",
+                              borderRadius: "999px",
+                              padding: "2px 8px",
+                            }}
+                          >
+                            未提供あり
+                          </span>
+                        )}
+                      </div>
                       <div style={{ fontSize: "12px", color: "var(--text-2)", marginTop: "3px" }}>
-                        {active ? `${count}点 · 注文あり` : "空席"}
+                        {active ? `${count}点 · 注文あり` : isOpen ? "空席" : "タップで来店受付"}
                       </div>
                       {s.tableEditMode ? (
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "10px" }}>
@@ -445,8 +505,30 @@ export default function StaffCheckout() {
                   : "誤操作防止のため、取消するには「注文編集」を押してください。"}
               </div>
               {aggList.length === 0 ? (
-                <div style={{ color: "var(--text-2)", fontSize: "14px", padding: "16px 0" }}>
-                  このテーブルにまだ注文はありません。
+                <div style={{ padding: "16px 0" }}>
+                  <div style={{ color: "var(--text-2)", fontSize: "14px" }}>
+                    このテーブルにまだ注文はありません。
+                  </div>
+                  {/* 誤って来店受付した場合の取消（注文が入ったら消える。会計での自動クローズが正規経路） */}
+                  {supabaseOn && sel != null && (
+                    <button
+                      onClick={() => s.confirmCloseTableGate(sel)}
+                      style={{
+                        marginTop: "12px",
+                        border: "1px solid var(--hairline)",
+                        background: "var(--surface)",
+                        color: "var(--text-2)",
+                        borderRadius: "999px",
+                        padding: "8px 16px",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        fontFamily: "inherit",
+                        cursor: "pointer",
+                      }}
+                    >
+                      受付を取り消す（卓を閉じる）
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
