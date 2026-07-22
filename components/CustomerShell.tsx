@@ -22,7 +22,15 @@ export default function CustomerShell({ table }: { table?: string }) {
   const openSession = useAppStore((s) => s.openSession);
   const customerToken = useAppStore((s) => s.customerToken);
   const customerTableId = useAppStore((s) => s.customerTableId);
+  const muteSound = useAppStore((s) => s.muteSound);
   const loading = isSupabaseConfigured() && !loaded;
+
+  // 客用画面には通知音は不要（厨房/管理側だけの機能）。soundOnはこの端末の
+  // ローカルstate（他端末には影響しない）で、既定値がONのままだと
+  // 新規注文検知(hydrateのshouldBeep)等で意図せず鳴ってしまうため明示的に消す。
+  useEffect(() => {
+    muteSound();
+  }, [muteSound]);
   // 匿名認証(signInAnonymously)完了フラグ。auth.uid()が要るopen_sessionより先に済ませる。
   // 未設定時はそもそも不要なのでtrue扱い。
   const [authReady, setAuthReady] = useState(!isSupabaseConfigured());

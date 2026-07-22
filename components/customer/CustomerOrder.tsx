@@ -118,7 +118,7 @@ export default function CustomerOrder() {
           scrollbarGutter: "stable",
         }}
       >
-        <div style={{ height: "68px", flexShrink: 0 }} />
+        <div style={{ height: "80px", flexShrink: 0 }} />
 
         {s.settings.showHeaderPhoto && s.settings.headerPhoto && (
           // eslint-disable-next-line @next/next/no-img-element

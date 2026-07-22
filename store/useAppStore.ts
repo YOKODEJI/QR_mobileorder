@@ -244,6 +244,7 @@ interface AppState {
   confirmStatus: (o: Order) => void;
   toggleSound: () => void;
   syncSoundPref: () => void; // localStorageの端末別設定をstoreへ反映（マウント時に1回）
+  muteSound: () => void; // 客用画面には通知音が不要なため、CustomerShellがマウント時に呼ぶ
 
   // ---- 会計 / テーブル ----
   selectStaffTable: (id: string) => void;
@@ -761,11 +762,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   // ---- カート ----
   // 在庫を超えてカートに入れない（売切・在庫0も弾く）。在庫判定はオプション違いを
   // またいだ「商品単位の合計個数」で行う。
-  addCart: (id, optionIds = []) =>
-    set((s) => {
-      const next = addToCart(s.cart, s.menu, id, optionIds);
-      return next ? { cart: next } : {};
-    }),
+  addCart: (id, optionIds = []) => {
+    const s = get();
+    const next = addToCart(s.cart, s.menu, id, optionIds);
+    if (!next) {
+      get().pushToast("売り切れのため、これ以上ご注文いただけません。");
+      return;
+    }
+    set({ cart: next });
+  },
   removeCart: (id, optionIds = []) =>
     set((s) => ({ cart: removeFromCart(s.cart, id, optionIds) })),
   addStaff: (id, optionIds = []) =>
@@ -986,6 +991,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { soundOn: next };
     }),
   syncSoundPref: () => set({ soundOn: getStoredSoundOn() }),
+  muteSound: () => set({ soundOn: false }),
 
   // ---- 会計 / テーブル ----
   selectStaffTable: (id) => set({ selectedStaffTable: id, orderEditMode: false }),
