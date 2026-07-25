@@ -20,12 +20,15 @@ const FONT =
  *  同じくライト/ダーク設定に追従する（トークン参照。固定白黒にはしない）。 */
 function ClosedTableScreen() {
   const storeName = useAppStore((s) => s.settings.storeName);
+  const footerPhoto = useAppStore((s) => s.settings.footerPhoto);
+  const showFooterPhoto = useAppStore((s) => s.settings.showFooterPhoto);
   return (
     <div
       style={{
         flex: 1,
         minHeight: "100dvh",
         display: "flex",
+        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
         padding: "32px 24px",
@@ -33,37 +36,105 @@ function ClosedTableScreen() {
         color: "var(--text)",
       }}
     >
-      <div style={{ width: "400px", maxWidth: "100%", textAlign: "center" }}>
+      <div style={{ width: "380px", maxWidth: "100%", textAlign: "center" }}>
         {storeName && (
-          <div style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "8px" }}>{storeName}</div>
+          <div
+            style={{
+              fontSize: "13px",
+              fontWeight: 700,
+              color: "var(--text-2)",
+              letterSpacing: ".04em",
+              marginBottom: "20px",
+            }}
+          >
+            {storeName}
+          </div>
         )}
-        <div style={{ fontSize: "21px", fontWeight: 800, marginBottom: "18px" }}>
-          ただいま、こちらの卓ではご注文を承っておりません
+
+        {/* 受付待ちであることを一目で伝えるアイコン（砂時計＝順番待ちの記号） */}
+        <div
+          aria-hidden
+          style={{
+            width: "64px",
+            height: "64px",
+            margin: "0 auto 20px",
+            borderRadius: "50%",
+            background: "var(--chip-tint)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "28px",
+            lineHeight: 1,
+          }}
+        >
+          ⏳
         </div>
+
+        <h1
+          style={{
+            fontSize: "20px",
+            fontWeight: 800,
+            lineHeight: 1.5,
+            margin: "0 0 10px",
+            // 3行に割れて頭でっかちに見えるのを防ぐ（対応ブラウザでは行長を均等化）
+            textWrap: "balance",
+          }}
+        >
+          ただいま、こちらの席では
+          <br />
+          ご注文を承っておりません
+        </h1>
+
+        <p style={{ fontSize: "14px", lineHeight: 1.8, color: "var(--text-2)", margin: "0 0 24px" }}>
+          スタッフの受付が完了しますと、
+          <wbr />
+          この画面は自動的にご注文画面へ切り替わります。
+        </p>
+
         <div
           style={{
             textAlign: "left",
             background: "var(--chip-tint)",
-            borderRadius: "12px",
+            borderRadius: "14px",
             padding: "16px 18px",
-            fontSize: "14px",
+            fontSize: "13px",
             lineHeight: 1.8,
-            marginBottom: "20px",
+            color: "var(--text-2)",
+            marginBottom: "24px",
           }}
         >
-          考えられる原因は以下の通りです。
-          <ul style={{ margin: "8px 0 0", paddingLeft: "1.3em" }}>
+          <div style={{ fontWeight: 700, color: "var(--text)", marginBottom: "6px" }}>
+            考えられる原因
+          </div>
+          <ul style={{ margin: 0, paddingLeft: "1.2em" }}>
             <li>お会計が完了した直後で、次のお客様のご案内前です</li>
             <li>スタッフによる受付がまだ行われていません</li>
           </ul>
         </div>
-        <div style={{ fontSize: "14px", lineHeight: 1.8, color: "var(--text-2)" }}>
-          スタッフの受付が完了すると、この画面は自動的に
-          <br />
-          ご注文画面へ切り替わります。
-          <br />
-          恐れ入りますが、お近くのスタッフまでお声がけください。
-        </div>
+
+        <p style={{ fontSize: "14px", fontWeight: 700, lineHeight: 1.7, margin: 0 }}>
+          恐れ入りますが、お近くのスタッフまで
+          <wbr />
+          お声がけください。
+        </p>
+
+        {/* 注文画面と同じフッター写真を流用し、待機中でも店舗の世界観を保つ。
+            設定でフッター表示がONかつ画像がある場合のみ出す（注文画面と同条件）。 */}
+        {showFooterPhoto && footerPhoto && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={footerPhoto}
+            alt=""
+            style={{
+              width: "100%",
+              height: "120px",
+              objectFit: "cover",
+              borderRadius: "16px",
+              marginTop: "28px",
+              display: "block",
+            }}
+          />
+        )}
       </div>
     </div>
   );
