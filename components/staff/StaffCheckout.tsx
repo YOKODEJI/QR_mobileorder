@@ -685,9 +685,7 @@ export default function StaffCheckout() {
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                           チャージ料（{s.settings.chargeRate}%）
-                          <span style={{ transform: "scale(.6)", transformOrigin: "left center" }}>
-                            <Toggle on={chargeEnabled} onChange={setChargeEnabled} />
-                          </span>
+                          <Toggle on={chargeEnabled} onChange={setChargeEnabled} />
                         </span>
                         <span>{chargeEnabled ? `+${s.yen(breakdown.chargeAmount)}` : "適用なし"}</span>
                       </div>
