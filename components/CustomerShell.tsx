@@ -37,13 +37,31 @@ function ClosedTableScreen() {
       }}
     >
       <div style={{ width: "380px", maxWidth: "100%", textAlign: "center" }}>
+        {/* 注文画面と同じヘッダー写真を流用し、待機中でも店舗の世界観を保つ。
+            設定でヘッダー表示がONかつ画像がある場合のみ出す（注文画面と同条件）。 */}
+        {showHeaderPhoto && headerPhoto && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={headerPhoto}
+            alt=""
+            style={{
+              width: "100%",
+              height: "120px",
+              objectFit: "cover",
+              borderRadius: "16px",
+              marginBottom: "20px",
+              display: "block",
+            }}
+          />
+        )}
+
         {storeName && (
           <div
             style={{
-              fontSize: "13px",
-              fontWeight: 700,
-              color: "var(--text-2)",
-              letterSpacing: ".04em",
+              fontSize: "17px",
+              fontWeight: 800,
+              color: "var(--text)",
+              letterSpacing: ".02em",
               marginBottom: "20px",
             }}
           >
@@ -102,10 +120,16 @@ function ClosedTableScreen() {
           <div style={{ fontWeight: 700, color: "var(--text)", marginBottom: "6px" }}>
             考えられる原因
           </div>
-          <ul style={{ margin: 0, paddingLeft: "1.2em" }}>
-            <li>お会計が完了した直後で、次のお客様のご案内前です</li>
-            <li>スタッフによる受付がまだ行われていません</li>
-          </ul>
+          {/* 「・」を行頭に置く日本語の箇条書き。ぶら下げインデントにして
+              折り返した2行目が「・」の位置に潜り込まないようにする。 */}
+          {[
+            "お会計が完了した直後で、次のお客様のご案内前です",
+            "スタッフによる受付がまだ行われていません",
+          ].map((line) => (
+            <div key={line} style={{ paddingLeft: "1em", textIndent: "-1em" }}>
+              ・{line}
+            </div>
+          ))}
         </div>
 
         <p style={{ fontSize: "14px", fontWeight: 700, lineHeight: 1.7, margin: 0 }}>
@@ -113,24 +137,6 @@ function ClosedTableScreen() {
           <br />
           お近くのスタッフまでお声がけください。
         </p>
-
-        {/* 注文画面と同じヘッダー写真を流用し、待機中でも店舗の世界観を保つ。
-            設定でヘッダー表示がONかつ画像がある場合のみ出す（注文画面と同条件）。 */}
-        {showHeaderPhoto && headerPhoto && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={headerPhoto}
-            alt=""
-            style={{
-              width: "100%",
-              height: "120px",
-              objectFit: "cover",
-              borderRadius: "16px",
-              marginTop: "28px",
-              display: "block",
-            }}
-          />
-        )}
       </div>
     </div>
   );
