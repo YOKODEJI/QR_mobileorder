@@ -14,7 +14,10 @@ const FONT =
 
 /** 卓が閉じている（来店受付前/会計後）間の待機画面(step17)。
  *  スタッフが「来店受付」するとRealtime経由でtables.open_sinceが更新され、
- *  客が何もしなくても自動的に注文画面へ切り替わる。 */
+ *  客が何もしなくても自動的に注文画面へ切り替わる。
+ *  バナーやポップアップではなく、その場に留まる全画面の案内であることを
+ *  はっきりさせるためシンプルな1枚の画面にしているが、色自体は他の画面と
+ *  同じくライト/ダーク設定に追従する（トークン参照。固定白黒にはしない）。 */
 function ClosedTableScreen() {
   const storeName = useAppStore((s) => s.settings.storeName);
   return (
@@ -22,44 +25,44 @@ function ClosedTableScreen() {
       style={{
         flex: 1,
         minHeight: "100dvh",
-        position: "relative",
-        overflow: "hidden",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "24px",
+        padding: "32px 24px",
         background: "var(--app-bg)",
+        color: "var(--text)",
       }}
     >
-      <div aria-hidden className="ambient-wash" />
-      <div
-        style={{
-          position: "relative",
-          zIndex: 1,
-          width: "360px",
-          maxWidth: "100%",
-          background: "var(--glass-strong)",
-          backdropFilter: "blur(26px) saturate(180%)",
-          WebkitBackdropFilter: "blur(26px) saturate(180%)",
-          border: "1px solid var(--glass-edge)",
-          borderRadius: "22px",
-          padding: "32px 24px",
-          boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)",
-          textAlign: "center",
-        }}
-      >
-        <div style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "6px" }}>
-          {storeName}
+      <div style={{ width: "400px", maxWidth: "100%", textAlign: "center" }}>
+        {storeName && (
+          <div style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "8px" }}>{storeName}</div>
+        )}
+        <div style={{ fontSize: "21px", fontWeight: 800, marginBottom: "18px" }}>
+          ただいま、こちらの卓ではご注文を承っておりません
         </div>
-        <div style={{ fontSize: "20px", fontWeight: 800, color: "var(--text)", marginBottom: "12px" }}>
-          ただいま準備中です
+        <div
+          style={{
+            textAlign: "left",
+            background: "var(--chip-tint)",
+            borderRadius: "12px",
+            padding: "16px 18px",
+            fontSize: "14px",
+            lineHeight: 1.8,
+            marginBottom: "20px",
+          }}
+        >
+          考えられる原因は以下の通りです。
+          <ul style={{ margin: "8px 0 0", paddingLeft: "1.3em" }}>
+            <li>お会計が完了した直後で、次のお客様のご案内前です</li>
+            <li>スタッフによる受付がまだ行われていません</li>
+          </ul>
         </div>
-        <div style={{ fontSize: "14px", color: "var(--text-2)", lineHeight: 1.7 }}>
-          スタッフが受付を行うと、この画面が
+        <div style={{ fontSize: "14px", lineHeight: 1.8, color: "var(--text-2)" }}>
+          スタッフの受付が完了すると、この画面は自動的に
           <br />
-          自動的にご注文画面へ切り替わります。
+          ご注文画面へ切り替わります。
           <br />
-          お近くのスタッフにお声がけください。
+          恐れ入りますが、お近くのスタッフまでお声がけください。
         </div>
       </div>
     </div>
