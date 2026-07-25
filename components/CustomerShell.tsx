@@ -20,8 +20,8 @@ const FONT =
  *  同じくライト/ダーク設定に追従する（トークン参照。固定白黒にはしない）。 */
 function ClosedTableScreen() {
   const storeName = useAppStore((s) => s.settings.storeName);
-  const footerPhoto = useAppStore((s) => s.settings.footerPhoto);
-  const showFooterPhoto = useAppStore((s) => s.settings.showFooterPhoto);
+  const headerPhoto = useAppStore((s) => s.settings.headerPhoto);
+  const showHeaderPhoto = useAppStore((s) => s.settings.showHeaderPhoto);
   return (
     <div
       style={{
@@ -51,23 +51,19 @@ function ClosedTableScreen() {
           </div>
         )}
 
-        {/* 受付待ちであることを一目で伝えるアイコン（砂時計＝順番待ちの記号） */}
+        {/* 通常の状態ではないことが一目で伝わるよう、警告色で状態名を出す。
+            色は systemRed(--red) だと強すぎるため、警告として落ち着く
+            オレンジ(iOS systemOrange相当)を使う。 */}
         <div
-          aria-hidden
           style={{
-            width: "64px",
-            height: "64px",
-            margin: "0 auto 20px",
-            borderRadius: "50%",
-            background: "var(--chip-tint)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "28px",
-            lineHeight: 1,
+            fontSize: "26px",
+            fontWeight: 800,
+            letterSpacing: ".08em",
+            color: "#f26c3a",
+            marginBottom: "16px",
           }}
         >
-          ⏳
+          ERROR
         </div>
 
         <h1
@@ -87,7 +83,7 @@ function ClosedTableScreen() {
 
         <p style={{ fontSize: "14px", lineHeight: 1.8, color: "var(--text-2)", margin: "0 0 24px" }}>
           スタッフの受付が完了しますと、
-          <wbr />
+          <br />
           この画面は自動的にご注文画面へ切り替わります。
         </p>
 
@@ -113,17 +109,17 @@ function ClosedTableScreen() {
         </div>
 
         <p style={{ fontSize: "14px", fontWeight: 700, lineHeight: 1.7, margin: 0 }}>
-          恐れ入りますが、お近くのスタッフまで
-          <wbr />
-          お声がけください。
+          恐れ入りますが、
+          <br />
+          お近くのスタッフまでお声がけください。
         </p>
 
-        {/* 注文画面と同じフッター写真を流用し、待機中でも店舗の世界観を保つ。
-            設定でフッター表示がONかつ画像がある場合のみ出す（注文画面と同条件）。 */}
-        {showFooterPhoto && footerPhoto && (
+        {/* 注文画面と同じヘッダー写真を流用し、待機中でも店舗の世界観を保つ。
+            設定でヘッダー表示がONかつ画像がある場合のみ出す（注文画面と同条件）。 */}
+        {showHeaderPhoto && headerPhoto && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={footerPhoto}
+            src={headerPhoto}
             alt=""
             style={{
               width: "100%",
