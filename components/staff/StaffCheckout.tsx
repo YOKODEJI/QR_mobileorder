@@ -432,7 +432,7 @@ export default function StaffCheckout() {
         </div>
 
         {/* テーブル詳細（下に全幅表示） */}
-        <div style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", padding: "20px 22px", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)", minHeight: "300px" }}>
+        <div style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", padding: "20px 22px", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)", minHeight: "300px", overflowX: "clip" }}>
           {sel == null ? (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "260px", color: "var(--text-2)", fontSize: "15px" }}>
               上のテーブルを選択してください

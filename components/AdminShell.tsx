@@ -60,6 +60,10 @@ export default function AdminShell() {
         display: "flex",
         flexDirection: "column",
         letterSpacing: ".01em",
+        // タブスワイプでtranslateした中身が画面外へはみ出しても、
+        // documentの横オーバーフロー（右の謎余白/横スクロール）にしない。
+        // clipはhiddenと違いスクロールコンテナ化しないので、stickyヘッダー等に影響しない。
+        overflowX: "clip",
       }}
     >
       {/* ガラスは背後に何か無いと透明感が見えない。画面全体を覆う連続的な階調を

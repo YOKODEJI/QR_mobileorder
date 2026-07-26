@@ -117,6 +117,9 @@ export default function CustomerOrder() {
           position: "absolute",
           inset: 0,
           overflowY: "scroll",
+          // overflow-y:scrollの指定によりoverflow-xは自動でautoに計算される。
+          // スワイプ中のtranslateで横スクロール領域が生まれないよう明示的に封じる。
+          overflowX: "hidden",
           // 品数の少ないカテゴリでスクロールバーが消えるとコンテンツ幅が変わり、
           // カテゴリ切替のたびに要素が左右にずれて見える。常にバー分の余白を確保する。
           scrollbarGutter: "stable",

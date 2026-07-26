@@ -30,6 +30,10 @@ const SWIPE_DIRECTION_RATIO = 1.5; // 横移動量がこの倍率を超えて縦
 const DRAG_START_THRESHOLD = 12;
 /** 端(先頭/末尾)で引っ張ったときの抵抗。1に近いほどよく動く。 */
 const EDGE_RESISTANCE = 0.25;
+/** 指を離した後の送り出し/入場アニメーションの長さ。ゆったりめ。 */
+const SETTLE_MS = 320;
+/** 減速して静かに止まるイージング（標準のease-outより終端が柔らかい） */
+const SETTLE_EASING = "cubic-bezier(0.25, 0.8, 0.35, 1)";
 
 /** スワイプ判定の純粋ロジック（DOM/Reactに依存しない部分だけを切り出し、単体テスト可能にしている）。
  *  次に切り替えるべきカテゴリ名を返す。発火条件を満たさない/端で止まる場合はnull。 */
@@ -192,7 +196,7 @@ export function useSwipeCategory({
           setSettling(true);
           setOffset(0); // 入場のスライド。ここで必ず定位置へ収まる
         }, 20);
-      }, 180);
+      }, SETTLE_MS);
     } else {
       setOffset(0); // 条件を満たさなかった/端だった。元の位置へ戻す
     }
@@ -219,7 +223,7 @@ export function useSwipeCategory({
      *  DRAG_START_THRESHOLDと縦横比の判定で処理している。 */
     style: {
       transform: offset === 0 ? undefined : `translate3d(${offset}px, 0, 0)`,
-      transition: settling ? "transform .18s ease-out" : undefined,
+      transition: settling ? `transform ${SETTLE_MS}ms ${SETTLE_EASING}` : undefined,
     } as React.CSSProperties,
   };
 }
