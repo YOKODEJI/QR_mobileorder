@@ -741,12 +741,16 @@ export default function StaffCheckout() {
                 </div>
                 <div
                   onTouchStart={proxySwipe.onTouchStart}
+                  onTouchMove={proxySwipe.onTouchMove}
                   onTouchEnd={proxySwipe.onTouchEnd}
+                  onTouchCancel={proxySwipe.onTouchCancel}
                   style={{
                     display: "grid",
                     gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))",
                     gap: "10px",
                     marginTop: "6px",
+                    // カテゴリを跨ぐスワイプで、この一覧がページ単位で指に追従する
+                    ...proxySwipe.style,
                   }}
                 >
                   {proxyFiltered.map((m) => {

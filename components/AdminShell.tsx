@@ -157,8 +157,18 @@ export default function AdminShell() {
 
       <main
         onTouchStart={tabSwipe.onTouchStart}
+        onTouchMove={tabSwipe.onTouchMove}
         onTouchEnd={tabSwipe.onTouchEnd}
-        style={{ flex: 1, display: "flex", flexDirection: "column", position: "relative", zIndex: 1 }}
+        onTouchCancel={tabSwipe.onTouchCancel}
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          position: "relative",
+          zIndex: 1,
+          // タブを跨ぐスワイプ中、中身がページ単位で指に追従して動く
+          ...tabSwipe.style,
+        }}
       >
         {loading ? (
           <LoadingScreen />

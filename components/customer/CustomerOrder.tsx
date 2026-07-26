@@ -110,7 +110,9 @@ export default function CustomerOrder() {
           パディングは下の実測ヘッダー/カート高さ+余白のおおよその値） */}
       <div
         onTouchStart={swipe.onTouchStart}
+        onTouchMove={swipe.onTouchMove}
         onTouchEnd={swipe.onTouchEnd}
+        onTouchCancel={swipe.onTouchCancel}
         style={{
           position: "absolute",
           inset: 0,
@@ -133,12 +135,15 @@ export default function CustomerOrder() {
 
         <ChipRow value={s.customerCat} onChange={s.setCustomerCat} accent={accent} />
 
+        {/* カテゴリを跨ぐスワイプで、この一覧だけが指に追従して動く
+            （チップ行は固定したまま、中身がページ単位で入れ替わる） */}
         <div
           style={{
             display: "flex",
             flexDirection: "column",
             gap: "10px",
             padding: "2px 14px 24px",
+            ...swipe.style,
           }}
         >
           {filtered.map((m) => {

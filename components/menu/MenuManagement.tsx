@@ -505,7 +505,9 @@ export default function MenuManagement() {
       {/* メニュー管理 */}
       <div
         onTouchStart={adminSwipe.onTouchStart}
+        onTouchMove={adminSwipe.onTouchMove}
         onTouchEnd={adminSwipe.onTouchEnd}
+        onTouchCancel={adminSwipe.onTouchCancel}
         style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", overflow: "hidden", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)" }}
       >
         <div style={{ padding: "18px 22px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", flexWrap: "wrap" }}>
@@ -553,7 +555,9 @@ export default function MenuManagement() {
           <ChipRow value={s.adminCat} onChange={s.setAdminCat} accent={accent} />
         </div>
 
-        <div className="menu-rows">
+        {/* カテゴリを跨ぐスワイプで、この行リストがページ単位で指に追従する
+            （カード自体はoverflow:hiddenのため、動かすのは中身だけにする） */}
+        <div className="menu-rows" style={adminSwipe.style}>
           {filtered.map((m, idx) => {
             const selected = s.selectedIds.includes(m.id);
             const dragging = s.dragId === m.id;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveSwipeTarget } from "./useSwipeCategory";
+import { resolveSwipeTarget, resolveDragOffset } from "./useSwipeCategory";
 
 const CATS = ["すべて", "ドリンク", "一品料理", "揚げ物"];
 
@@ -41,5 +41,32 @@ describe("resolveSwipeTarget", () => {
 
   it("現在値がcategoriesに無ければnull", () => {
     expect(resolveSwipeTarget("存在しない", CATS, -100, 0)).toBeNull();
+  });
+});
+
+describe("resolveDragOffset（指への追従量）", () => {
+  it("中間のカテゴリでは指の移動量にそのまま追従する", () => {
+    expect(resolveDragOffset("ドリンク", CATS, -80)).toBe(-80);
+    expect(resolveDragOffset("ドリンク", CATS, 80)).toBe(80);
+  });
+
+  it("先頭で右へ引っ張ると抵抗がかかる（進めないことを手触りで返す）", () => {
+    expect(resolveDragOffset("すべて", CATS, 80)).toBe(20);
+  });
+
+  it("先頭でも左へは通常どおり追従する", () => {
+    expect(resolveDragOffset("すべて", CATS, -80)).toBe(-80);
+  });
+
+  it("末尾で左へ引っ張ると抵抗がかかる", () => {
+    expect(resolveDragOffset("揚げ物", CATS, -80)).toBe(-20);
+  });
+
+  it("末尾でも右へは通常どおり追従する", () => {
+    expect(resolveDragOffset("揚げ物", CATS, 80)).toBe(80);
+  });
+
+  it("現在値がcategoriesに無ければ動かさない", () => {
+    expect(resolveDragOffset("存在しない", CATS, -80)).toBe(0);
   });
 });
