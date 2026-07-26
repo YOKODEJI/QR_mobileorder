@@ -10,7 +10,7 @@ import { BellIcon, CheckIcon } from "@/components/ui/Icon";
 import { hm, useNow } from "@/lib/time";
 import { priceWithTax } from "@/lib/pricing";
 import { cartKey, parseCartKey, lineTotal, unitPrice, optionsLabel } from "@/lib/options";
-import { useSwipeCategory } from "@/lib/useSwipeCategory";
+import { useSwipePager } from "@/lib/useSwipePager";
 import {
   itemCardStyle,
   addBtnStyle,
@@ -49,13 +49,9 @@ export default function CustomerOrder() {
   const now = useNow();
   const called = s.calls.some((c) => c.table === s.customerTableId);
 
-  const filtered = s.menu.filter(
-    (m) => s.customerCat === "すべて" || m.cat === s.customerCat
-  );
-
   const catFilters = ["すべて", ...s.categories];
-  const swipe = useSwipeCategory({
-    categories: catFilters,
+  const swipe = useSwipePager({
+    items: catFilters,
     current: s.customerCat,
     onChange: s.setCustomerCat,
   });
@@ -109,10 +105,7 @@ export default function CustomerOrder() {
       {/* スクロール領域（ヘッダー/カートバーの下を流れる＝ガラスの奥行きの源。
           パディングは下の実測ヘッダー/カート高さ+余白のおおよその値） */}
       <div
-        onTouchStart={swipe.onTouchStart}
-        onTouchMove={swipe.onTouchMove}
-        onTouchEnd={swipe.onTouchEnd}
-        onTouchCancel={swipe.onTouchCancel}
+        {...swipe.handlers}
         style={{
           position: "absolute",
           inset: 0,
@@ -138,18 +131,18 @@ export default function CustomerOrder() {
 
         <ChipRow value={s.customerCat} onChange={s.setCustomerCat} accent={accent} />
 
-        {/* カテゴリを跨ぐスワイプで、この一覧だけが指に追従して動く
+        {/* カテゴリを跨ぐスワイプで、隣カテゴリの一覧が見えながら指に追従して入ってくる
             （チップ行は固定したまま、中身がページ単位で入れ替わる） */}
+        {swipe.wrap((cat) => (
         <div
           style={{
             display: "flex",
             flexDirection: "column",
             gap: "10px",
             padding: "2px 14px 24px",
-            ...swipe.style,
           }}
         >
-          {filtered.map((m) => {
+          {s.menu.filter((m) => cat === "すべて" || m.cat === cat).map((m) => {
             const opts = optionsFor(m.id);
             const hasOptions = opts.length > 0;
             // オプション無しの商品は従来通り単純なステッパー。
@@ -319,6 +312,7 @@ export default function CustomerOrder() {
             />
           )}
         </div>
+        ))}
 
         <div style={{ height: "126px", flexShrink: 0 }} />
       </div>

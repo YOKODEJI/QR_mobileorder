@@ -14,7 +14,7 @@ import MenuManagement from "@/components/menu/MenuManagement";
 import CheckoutHistory from "@/components/history/CheckoutHistory";
 import SupabaseSync from "@/components/SupabaseSync";
 import LoadingScreen from "@/components/ui/LoadingScreen";
-import { useSwipeCategory } from "@/lib/useSwipeCategory";
+import { useSwipePager } from "@/lib/useSwipePager";
 import type { AppState } from "@/store/useAppStore";
 
 const FONT =
@@ -34,8 +34,8 @@ export default function AdminShell() {
   const syncSoundPref = useAppStore((s) => s.syncSoundPref);
   const loading = isSupabaseConfigured() && !loaded;
 
-  const tabSwipe = useSwipeCategory({
-    categories: MGMT_TABS,
+  const tabPager = useSwipePager({
+    items: MGMT_TABS,
     current: mgmtTab,
     onChange: (v) => setMgmt(v as AppState["mgmtTab"]),
   });
@@ -160,29 +160,30 @@ export default function AdminShell() {
       </header>
 
       <main
-        onTouchStart={tabSwipe.onTouchStart}
-        onTouchMove={tabSwipe.onTouchMove}
-        onTouchEnd={tabSwipe.onTouchEnd}
-        onTouchCancel={tabSwipe.onTouchCancel}
+        {...tabPager.handlers}
         style={{
           flex: 1,
           display: "flex",
           flexDirection: "column",
           position: "relative",
           zIndex: 1,
-          // タブを跨ぐスワイプ中、中身がページ単位で指に追従して動く
-          ...tabSwipe.style,
         }}
       >
         {loading ? (
           <LoadingScreen />
         ) : (
-          <>
-            {mgmtTab === "kitchen" && <KitchenDisplay />}
-            {mgmtTab === "staff" && <StaffCheckout />}
-            {mgmtTab === "menu" && <MenuManagement />}
-            {mgmtTab === "history" && <CheckoutHistory />}
-          </>
+          // タブを跨ぐスワイプで、隣のタブの中身が見えながら指に追従して入ってくる
+          tabPager.wrap(
+            (tab) => (
+              <>
+                {tab === "kitchen" && <KitchenDisplay />}
+                {tab === "staff" && <StaffCheckout />}
+                {tab === "menu" && <MenuManagement />}
+                {tab === "history" && <CheckoutHistory />}
+              </>
+            ),
+            { flex: 1 }
+          )
         )}
       </main>
 

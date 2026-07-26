@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useSwipeCategory } from "@/lib/useSwipeCategory";
+import { useSwipePager } from "@/lib/useSwipePager";
 import { useAppStore } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import type { MenuItem } from "@/store/useAppStore";
@@ -425,13 +425,13 @@ export default function MenuManagement() {
   );
   const accent = s.settings.theme;
 
-  const filtered = s.menu.filter(
-    (m) => s.adminCat === "すべて" || m.cat === s.adminCat
-  );
+  /** 指定カテゴリで絞ったメニュー一覧（カルーセルの各ページの中身） */
+  const itemsFor = (cat: string) =>
+    s.menu.filter((m) => cat === "すべて" || m.cat === cat);
 
   const adminCatFilters = ["すべて", ...s.categories];
-  const adminSwipe = useSwipeCategory({
-    categories: adminCatFilters,
+  const adminPager = useSwipePager({
+    items: adminCatFilters,
     current: s.adminCat,
     onChange: s.setAdminCat,
   });
@@ -504,10 +504,7 @@ export default function MenuManagement() {
 
       {/* メニュー管理 */}
       <div
-        onTouchStart={adminSwipe.onTouchStart}
-        onTouchMove={adminSwipe.onTouchMove}
-        onTouchEnd={adminSwipe.onTouchEnd}
-        onTouchCancel={adminSwipe.onTouchCancel}
+        {...adminPager.handlers}
         style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", overflow: "hidden", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)" }}
       >
         <div style={{ padding: "18px 22px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", flexWrap: "wrap" }}>
@@ -555,10 +552,11 @@ export default function MenuManagement() {
           <ChipRow value={s.adminCat} onChange={s.setAdminCat} accent={accent} />
         </div>
 
-        {/* カテゴリを跨ぐスワイプで、この行リストがページ単位で指に追従する
-            （カード自体はoverflow:hiddenのため、動かすのは中身だけにする） */}
-        <div className="menu-rows" style={adminSwipe.style}>
-          {filtered.map((m, idx) => {
+        {/* カテゴリを跨ぐスワイプで、隣カテゴリの行リストが見えながら指に追従して入ってくる
+            （カード自体はoverflow:hiddenのため、はみ出した隣ページはカードが切り取る） */}
+        {adminPager.wrap((cat) => (
+        <div className="menu-rows">
+          {itemsFor(cat).map((m, idx) => {
             const selected = s.selectedIds.includes(m.id);
             const dragging = s.dragId === m.id;
             return (
@@ -722,6 +720,7 @@ export default function MenuManagement() {
             );
           })}
         </div>
+        ))}
       </div>
 
       {/* カテゴリ管理 */}

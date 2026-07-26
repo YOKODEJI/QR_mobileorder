@@ -10,7 +10,7 @@ import Toggle from "@/components/ui/Toggle";
 import { proxyCardStyle, proxyAddStyle, proxySubStyle, addBtnStyle } from "@/lib/styles";
 import { computeCheckoutBreakdown, type DiscountType } from "@/lib/pricing";
 import { cartKey, parseCartKey, lineTotal, unitPrice, optionsLabel } from "@/lib/options";
-import { useSwipeCategory } from "@/lib/useSwipeCategory";
+import { useSwipePager } from "@/lib/useSwipePager";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
 export default function StaffCheckout() {
@@ -132,13 +132,13 @@ export default function StaffCheckout() {
     s.settings.taxRate
   );
 
-  const proxyFiltered = s.menu.filter(
-    (m) => s.proxyCat === "すべて" || m.cat === s.proxyCat
-  );
+  /** 指定カテゴリで絞った代理注文メニュー一覧（カルーセルの各ページの中身） */
+  const proxyItemsFor = (cat: string) =>
+    s.menu.filter((m) => cat === "すべて" || m.cat === cat);
   const proxyCount = Object.values(s.staffCart).reduce((a, b) => a + b, 0);
   const proxyCatFilters = ["すべて", ...s.categories];
-  const proxySwipe = useSwipeCategory({
-    categories: proxyCatFilters,
+  const proxyPager = useSwipePager({
+    items: proxyCatFilters,
     current: s.proxyCat,
     onChange: s.setProxyCat,
   });
@@ -739,21 +739,18 @@ export default function StaffCheckout() {
                 <div style={{ margin: "0 -6px" }}>
                   <ChipRow value={s.proxyCat} onChange={s.setProxyCat} accent={accent} />
                 </div>
+                {/* カテゴリを跨ぐスワイプで、隣カテゴリの一覧が見えながら指に追従して入ってくる */}
+                <div {...proxyPager.handlers}>
+                {proxyPager.wrap((cat) => (
                 <div
-                  onTouchStart={proxySwipe.onTouchStart}
-                  onTouchMove={proxySwipe.onTouchMove}
-                  onTouchEnd={proxySwipe.onTouchEnd}
-                  onTouchCancel={proxySwipe.onTouchCancel}
                   style={{
                     display: "grid",
                     gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))",
                     gap: "10px",
                     marginTop: "6px",
-                    // カテゴリを跨ぐスワイプで、この一覧がページ単位で指に追従する
-                    ...proxySwipe.style,
                   }}
                 >
-                  {proxyFiltered.map((m) => {
+                  {proxyItemsFor(cat).map((m) => {
                     const opts = optionsFor(m.id);
                     const hasOptions = opts.length > 0;
                     const rows = hasOptions ? staffRowsFor(m.id) : [];
@@ -861,6 +858,8 @@ export default function StaffCheckout() {
                       </div>
                     );
                   })}
+                </div>
+                ))}
                 </div>
                 <button
                   onClick={() => s.submitProxy()}
