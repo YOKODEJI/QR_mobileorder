@@ -7,9 +7,6 @@
 // stores.square_enabled（店舗ごとに「よこでじ」がSQL Editorから直接設定する
 // 内部フラグ。店舗の設定画面には一切露出しない）で決まる。
 //
-// ★現状はキー未登録のためスタブ。square_enabled=trueの店舗でもSquare側への
-//   実際のAPI呼び出しはまだ行わず、ログを残して終了する。実キー登録時に
-//   syncToSquare() の中身を実装する（Square Orders API等）。
 // ★失敗してもチェックアウト自体には一切影響しない設計（会計は既に確定済み。
 //   ここでの失敗はログに残すだけで、客・スタッフ双方に何も表示しない）。
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -35,7 +32,7 @@ Deno.serve(async (req) => {
 
     const { data: checkout, error: checkoutErr } = await supabase
       .from("checkouts")
-      .select("id, store_id, table_name, items, total")
+      .select("id, store_id, table_name, items, total, discount_amount, charge_amount, tax_amount")
       .eq("id", checkoutId)
       .maybeSingle();
     if (checkoutErr || !checkout) {
@@ -67,41 +64,135 @@ Deno.serve(async (req) => {
   }
 });
 
-/** Square Orders APIへの実際の同期。キー登録後にここを実装する。
- *  アドホック明細行(カタログ商品と紐付けない line item)でPOSTすれば、
- *  Square側にメニューを二重登録せずに会計内容をそのまま起票できる。 */
+const SQUARE_VERSION = "2025-01-23";
+
+type CheckoutItem = {
+  name: string;
+  qty: number;
+  price: number; // 本体単価（オプション差額を含まない）
+  options?: Array<{ name: string; priceDelta: number }>;
+};
+
+/** Square Orders/Payments APIへの実際の同期。
+ *  1. アドホック明細行(カタログ商品と紐付けないline item)で注文を起票
+ *     → Square側にメニューを二重登録せずに会計内容をそのまま写せる
+ *  2. その注文に「現金支払い」を記録して完了させる
+ *     → 店頭での現金/その場決済は既に済んでいる前提。支払いまで記録しないと
+ *       Squareダッシュボードの売上（取引）に現れないため、ここまでやって初めて
+ *       「レジへの二度打ち」が不要になる */
 async function syncToSquare(
   store: {
     square_environment: string;
     square_location_id: string | null;
     square_access_token: string | null;
   },
-  checkout: { id: string; table_name: string; items: unknown; total: number }
+  checkout: {
+    id: string;
+    table_name: string;
+    items: unknown;
+    total: number;
+    discount_amount: number | null;
+    charge_amount: number | null;
+    tax_amount: number | null;
+  }
 ): Promise<void> {
-  // TODO(キー登録後に実装):
-  //   const base = store.square_environment === "production"
-  //     ? "https://connect.squareup.com"
-  //     : "https://connect.squareupsandbox.com";
-  //   await fetch(`${base}/v2/orders`, {
-  //     method: "POST",
-  //     headers: {
-  //       Authorization: `Bearer ${store.square_access_token}`,
-  //       "Content-Type": "application/json",
-  //       "Square-Version": "2025-01-23",
-  //     },
-  //     body: JSON.stringify({
-  //       idempotency_key: checkout.id,
-  //       order: {
-  //         location_id: store.square_location_id,
-  //         line_items: (checkout.items as Array<{ name: string; qty: number; price: number }>).map((it) => ({
-  //           name: it.name,
-  //           quantity: String(it.qty),
-  //           base_price_money: { amount: it.price, currency: "JPY" },
-  //         })),
-  //       },
-  //     }),
-  //   });
-  console.log("square_sync: stub call (no credentials yet)", checkout.id, checkout.table_name);
+  const base =
+    store.square_environment === "production"
+      ? "https://connect.squareup.com"
+      : "https://connect.squareupsandbox.com";
+  const headers = {
+    Authorization: `Bearer ${store.square_access_token}`,
+    "Content-Type": "application/json",
+    "Square-Version": SQUARE_VERSION,
+  };
+
+  const items = (checkout.items as CheckoutItem[]) ?? [];
+  const lineItems = items.map((it) => {
+    const delta = (it.options ?? []).reduce((a, o) => a + (o.priceDelta || 0), 0);
+    const label = (it.options ?? []).map((o) => o.name).join(" / ");
+    return {
+      name: it.name,
+      // オプションはSquare上では「バリエーション名」として明細行に併記する
+      ...(label ? { variation_name: label } : {}),
+      quantity: String(it.qty),
+      base_price_money: { amount: it.price + delta, currency: "JPY" },
+    };
+  });
+  // チャージ料・外税はアドホック行として追加し、Square側の合計をアプリの請求額と一致させる
+  // （Squareの注文レベル税は%指定のみで金額指定ができないため、行として写すのが確実）
+  if ((checkout.charge_amount ?? 0) > 0) {
+    lineItems.push({
+      name: "チャージ料",
+      quantity: "1",
+      base_price_money: { amount: checkout.charge_amount!, currency: "JPY" },
+    });
+  }
+  if ((checkout.tax_amount ?? 0) > 0) {
+    lineItems.push({
+      name: "消費税（外税）",
+      quantity: "1",
+      base_price_money: { amount: checkout.tax_amount!, currency: "JPY" },
+    });
+  }
+
+  // --- 1. 注文の起票（idempotency_key=checkout.id なので再実行しても二重起票されない） ---
+  const orderRes = await fetch(`${base}/v2/orders`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      idempotency_key: checkout.id,
+      order: {
+        location_id: store.square_location_id,
+        reference_id: checkout.id,
+        ticket_name: checkout.table_name.slice(0, 30),
+        line_items: lineItems,
+        ...((checkout.discount_amount ?? 0) > 0
+          ? {
+              discounts: [
+                {
+                  name: "割引",
+                  type: "FIXED_AMOUNT",
+                  amount_money: { amount: checkout.discount_amount!, currency: "JPY" },
+                  scope: "ORDER",
+                },
+              ],
+            }
+          : {}),
+      },
+    }),
+  });
+  const orderData = await orderRes.json();
+  if (!orderRes.ok) {
+    throw new Error(`square orders api ${orderRes.status}: ${JSON.stringify(orderData?.errors ?? orderData)}`);
+  }
+  const order = orderData.order;
+  console.log("square_sync: order created", order.id, "total", order.total_money?.amount);
+
+  // --- 2. 現金支払いの記録（注文を完了させ、売上として計上する） ---
+  // Square側で計算された合計(total_money)をそのまま支払う。アプリ側totalと一致するはずだが、
+  // 万一ズレてもSquareの注文が完了しないよりは、Square側の合計で完了させて差分をログに残す。
+  const squareTotal = order.total_money?.amount ?? checkout.total;
+  if (squareTotal !== checkout.total) {
+    console.error("square_sync: total mismatch app=", checkout.total, "square=", squareTotal, checkout.id);
+  }
+  const payRes = await fetch(`${base}/v2/payments`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      idempotency_key: `${checkout.id}:pay`,
+      source_id: "CASH",
+      order_id: order.id,
+      location_id: store.square_location_id,
+      amount_money: { amount: squareTotal, currency: "JPY" },
+      cash_details: { buyer_supplied_money: { amount: squareTotal, currency: "JPY" } },
+      note: `QRオーダー ${checkout.table_name}`,
+    }),
+  });
+  const payData = await payRes.json();
+  if (!payRes.ok) {
+    throw new Error(`square payments api ${payRes.status}: ${JSON.stringify(payData?.errors ?? payData)}`);
+  }
+  console.log("square_sync: payment recorded", payData.payment?.id, payData.payment?.status);
 }
 
 function json(obj: unknown, status: number) {
