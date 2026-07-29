@@ -26,6 +26,9 @@ export interface Snapshot {
   taxMode: TaxMode | null;
   taxRate: number | null;
   chargeRate: number | null;
+  squarePosMode: string | null;
+  squareApplicationId: string | null;
+  squareLocationId: string | null;
   categories: string[];
   tables: TableRec[];
   menu: MenuItem[];
@@ -46,6 +49,9 @@ export interface StoreSettingsSlice {
   taxMode: TaxMode | null;
   taxRate: number | null;
   chargeRate: number | null;
+  squarePosMode: string | null;
+  squareApplicationId: string | null;
+  squareLocationId: string | null;
 }
 
 /** 店舗設定のみ取得（Realtime差分更新用の1テーブル分）。
@@ -75,6 +81,7 @@ export async function fetchStoreSettings(): Promise<StoreSettingsSlice | null> {
     taxMode: (data?.tax_mode as TaxMode | null) ?? null,
     taxRate: (data?.tax_rate as number | null) ?? null,
     chargeRate: (data?.charge_rate as number | null) ?? null,
+    ...(await fetchSquarePosConfig()),
   };
 }
 
@@ -84,6 +91,29 @@ async function fetchPwaIconUrl(): Promise<string | null> {
   const { data, error } = await sb.from("stores").select("pwa_icon_url").eq("id", STORE_ID).single();
   if (error) return null; // 列未追加(step16未適用)や通信失敗はPWAアイコン無しとして扱う
   return (data?.pwa_icon_url as string | null) ?? null;
+}
+
+/** Square POS連携（決済をSquareで実行する方式）の店舗設定。square_pos_mode等は
+ *  staff(authenticated)にのみ読み取りを許可した列（step19。客画面には一切出さない）。
+ *  失敗/列未追加(step19未適用)時は全てnull＝連携無し扱いにして、他機能を止めない。 */
+async function fetchSquarePosConfig(): Promise<{
+  squarePosMode: string | null;
+  squareApplicationId: string | null;
+  squareLocationId: string | null;
+}> {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return { squarePosMode: null, squareApplicationId: null, squareLocationId: null };
+  const { data, error } = await sb
+    .from("stores")
+    .select("square_pos_mode,square_application_id,square_location_id")
+    .eq("id", STORE_ID)
+    .single();
+  if (error) return { squarePosMode: null, squareApplicationId: null, squareLocationId: null };
+  return {
+    squarePosMode: (data?.square_pos_mode as string | null) ?? null,
+    squareApplicationId: (data?.square_application_id as string | null) ?? null,
+    squareLocationId: (data?.square_location_id as string | null) ?? null,
+  };
 }
 
 /** カテゴリ一覧のみ取得（Realtime差分更新用の1テーブル分） */
@@ -508,6 +538,33 @@ export async function dbCloseTable(
     total: c.total as number,
     closedAt: c.closed_at as string,
   };
+}
+
+/** Square POSアプリを開く前に、現時点の未会計分から合計金額だけをサーバー計算で
+ *  確定させる（会計はまだ確定しない・読み取り専用）。金額の正はサーバーという
+ *  既存方針を、決済を外部アプリに渡すこのフローでも崩さないため。 */
+export async function dbPreviewCheckout(
+  tableId: string,
+  discountType: DiscountType,
+  discountValue: number,
+  chargeEnabled: boolean
+): Promise<{ total: number } | null> {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return null;
+  const { data, error } = await sb.rpc("preview_checkout", {
+    p_store: STORE_ID,
+    p_table: tableId,
+    p_discount_type: discountType,
+    p_discount_value: discountValue,
+    p_charge_enabled: chargeEnabled,
+  });
+  if (error) {
+    console.error("dbPreviewCheckout:", error.message);
+    return null;
+  }
+  if (!data) return null;
+  const c = data as Record<string, unknown>;
+  return { total: c.total as number };
 }
 
 export async function dbSetOrderStatus(orderId: string, status: "cooking" | "served"): Promise<boolean> {

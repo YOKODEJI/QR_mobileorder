@@ -14,6 +14,7 @@ import {
   type MenuOption,
   type SelectedOption,
 } from "@/lib/options";
+import { detectSquarePosPlatform, buildSquarePosUrl } from "@/lib/squarePos";
 
 export type { MenuOption, SelectedOption };
 
@@ -111,6 +112,11 @@ export interface Settings {
   taxMode: TaxMode;
   taxRate: number; // 外税のときの消費税率（%）
   chargeRate: number; // チャージ料（%）。0なら無し
+  // Square POS連携（決済をSquareで実行する方式）。店舗設定画面には出さず、
+  // よこでじがSQL Editorから内部で設定する（step19）。未設定なら従来通りの会計フロー。
+  squarePosMode: string | null; // null | 'mobile_web' | 'terminal'(将来)
+  squareApplicationId: string | null;
+  squareLocationId: string | null;
 }
 
 export interface DialogSpec {
@@ -199,6 +205,9 @@ export interface AppState {
     taxMode: TaxMode | null;
     taxRate: number | null;
     chargeRate: number | null;
+    squarePosMode: string | null;
+    squareApplicationId: string | null;
+    squareLocationId: string | null;
     categories: string[];
     tables: TableRec[];
     menu: MenuItem[];
@@ -256,6 +265,9 @@ export interface AppState {
   selectStaffTable: (id: string) => void;
   confirmCheckout: (discountType: DiscountType, discountValue: number, chargeEnabled: boolean) => void;
   checkout: (discountType: DiscountType, discountValue: number, chargeEnabled: boolean) => void;
+  // 決済そのものをSquareで実行する店舗向け(step19)。Square POSアプリを開くところまでを行い、
+  // 当店側の会計確定は決済成功のコールバックが返ってから(/admin/square-callback)行う。
+  checkoutViaSquare: (discountType: DiscountType, discountValue: number, chargeEnabled: boolean) => Promise<void>;
   cancelUnit: (menuItemId: string, options?: SelectedOption[]) => void;
   addUnit: (menuItemId: string, options?: SelectedOption[], idem?: string) => void;
   setOrderEditMode: (v: boolean) => void;
@@ -492,6 +504,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     taxMode: "inclusive",
     taxRate: 10,
     chargeRate: 0,
+    squarePosMode: null,
+    squareApplicationId: null,
+    squareLocationId: null,
   },
   showSettings: false,
   customerCat: "すべて",
@@ -647,6 +662,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           taxMode: snap.taxMode ?? s.settings.taxMode,
           taxRate: snap.taxRate ?? s.settings.taxRate,
           chargeRate: snap.chargeRate ?? s.settings.chargeRate,
+          squarePosMode: snap.squarePosMode,
+          squareApplicationId: snap.squareApplicationId,
+          squareLocationId: snap.squareLocationId,
         },
         tables: snap.tables,
         menu: snap.menu,
@@ -1086,14 +1104,62 @@ export const useAppStore = create<AppState>((set, get) => ({
             : "") +
           lines.join("\n") +
           "\n\nこのテーブルのセッションを締めます。よろしいですか？\n\n※決済は既存レジで実施してください。",
-        confirmText: "お会計する",
+        confirmText: s.settings.squarePosMode === "mobile_web" ? "Squareで決済する" : "お会計する",
         danger: false,
         onConfirm: () => {
-          get().checkout(discountType, discountValue, chargeEnabled);
           get().closeDialog();
+          if (s.settings.squarePosMode === "mobile_web") {
+            get().checkoutViaSquare(discountType, discountValue, chargeEnabled);
+          } else {
+            get().checkout(discountType, discountValue, chargeEnabled);
+          }
         },
       },
     });
+  },
+  checkoutViaSquare: async (discountType, discountValue, chargeEnabled) => {
+    const s = get();
+    const t = s.selectedStaffTable;
+    if (t == null) return;
+    const platform = detectSquarePosPlatform();
+    if (platform === "unsupported") {
+      // PC等、Square POSアプリを開けない端末では従来のフローにフォールバックする
+      get().pushToast("この端末ではSquare決済アプリを開けないため、通常のお会計として確定します。");
+      get().checkout(discountType, discountValue, chargeEnabled);
+      return;
+    }
+    if (!s.settings.squareApplicationId) {
+      get().pushToast("Square連携の設定が未登録です。よこでじにご連絡ください。");
+      return;
+    }
+    const preview = await db.dbPreviewCheckout(t, discountType, discountValue, chargeEnabled);
+    if (!preview) {
+      get().pushToast("お会計の確定に失敗しました。通信環境を確認し、もう一度お試しください。");
+      return;
+    }
+    const tableName = s.tableName(t);
+    const token = newId();
+    if (typeof sessionStorage !== "undefined") {
+      sessionStorage.setItem(
+        `squarePosPending:${token}`,
+        JSON.stringify({ tableId: t, tableName, discountType, discountValue, chargeEnabled })
+      );
+    }
+    const url = buildSquarePosUrl({
+      platform,
+      applicationId: s.settings.squareApplicationId,
+      locationId: s.settings.squareLocationId,
+      amountYen: preview.total,
+      callbackUrl: `${window.location.origin}/admin/square-callback`,
+      state: token,
+      note: tableName,
+    });
+    if (!url) {
+      get().pushToast("Square決済アプリを開けませんでした。");
+      return;
+    }
+    set({ selectedStaffTable: null, orderEditMode: false });
+    window.location.href = url;
   },
   checkout: async (discountType, discountValue, chargeEnabled) => {
     const s = get();
@@ -1872,7 +1938,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // ---- 設定 / ダイアログ ----
   setSetting: async (k, v) => {
-    const col = {
+    // square*系は設定画面に出さない内部専用フィールド（よこでじがSQL Editorで直接設定）。
+    // ここに列名を持たせないことで、設定画面経由での更新を型レベルでも封じている。
+    const col: Partial<Record<keyof Settings, string>> = {
       storeName: "name",
       theme: "theme",
       showHeaderPhoto: "show_header_photo",
@@ -1883,10 +1951,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       taxMode: "tax_mode",
       taxRate: "tax_rate",
       chargeRate: "charge_rate",
-    }[k];
+    };
+    const colName = col[k];
+    if (!colName) return; // square*等、更新対象外のキー
     const prevSettings = get().settings;
     set((s) => ({ settings: { ...s.settings, [k]: v } }));
-    const success = await db.dbUpdateStore({ [col]: v });
+    const success = await db.dbUpdateStore({ [colName]: v });
     if (!success) {
       set({ settings: prevSettings });
       get().pushToast("設定の保存に失敗しました。もう一度お試しください。");

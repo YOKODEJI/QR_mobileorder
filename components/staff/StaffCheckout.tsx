@@ -722,11 +722,13 @@ export default function StaffCheckout() {
                   boxShadow: s.orderEditMode ? "none" : "inset 0 1px 0 rgba(255,255,255,.3)",
                 }}
               >
-                お会計する（セッションを締める）
+                {s.settings.squarePosMode === "mobile_web" ? "Squareで決済する" : "お会計する（セッションを締める）"}
               </button>
               <div style={{ fontSize: "11px", color: s.orderEditMode ? "var(--red)" : "var(--text-2)", marginTop: "8px", textAlign: "center", fontWeight: s.orderEditMode ? 700 : 400 }}>
                 {s.orderEditMode
                   ? "注文編集を「完了」してからお会計できます。"
+                  : s.settings.squarePosMode === "mobile_web"
+                  ? "Square POSアプリが開きます。決済が完了するとセッションが締まります。"
                   : "決済は既存レジで実施。ここではセッションを締めるだけです。"}
               </div>
 
