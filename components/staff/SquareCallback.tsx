@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { dbCloseTable } from "@/lib/data";
+import { dbCloseTable, dbPreviewCheckout } from "@/lib/data";
+import { getSupabase, STORE_ID } from "@/lib/supabase";
 import { parseSquarePosCallback } from "@/lib/squarePos";
 import type { DiscountType } from "@/store/useAppStore";
 
@@ -18,10 +19,28 @@ type PendingCheckout = {
 const FONT =
   "-apple-system, BlinkMacSystemFont, 'Hiragino Sans', var(--font-noto-sans-jp), 'Noto Sans JP', sans-serif";
 
+/** Square側に実際の決済を問い合わせて確認する（Edge Function square_verify_payment）。
+ *  Square POSアプリのコールバックが返す status=ok / transaction_id は、しょせん
+ *  ブラウザのクエリパラメータ＝クライアント側で自由に書き換え可能な値でしかない。
+ *  これをそのまま信用してclose_tableを呼ぶと、URLを手で書き換えるだけで
+ *  決済せずに会計を確定できてしまう（Codexレビューで指摘）。必ずサーバー側で
+ *  Square access_tokenを使って裏取りしてから確定する。 */
+async function verifySquarePayment(transactionId: string): Promise<{ verified: boolean; amountYen: number | null }> {
+  const sb = getSupabase();
+  if (!sb) return { verified: false, amountYen: null };
+  const { data, error } = await sb.functions.invoke("square_verify_payment", {
+    body: { storeId: STORE_ID, transactionId },
+  });
+  if (error || !data?.verified) return { verified: false, amountYen: null };
+  return { verified: true, amountYen: (data.amountYen as number) ?? null };
+}
+
 /** Square POSアプリから戻ってきた直後に一度だけ表示される画面(step19)。
  *  ここで初めて当店側の会計(close_table)を確定する。sessionStorageに
  *  会計ボタンを押した時点で退避しておいた内容(卓・割引等)を、Square側の
- *  結果(state)と突き合わせて使う（ページ遷移でZustandの状態は失われるため）。 */
+ *  結果(state)と突き合わせて使う（ページ遷移でZustandの状態は失われるため）。
+ *  ペンディング情報(sessionStorage)は、会計が実際に確定した時にだけ消す。
+ *  失敗時に消してしまうと、リロードしても再試行できなくなるため。 */
 export default function SquareCallback() {
   const [phase, setPhase] = useState<Phase>("processing");
   const [tableName, setTableName] = useState("");
@@ -37,13 +56,12 @@ export default function SquareCallback() {
         return;
       }
 
-      const token = result.status === "ok" || result.status === "canceled" || result.status === "error" ? result.state : null;
+      const token = result.state;
       const raw = token && typeof sessionStorage !== "undefined" ? sessionStorage.getItem(`squarePosPending:${token}`) : null;
-      if (token && typeof sessionStorage !== "undefined") sessionStorage.removeItem(`squarePosPending:${token}`);
 
       if (!raw) {
         if (!cancelled) {
-          setPhase(result.status === "ok" ? "error" : result.status === "canceled" ? "canceled" : "error");
+          setPhase("error");
           setDetail("この端末でお会計を開始した記録が見つかりませんでした。お会計が確定していない場合は、もう一度「Squareで決済する」からやり直してください。");
         }
         return;
@@ -51,11 +69,17 @@ export default function SquareCallback() {
       const pending = JSON.parse(raw) as PendingCheckout;
       if (!cancelled) setTableName(pending.tableName);
 
+      const clearPending = () => {
+        if (typeof sessionStorage !== "undefined") sessionStorage.removeItem(`squarePosPending:${token}`);
+      };
+
       if (result.status === "canceled") {
+        clearPending(); // キャンセルは再試行の必要が無いのでここで消してよい
         if (!cancelled) setPhase("canceled");
         return;
       }
       if (result.status === "error") {
+        clearPending();
         if (!cancelled) {
           setPhase("error");
           setDetail(result.errorCode ?? "不明なエラー");
@@ -63,14 +87,47 @@ export default function SquareCallback() {
         return;
       }
 
-      // ここまで来て初めて当店側の会計を確定する（Square側の決済が成功した後）
+      // ここから先は status=ok の場合。クライアント側の申告を信用せず、
+      // Square側に実際の決済を確認してから確定する。
+      if (!result.transactionId) {
+        if (!cancelled) {
+          setPhase("error");
+          setDetail("Squareから取引IDを受け取れなかったため、お会計を確定できません。Squareダッシュボードで取引を確認の上、必要なら管理画面から手動対応してください。");
+        }
+        return; // ペンディングは消さない（原因を解消した上でこの画面をやり直せるように）
+      }
+
+      const verify = await verifySquarePayment(result.transactionId);
+      if (cancelled) return;
+      if (!verify.verified || verify.amountYen == null) {
+        setPhase("error");
+        setDetail("Square側で決済の確認が取れませんでした。少し待ってからこの画面を再読み込みするか、Squareダッシュボードで取引を確認してください。");
+        return;
+      }
+
+      // 決済額と、現時点の未会計分から再計算した金額が一致するか確認する。
+      // Square操作中に注文が追加/変更されていた場合、close_tableは現在の未会計分を
+      // 元に再計算するため、決済額とズレたまま確定してしまう恐れがある(Codexレビューで指摘)。
+      // 一致しない場合は自動確定せず、スタッフの手動確認に委ねる。
+      const preview = await dbPreviewCheckout(pending.tableId, pending.discountType, pending.discountValue, pending.chargeEnabled);
+      if (cancelled) return;
+      if (!preview || preview.total !== verify.amountYen) {
+        setPhase("error");
+        setDetail(
+          `Squareでの決済額（${verify.amountYen}円）と、現在の未会計分の合計が一致しないため、自動確定を止めました。決済自体は完了しています。管理画面の「テーブル / 会計」から内容を確認し、手動でお会計を確定してください。`
+        );
+        return; // ペンディングは消さない
+      }
+
+      // ここまで来て初めて当店側の会計を確定する（Square側の決済が検証できた後）
       const record = await dbCloseTable(pending.tableId, pending.discountType, pending.discountValue, pending.chargeEnabled);
       if (cancelled) return;
       if (!record) {
         setPhase("error");
-        setDetail("Squareの決済は完了しましたが、当店側のお会計確定に失敗しました。管理画面の「テーブル / 会計」から手動で確認してください。");
-        return;
+        setDetail("Squareの決済は完了しましたが、当店側のお会計確定に失敗しました。この画面を再読み込みするか、管理画面の「テーブル / 会計」から手動で確認してください。");
+        return; // ペンディングは消さない＝再読み込みで再試行できる
       }
+      clearPending();
       setPhase("success");
     })();
     return () => {
