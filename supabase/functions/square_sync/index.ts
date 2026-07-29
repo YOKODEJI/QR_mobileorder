@@ -73,13 +73,12 @@ type CheckoutItem = {
   options?: Array<{ name: string; priceDelta: number }>;
 };
 
-/** Square Orders/Payments APIへの実際の同期。
- *  1. アドホック明細行(カタログ商品と紐付けないline item)で注文を起票
- *     → Square側にメニューを二重登録せずに会計内容をそのまま写せる
- *  2. その注文に「現金支払い」を記録して完了させる
- *     → 店頭での現金/その場決済は既に済んでいる前提。支払いまで記録しないと
- *       Squareダッシュボードの売上（取引）に現れないため、ここまでやって初めて
- *       「レジへの二度打ち」が不要になる */
+/** Square Orders APIへの実際の同期。
+ *  アドホック明細行(カタログ商品と紐付けないline item)で「未払いのOPEN注文」を起票する。
+ *  → 支払いはここでは記録しない。実際の決済（カード/現金/QR）はSquareレジ側で
+ *    この注文を開いて実行する。つまりアプリの会計ボタン＝Squareに伝票を送るボタン。
+ *  → フルフィルメント(PICKUP/ASAP)を付けるのは、API起票の注文をSquare POS・
+ *    ダッシュボードの「注文」一覧に表示させて決済可能にするための要件。 */
 async function syncToSquare(
   store: {
     square_environment: string;
@@ -146,6 +145,20 @@ async function syncToSquare(
         reference_id: checkout.id,
         ticket_name: checkout.table_name.slice(0, 30),
         line_items: lineItems,
+        // API起票の注文はフルフィルメントが無いとPOS/ダッシュボードの「注文」に
+        // 出てこない。店内会計なので実体は「その場受け渡し済み」だが、
+        // Squareレジで開いて決済するための表示要件としてPICKUP/ASAPを付ける。
+        fulfillments: [
+          {
+            type: "PICKUP",
+            state: "PROPOSED",
+            pickup_details: {
+              recipient: { display_name: checkout.table_name.slice(0, 30) || "テーブル" },
+              schedule_type: "ASAP",
+              pickup_at: new Date().toISOString(),
+            },
+          },
+        ],
         ...((checkout.discount_amount ?? 0) > 0
           ? {
               discounts: [
@@ -166,33 +179,13 @@ async function syncToSquare(
     throw new Error(`square orders api ${orderRes.status}: ${JSON.stringify(orderData?.errors ?? orderData)}`);
   }
   const order = orderData.order;
-  console.log("square_sync: order created", order.id, "total", order.total_money?.amount);
-
-  // --- 2. 現金支払いの記録（注文を完了させ、売上として計上する） ---
-  // Square側で計算された合計(total_money)をそのまま支払う。アプリ側totalと一致するはずだが、
-  // 万一ズレてもSquareの注文が完了しないよりは、Square側の合計で完了させて差分をログに残す。
-  const squareTotal = order.total_money?.amount ?? checkout.total;
+  // アプリ側の請求額とSquare側の計算合計が一致しているかは常に検算してログに残す
+  // （ズレたままレジ決済すると請求額が変わってしまうため、気付ける状態にしておく）
+  const squareTotal = order.total_money?.amount;
   if (squareTotal !== checkout.total) {
     console.error("square_sync: total mismatch app=", checkout.total, "square=", squareTotal, checkout.id);
   }
-  const payRes = await fetch(`${base}/v2/payments`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      idempotency_key: `${checkout.id}:pay`,
-      source_id: "CASH",
-      order_id: order.id,
-      location_id: store.square_location_id,
-      amount_money: { amount: squareTotal, currency: "JPY" },
-      cash_details: { buyer_supplied_money: { amount: squareTotal, currency: "JPY" } },
-      note: `QRオーダー ${checkout.table_name}`,
-    }),
-  });
-  const payData = await payRes.json();
-  if (!payRes.ok) {
-    throw new Error(`square payments api ${payRes.status}: ${JSON.stringify(payData?.errors ?? payData)}`);
-  }
-  console.log("square_sync: payment recorded", payData.payment?.id, payData.payment?.status);
+  console.log("square_sync: open order sent", order.id, "total", squareTotal, order.state);
 }
 
 function json(obj: unknown, status: number) {
