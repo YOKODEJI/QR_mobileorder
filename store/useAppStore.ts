@@ -268,6 +268,8 @@ export interface AppState {
   // 決済そのものをSquareで実行する店舗向け(step19)。Square POSアプリを開くところまでを行い、
   // 当店側の会計確定は決済成功のコールバックが返ってから(/admin/square-callback)行う。
   checkoutViaSquare: (discountType: DiscountType, discountValue: number, chargeEnabled: boolean) => Promise<void>;
+  // checkoutViaSquareの内部実装(重複開始の警告確認後に呼ばれる実処理)
+  checkoutViaSquareForce: (discountType: DiscountType, discountValue: number, chargeEnabled: boolean) => Promise<void>;
   cancelUnit: (menuItemId: string, options?: SelectedOption[]) => void;
   addUnit: (menuItemId: string, options?: SelectedOption[], idem?: string) => void;
   setOrderEditMode: (v: boolean) => void;
@@ -1147,6 +1149,48 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().pushToast("Square連携の設定が未登録です。よこでじにご連絡ください。");
       return;
     }
+    // 同じ卓に対して未完了(30分以内)のSquare決済リクエストが既にある場合は、
+    // 気付かず新しい決済を重ねて始めてしまわないよう警告する。Square POSアプリは
+    // 決済完了後もアプリ内に留まることがあり、そこで「戻る」操作等をすると
+    // 同じ金額を誤ってもう一度チャージできてしまうため（二重請求の防止策）。
+    if (typeof localStorage !== "undefined") {
+      const cutoff = Date.now() - 30 * 60 * 1000;
+      const hasInFlight = Object.keys(localStorage)
+        .filter((k) => k.startsWith("squarePosPending:"))
+        .some((k) => {
+          try {
+            const v = JSON.parse(localStorage.getItem(k) ?? "{}");
+            return v.tableId === t && (v.ts ?? 0) >= cutoff;
+          } catch {
+            return false;
+          }
+        });
+      if (hasInFlight) {
+        set({
+          dialog: {
+            title: "この卓は決済処理中の可能性があります",
+            body:
+              "この卓では、少し前にSquareでの決済を開始した記録が残っています。\n\n" +
+              "すでに決済済みの場合、ここで新しく決済を開始するとSquare側で二重に請求してしまう恐れがあります。Squareアプリ側で本当に未決済か確認してから進めてください。\n\nそれでも新しく決済を開始しますか？",
+            confirmText: "新しく決済を開始する",
+            danger: true,
+            onConfirm: () => {
+              get().closeDialog();
+              get().checkoutViaSquareForce(discountType, discountValue, chargeEnabled);
+            },
+          },
+        });
+        return;
+      }
+    }
+    await get().checkoutViaSquareForce(discountType, discountValue, chargeEnabled);
+  },
+  checkoutViaSquareForce: async (discountType, discountValue, chargeEnabled) => {
+    const s = get();
+    const t = s.selectedStaffTable;
+    if (t == null) return;
+    const platform = detectSquarePosPlatform();
+    if (platform === "unsupported" || !s.settings.squareApplicationId) return;
     const preview = await db.dbPreviewCheckout(t, discountType, discountValue, chargeEnabled);
     if (!preview) {
       get().pushToast("お会計の確定に失敗しました。通信環境を確認し、もう一度お試しください。");

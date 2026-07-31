@@ -81,6 +81,10 @@ export function buildSquarePosUrl(params: {
       `S.com.squareup.pos.TENDER_TYPES=${TENDER_TYPES_ANDROID.join(",")}`,
       `S.com.squareup.pos.NOTE=${encodeURIComponent(note)}`,
       `S.com.squareup.pos.REQUEST_METADATA=${encodeURIComponent(state)}`,
+      // 決済完了後、できるだけ早くこのアプリへ自動的に戻す(最小値=3200ms)。
+      // これが無いと決済完了画面にとどまり続け、スタッフが「戻る」操作をした際に
+      // 誤って再度チャージ画面へ入り、同じ金額を二重に決済できてしまう恐れがある。
+      "l.com.squareup.pos.AUTO_RETURN_TIMEOUT_MS=3200",
       ...(locationId ? [`S.com.squareup.pos.LOCATION_ID=${locationId}`] : []),
       "end",
     ];
