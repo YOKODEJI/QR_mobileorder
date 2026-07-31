@@ -9,6 +9,12 @@ export type SquarePosPlatform = "ios" | "android" | "unsupported";
 
 export function detectSquarePosPlatform(): SquarePosPlatform {
   if (typeof navigator === "undefined") return "unsupported";
+
+  // Client Hints(Chromium系)。UA文字列と違い「デスクトップ表示」設定の影響を受けにくく、
+  // 大画面Androidタブレットの誤判定(後述)に対する最も信頼できる一次情報。
+  const uaData = (navigator as unknown as { userAgentData?: { platform?: string } }).userAgentData;
+  if (uaData?.platform === "Android") return "android";
+
   const ua = navigator.userAgent;
   if (/iPad|iPhone|iPod/.test(ua)) return "ios";
   // iPadOS 13以降のSafariは既定で「Macintosh」を名乗るデスクトップ版UAを送るため、
@@ -16,6 +22,9 @@ export function detectSquarePosPlatform(): SquarePosPlatform {
   // (maxTouchPoints=0)なので、タッチ対応のMacintosh名乗りはiPadとみなす。
   if (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) return "ios";
   if (/Android/.test(ua)) return "android";
+  // 大画面Androidタブレット(Xiaomi Pad 7等)のブラウザは、既定で「Android」を含まない
+  // デスクトップ相当のUA(Linux系)を送ることがある。タッチ対応のLinux系UAはAndroidとみなす。
+  if (/Linux/.test(ua) && navigator.maxTouchPoints > 1) return "android";
   return "unsupported";
 }
 

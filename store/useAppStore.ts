@@ -1123,9 +1123,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (t == null) return;
     const platform = detectSquarePosPlatform();
     if (platform === "unsupported") {
-      // PC等、Square POSアプリを開けない端末では従来のフローにフォールバックする
-      get().pushToast("この端末ではSquare決済アプリを開けないため、通常のお会計として確定します。");
-      get().checkout(discountType, discountValue, chargeEnabled);
+      // 端末判定に失敗した場合を含め、ここで無条件に旧フロー(即座にセッションを締める)へ
+      // 落とすと「Square決済を経ずにセッションだけ締まる」事故につながる
+      // （実機で実際に発生：タブレット誤検知→無会計のままセッション終了）。
+      // 必ずスタッフの明示確認を挟み、Square決済を経ていないと分かった上でしか進めない。
+      set({
+        dialog: {
+          title: "Square決済アプリを開けません",
+          body:
+            "この端末ではSquare決済アプリを検出できませんでした。\n\n" +
+            "このまま「通常のお会計」として確定すると、Square側での決済確認は一切行われません。決済が完了していることを別の方法で確認してから進めてください。\n\nよろしいですか？",
+          confirmText: "通常のお会計として確定する",
+          danger: true,
+          onConfirm: () => {
+            get().closeDialog();
+            get().checkout(discountType, discountValue, chargeEnabled);
+          },
+        },
+      });
       return;
     }
     if (!s.settings.squareApplicationId) {
