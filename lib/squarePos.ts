@@ -11,6 +11,10 @@ export function detectSquarePosPlatform(): SquarePosPlatform {
   if (typeof navigator === "undefined") return "unsupported";
   const ua = navigator.userAgent;
   if (/iPad|iPhone|iPod/.test(ua)) return "ios";
+  // iPadOS 13以降のSafariは既定で「Macintosh」を名乗るデスクトップ版UAを送るため、
+  // UA文字列だけでは実機のMacと区別できない。実際のMacはタッチ非対応
+  // (maxTouchPoints=0)なので、タッチ対応のMacintosh名乗りはiPadとみなす。
+  if (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) return "ios";
   if (/Android/.test(ua)) return "android";
   return "unsupported";
 }
