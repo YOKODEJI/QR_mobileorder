@@ -1154,11 +1154,27 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     const tableName = s.tableName(t);
     const token = newId();
-    if (typeof sessionStorage !== "undefined") {
-      sessionStorage.setItem(
+    if (typeof localStorage !== "undefined") {
+      // Android実機で確認: Square POSアプリからの戻り先が「別タブ」で開かれることがあり、
+      // タブ専用のsessionStorageでは会計開始時の情報を読めなくなる。タブをまたいで
+      // 共有されるlocalStorageに保存する（コールバック側での期限切れ判定はts参照）。
+      localStorage.setItem(
         `squarePosPending:${token}`,
-        JSON.stringify({ tableId: t, tableName, discountType, discountValue, chargeEnabled })
+        JSON.stringify({ tableId: t, tableName, discountType, discountValue, chargeEnabled, ts: Date.now() })
       );
+      // 消し忘れ(未完了のまま放置)がlocalStorageに溜まり続けないよう、書き込みのついでに
+      // 30分より古いペンディングエントリを掃除する。
+      const cutoff = Date.now() - 30 * 60 * 1000;
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith("squarePosPending:") && k !== `squarePosPending:${token}`)
+        .forEach((k) => {
+          try {
+            const v = JSON.parse(localStorage.getItem(k) ?? "{}");
+            if (!v.ts || v.ts < cutoff) localStorage.removeItem(k);
+          } catch {
+            localStorage.removeItem(k);
+          }
+        });
     }
     const url = buildSquarePosUrl({
       platform,

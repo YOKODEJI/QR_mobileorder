@@ -14,7 +14,12 @@ type PendingCheckout = {
   discountType: DiscountType;
   discountValue: number;
   chargeEnabled: boolean;
+  ts: number;
 };
+
+/** ペンディング情報の有効期限。localStorageはタブを閉じても残り続けるため、
+ *  古い(=別の会計操作で上書きされずに放置された)エントリを誤って使わないための上限。 */
+const PENDING_MAX_AGE_MS = 30 * 60 * 1000;
 
 const FONT =
   "-apple-system, BlinkMacSystemFont, 'Hiragino Sans', var(--font-noto-sans-jp), 'Noto Sans JP', sans-serif";
@@ -36,10 +41,14 @@ async function verifySquarePayment(transactionId: string): Promise<{ verified: b
 }
 
 /** Square POSアプリから戻ってきた直後に一度だけ表示される画面(step19)。
- *  ここで初めて当店側の会計(close_table)を確定する。sessionStorageに
+ *  ここで初めて当店側の会計(close_table)を確定する。localStorageに
  *  会計ボタンを押した時点で退避しておいた内容(卓・割引等)を、Square側の
  *  結果(state)と突き合わせて使う（ページ遷移でZustandの状態は失われるため）。
- *  ペンディング情報(sessionStorage)は、会計が実際に確定した時にだけ消す。
+ *  sessionStorageではなくlocalStorageを使うのは、Android実機で確認した通り
+ *  Square POSアプリからの戻り先が「別タブ」で開かれることがあり、タブ専用の
+ *  sessionStorageでは会計開始時の情報を読めなくなるため（タブをまたいで
+ *  共有されるlocalStorageなら読める）。
+ *  ペンディング情報は、会計が実際に確定した時にだけ消す。
  *  失敗時に消してしまうと、リロードしても再試行できなくなるため。 */
 export default function SquareCallback() {
   const [phase, setPhase] = useState<Phase>("processing");
@@ -57,7 +66,7 @@ export default function SquareCallback() {
       }
 
       const token = result.state;
-      const raw = token && typeof sessionStorage !== "undefined" ? sessionStorage.getItem(`squarePosPending:${token}`) : null;
+      const raw = token && typeof localStorage !== "undefined" ? localStorage.getItem(`squarePosPending:${token}`) : null;
 
       if (!raw) {
         if (!cancelled) {
@@ -70,8 +79,17 @@ export default function SquareCallback() {
       if (!cancelled) setTableName(pending.tableName);
 
       const clearPending = () => {
-        if (typeof sessionStorage !== "undefined") sessionStorage.removeItem(`squarePosPending:${token}`);
+        if (typeof localStorage !== "undefined") localStorage.removeItem(`squarePosPending:${token}`);
       };
+
+      if (Date.now() - (pending.ts ?? 0) > PENDING_MAX_AGE_MS) {
+        clearPending();
+        if (!cancelled) {
+          setPhase("error");
+          setDetail("お会計を開始してから時間が経ちすぎているため、この記録は無効になりました。決済が完了していないか確認の上、必要ならもう一度「Squareで決済する」からやり直してください。");
+        }
+        return;
+      }
 
       if (result.status === "canceled") {
         clearPending(); // キャンセルは再試行の必要が無いのでここで消してよい
@@ -129,6 +147,11 @@ export default function SquareCallback() {
       }
       clearPending();
       setPhase("success");
+      // 会計成功時はスタッフの操作を待たず自動的に管理画面へ戻る
+      // （手動タップ待ちのままレジ前で放置される事故を避ける）。
+      setTimeout(() => {
+        if (!cancelled) window.location.href = "/admin";
+      }, 1500);
     })();
     return () => {
       cancelled = true;
