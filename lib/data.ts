@@ -333,6 +333,53 @@ export function subscribeRealtime(onChange: (table: string) => void): () => void
   };
 }
 
+/** 親機（スタッフ）専用: DBが注文確定・呼び出し作成と同時に送る中身入りの通知を受け取る（step20）。
+ *  private チャンネルなので自店舗のスタッフしか受信できない。受信した内容はDBがコミットしたもの。
+ *  step20未適用のDBでは購読が拒否されるだけで、従来の postgres_changes 経路はそのまま動く。 */
+export function subscribeStoreBroadcast(handlers: {
+  onOrder: (order: Order) => void;
+  onCall: (call: StaffCall) => void;
+}): () => void {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return () => {};
+  let warned = false;
+  const channel = sb
+    .channel(`store:${STORE_ID}`, { config: { private: true } })
+    .on("broadcast", { event: "order_created" }, ({ payload }) => {
+      const o = (payload as { order?: Record<string, unknown> })?.order;
+      if (!o?.id) return;
+      handlers.onOrder({
+        id: o.id as string,
+        table: o.table as string,
+        createdAt: o.createdAt as string,
+        status: o.status as Order["status"],
+        proxy: (o.proxy as boolean) || undefined,
+        checkedOutAt: (o.checkedOutAt as string | null) ?? undefined,
+        items: ((o.items ?? []) as Array<Record<string, unknown>>).map((it) => ({
+          menuItemId: (it.menuItemId as string) ?? "",
+          name: it.name as string,
+          price: it.price as number,
+          qty: it.qty as number,
+          options: (it.options as SelectedOption[] | null) ?? [],
+        })),
+      });
+    })
+    .on("broadcast", { event: "call_created" }, ({ payload }) => {
+      const c = (payload as { call?: Record<string, unknown> })?.call;
+      if (!c?.id) return;
+      handlers.onCall({ id: c.id as string, table: c.table as string, createdAt: c.createdAt as string });
+    })
+    .subscribe((status, err) => {
+      if (status === "CHANNEL_ERROR" && !warned) {
+        warned = true;
+        console.warn("store broadcast unavailable (step20未適用?):", err?.message ?? status);
+      }
+    });
+  return () => {
+    sb.removeChannel(channel);
+  };
+}
+
 /** チャネルの接続状態を購読（true=接続, false=切断） */
 export function subscribeConnection(onState: (connected: boolean) => void): () => void {
   const sb = getSupabase();
@@ -405,12 +452,38 @@ export async function dbInsertOrder(
   return orderId;
 }
 
+export type SubmitErrorCode = "out_of_stock" | "session" | "rate_limited" | "closed" | "error";
+
 export type SubmitResult =
   | { ok: true; orderId: string }
-  | { ok: false; code: "out_of_stock" | "session" | "rate_limited" | "closed" | "error"; message: string };
+  | { ok: false; code: SubmitErrorCode; message: string };
 
-/** Edge Function `submit_order` 経由で注文（冪等・在庫の原子的減算・スナップショットをサーバで保証） */
-export async function dbSubmitOrderViaFunction(
+/** place_order が raise するメッセージを画面用の分類に変換する（RPC/Edge Function共通） */
+export function classifyOrderError(msg: string): SubmitErrorCode {
+  if (/out of stock/i.test(msg)) return "out_of_stock";
+  if (/table closed/i.test(msg)) return "closed";
+  if (/session expired|invalid token/i.test(msg)) return "session";
+  if (/too many requests/i.test(msg)) return "rate_limited";
+  return "error";
+}
+
+// 送るのは optionIds だけ。追加料金は place_order がDBから引く（クライアント申告は信用しない）
+function orderPayload(items: OrderItem[]) {
+  return items.map((it) => ({
+    menuItemId: it.menuItemId,
+    qty: it.qty,
+    optionIds: (it.options ?? []).map((o) => o.id),
+  }));
+}
+
+// step20 のSQLが未実行のDBでは submit_order_direct が存在しない。一度見つからなければ
+// このページを開いている間は Edge Function 経路だけを使う（毎回の空振りを避ける）。
+let directRpcUnavailable = false;
+
+/** 注文をサーバー側で確定する（冪等・在庫の原子的減算・スナップショットをサーバで保証）。
+ *  RPC submit_order_direct を直接呼ぶ（Edge Functionより往復が約300ms短く、起動待ちも無い）。
+ *  確定と同時にDBが親機へ注文をBroadcastする。RPCが未作成なら Edge Function に戻す。 */
+export async function dbSubmitOrder(
   tableId: string,
   items: OrderItem[],
   proxy: boolean,
@@ -419,14 +492,38 @@ export async function dbSubmitOrderViaFunction(
 ): Promise<SubmitResult> {
   const sb = getSupabase();
   if (!sb || !STORE_ID) return { ok: false, code: "error", message: "not configured" };
-  // 送るのは optionIds だけ。追加料金は place_order がDBから引く（クライアント申告は信用しない）
-  const payload = items.map((it) => ({
-    menuItemId: it.menuItemId,
-    qty: it.qty,
-    optionIds: (it.options ?? []).map((o) => o.id),
-  }));
+  if (directRpcUnavailable) return dbSubmitOrderViaFunction(tableId, items, proxy, idempotencyKey, token);
+
+  const { data, error } = await sb.rpc("submit_order_direct", {
+    p_store: STORE_ID,
+    p_table: tableId,
+    p_proxy: proxy,
+    p_idem: idempotencyKey,
+    p_items: orderPayload(items),
+    p_token: token,
+  });
+  if (error) {
+    if (error.code === "PGRST202") {
+      directRpcUnavailable = true;
+      return dbSubmitOrderViaFunction(tableId, items, proxy, idempotencyKey, token);
+    }
+    return { ok: false, code: classifyOrderError(error.message), message: error.message };
+  }
+  return { ok: true, orderId: (data as string) ?? "" };
+}
+
+/** Edge Function `submit_order` 経由で注文（step20未適用のDB向けの経路） */
+async function dbSubmitOrderViaFunction(
+  tableId: string,
+  items: OrderItem[],
+  proxy: boolean,
+  idempotencyKey: string,
+  token: string | null
+): Promise<SubmitResult> {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return { ok: false, code: "error", message: "not configured" };
   const { data, error } = await sb.functions.invoke("submit_order", {
-    body: { storeId: STORE_ID, tableId, proxy, idempotencyKey, token, items: payload },
+    body: { storeId: STORE_ID, tableId, proxy, idempotencyKey, token, items: orderPayload(items) },
   });
   if (error) {
     let msg = error.message;
@@ -437,16 +534,7 @@ export async function dbSubmitOrderViaFunction(
     } catch {
       /* ignore */
     }
-    const code = /out of stock/i.test(msg)
-      ? "out_of_stock"
-      : /table closed/i.test(msg)
-        ? "closed"
-        : /session expired|invalid token/i.test(msg)
-          ? "session"
-          : /too many requests/i.test(msg)
-            ? "rate_limited"
-            : "error";
-    return { ok: false, code, message: msg };
+    return { ok: false, code: classifyOrderError(msg), message: msg };
   }
   return { ok: true, orderId: (data?.orderId as string) ?? "" };
 }

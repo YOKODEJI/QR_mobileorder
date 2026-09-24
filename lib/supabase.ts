@@ -14,8 +14,8 @@ const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 export const STORE_ID = process.env.NEXT_PUBLIC_STORE_ID ?? "";
 
 /**
- * 注文/会計を Edge Function(place_order) / RPC(close_table) 経由にするか。
- * true にするのは、supabase/functions.sql を実行し、submit_order をデプロイした後。
+ * 注文/会計をサーバー側で確定するか（注文=RPC submit_order_direct、未作成ならEdge Function submit_order /
+ * 会計=RPC close_table）。true にするのは、supabase/functions.sql を実行し、submit_order をデプロイした後。
  */
 export const ORDER_VIA_FUNCTION =
   process.env.NEXT_PUBLIC_ORDER_VIA_FUNCTION === "true";

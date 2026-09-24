@@ -187,7 +187,7 @@ export default function AdminShell() {
         )}
       </main>
 
-      <SupabaseSync />
+      <SupabaseSync staff />
       <SettingsSheet />
       <AlertDialog />
       <Toast />

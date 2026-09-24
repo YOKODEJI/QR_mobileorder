@@ -217,6 +217,8 @@ export interface AppState {
     checkouts: CheckoutRecord[];
   }) => void;
   setConnected: (v: boolean) => void;
+  applyRemoteOrder: (order: Order) => void; // 親機: DBからのBroadcastで届いた確定注文を即反映
+  applyRemoteCall: (call: StaffCall) => void; // 親機: 同じくスタッフ呼び出し
   setCustomerTable: (id: string) => void;
   setCustomerToken: (k: string | null) => void;
   openSession: () => Promise<void>; // 現在の卓の session_token を取得
@@ -435,7 +437,13 @@ type PlaceResult =
   | { ok: true; id: string }
   | { ok: false; code: "out_of_stock" | "session" | "rate_limited" | "closed" | "error"; message: string };
 
-/** 注文の書き込み経路: フラグONならEdge Function、OFFなら直接insert。
+/** 注文を先頭に足す。親機ではDBからのBroadcastが自分のRPC応答より先に届くことがあるため、
+ *  同じidが既にあれば足さない（二重表示防止）。 */
+function prependOrder(orders: Order[], order: Order): Order[] {
+  return orders.some((o) => o.id === order.id) ? orders : [order, ...orders];
+}
+
+/** 注文の書き込み経路: フラグONならサーバー側確定（RPC、未作成ならEdge Function）、OFFなら直接insert。
  *  token は客の session_token（proxy注文では null）。 */
 async function placeOrder(
   tableId: string,
@@ -446,7 +454,7 @@ async function placeOrder(
   token: string | null
 ): Promise<PlaceResult> {
   if (ORDER_VIA_FUNCTION) {
-    const res = await db.dbSubmitOrderViaFunction(tableId, items, proxy, idem, token);
+    const res = await db.dbSubmitOrder(tableId, items, proxy, idem, token);
     return res.ok
       ? { ok: true, id: res.orderId }
       : { ok: false, code: res.code, message: res.message };
@@ -684,6 +692,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (shouldBeep) playBeep(true);
   },
   setConnected: (v) => set({ connected: v }),
+  applyRemoteOrder: (order) => {
+    const s = get();
+    if (s.orders.some((o) => o.id === order.id)) return;
+    set({ orders: [...s.orders, order] });
+    if (s.loaded && s.soundOn && order.status === "cooking") playBeep(true);
+  },
+  applyRemoteCall: (call) => {
+    const s = get();
+    if (s.calls.some((c) => c.id === call.id)) return;
+    set({ calls: [...s.calls, call] });
+  },
   setCustomerTable: (id) => set({ customerTableId: id }),
   setCustomerToken: (k) => set({ customerToken: k }),
 
@@ -877,10 +896,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       id = newId();
     }
     set((st) => ({
-      orders: [
-        { id: id!, table: tableId, createdAt: new Date().toISOString(), status: "cooking", items },
-        ...st.orders,
-      ],
+      orders: prependOrder(st.orders, {
+        id: id!,
+        table: tableId,
+        createdAt: new Date().toISOString(),
+        status: "cooking",
+        items,
+      }),
       menu: decrementStock(st.menu, items),
       cart: {},
       submitting: false,
@@ -918,10 +940,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       id = newId();
     }
     set((st) => ({
-      orders: [
-        { id: id!, table: t, createdAt: new Date().toISOString(), status: "cooking", items, proxy: true },
-        ...st.orders,
-      ],
+      orders: prependOrder(st.orders, {
+        id: id!,
+        table: t,
+        createdAt: new Date().toISOString(),
+        status: "cooking",
+        items,
+        proxy: true,
+      }),
       menu: decrementStock(st.menu, items),
       staffCart: {},
       highlightId: id,
@@ -1413,9 +1439,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       }));
       return;
     }
-    // 確定したサーバー側idへ差し替え（提供済み操作等が本物のorder idを必要とするため）
+    // 確定したサーバー側idへ差し替え（提供済み操作等が本物のorder idを必要とするため）。
+    // Broadcastで本物が先に届いていれば、仮の行は捨てるだけにする。
     set((st) => ({
-      orders: st.orders.map((o) => (o.id === tempId ? { ...o, id: res.id } : o)),
+      orders: st.orders.some((o) => o.id === res.id)
+        ? st.orders.filter((o) => o.id !== tempId)
+        : st.orders.map((o) => (o.id === tempId ? { ...o, id: res.id } : o)),
       highlightId: st.highlightId === tempId ? res.id : st.highlightId,
     }));
   },
