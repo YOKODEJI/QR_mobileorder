@@ -424,6 +424,9 @@ export default function MenuManagement() {
     }))
   );
   const accent = s.settings.theme;
+  // ハンディモードの店は金額を持たず、在庫を数えない店は在庫数を使わない（step21）
+  const showPrice = s.settings.orderMode !== "handy";
+  const showStock = s.settings.trackStock;
 
   /** 指定カテゴリで絞ったメニュー一覧（カルーセルの各ページの中身） */
   const itemsFor = (cat: string) =>
@@ -479,20 +482,24 @@ export default function MenuManagement() {
               fontWeight: 400,
             }}
           />
-          <input
-            type="number"
-            placeholder="価格"
-            value={s.newPrice}
-            onChange={(e) => s.setNewField("newPrice", e.target.value)}
-            style={{ ...insetInput, width: "100px" }}
-          />
-          <input
-            type="number"
-            placeholder="在庫"
-            value={s.newStock}
-            onChange={(e) => s.setNewField("newStock", e.target.value)}
-            style={{ ...insetInput, width: "90px" }}
-          />
+          {showPrice && (
+            <input
+              type="number"
+              placeholder="価格"
+              value={s.newPrice}
+              onChange={(e) => s.setNewField("newPrice", e.target.value)}
+              style={{ ...insetInput, width: "100px" }}
+            />
+          )}
+          {showStock && (
+            <input
+              type="number"
+              placeholder="在庫"
+              value={s.newStock}
+              onChange={(e) => s.setNewField("newStock", e.target.value)}
+              style={{ ...insetInput, width: "90px" }}
+            />
+          )}
           <button
             onClick={s.addItem}
             style={{ ...pill, border: "none", background: accent, color: "#fff", padding: "11px 22px", fontSize: "14px" }}
@@ -511,7 +518,14 @@ export default function MenuManagement() {
           <div>
             <div style={{ fontSize: "19px", fontWeight: 800 }}>メニュー管理</div>
             <div style={{ fontSize: "12px", color: "var(--text-2)", marginTop: "2px" }}>
-              価格は1円単位、在庫は増減できます。行をドラッグ&ドロップで並び替え。
+              {showPrice && showStock
+                ? "価格は1円単位、在庫は増減できます。"
+                : showPrice
+                  ? "価格は1円単位です。"
+                  : showStock
+                    ? "在庫は増減できます。"
+                    : ""}
+              行をドラッグ&ドロップで並び替え。
             </div>
           </div>
           {s.deleteMode ? (
@@ -642,6 +656,7 @@ export default function MenuManagement() {
                 </div>
 
                 {/* 価格 */}
+                {showPrice && (
                 <div style={{ display: "flex", alignItems: "center", gap: "3px", flexShrink: 0 }}>
                   <span style={{ fontSize: "14px", color: "var(--text-2)" }}>¥</span>
                   <input
@@ -663,8 +678,10 @@ export default function MenuManagement() {
                     }}
                   />
                 </div>
+                )}
 
                 {/* 在庫 */}
+                {showStock && (
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
                   <button
                     onClick={() => s.bumpStock(m.id, -1)}
@@ -699,6 +716,7 @@ export default function MenuManagement() {
                     ＋
                   </button>
                 </div>
+                )}
 
                 {/* この商品に出すオプション */}
                 <ItemOptionsButton item={m} accent={accent} />

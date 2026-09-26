@@ -13,6 +13,7 @@ import type {
   DiscountType,
   MenuOption,
   SelectedOption,
+  OrderMode,
 } from "@/store/useAppStore";
 
 export interface Snapshot {
@@ -29,6 +30,8 @@ export interface Snapshot {
   squarePosMode: string | null;
   squareApplicationId: string | null;
   squareLocationId: string | null;
+  orderMode: OrderMode;
+  trackStock: boolean;
   categories: string[];
   tables: TableRec[];
   menu: MenuItem[];
@@ -52,6 +55,8 @@ export interface StoreSettingsSlice {
   squarePosMode: string | null;
   squareApplicationId: string | null;
   squareLocationId: string | null;
+  orderMode: OrderMode;
+  trackStock: boolean;
 }
 
 /** 店舗設定のみ取得（Realtime差分更新用の1テーブル分）。
@@ -82,6 +87,21 @@ export async function fetchStoreSettings(): Promise<StoreSettingsSlice | null> {
     taxRate: (data?.tax_rate as number | null) ?? null,
     chargeRate: (data?.charge_rate as number | null) ?? null,
     ...(await fetchSquarePosConfig()),
+    ...(await fetchModeConfig()),
+  };
+}
+
+/** 注文の受け方（QR注文 / ハンディ）と在庫を数えるか（step21）。
+ *  列未追加(step21未適用)や失敗時は、従来どおりのQR注文・在庫あり扱いにして他機能を止めない。 */
+async function fetchModeConfig(): Promise<{ orderMode: OrderMode; trackStock: boolean }> {
+  const fallback = { orderMode: "qr" as const, trackStock: true };
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return fallback;
+  const { data, error } = await sb.from("stores").select("order_mode,track_stock").eq("id", STORE_ID).single();
+  if (error || !data) return fallback;
+  return {
+    orderMode: data.order_mode === "handy" ? "handy" : "qr",
+    trackStock: data.track_stock !== false,
   };
 }
 
@@ -214,7 +234,7 @@ export async function fetchOrders(): Promise<Order[] | null> {
   if (!sb || !STORE_ID) return null;
   const { data, error } = await sb
     .from("orders")
-    .select("id,table_id,status,proxy,created_at,checked_out_at, order_items(menu_item_id,name,price,qty,options)")
+    .select("id,table_id,status,proxy,created_at,checked_out_at, order_items(menu_item_id,name,price,qty,options,note)")
     .eq("store_id", STORE_ID)
     .order("created_at", { ascending: true });
   if (error) {
@@ -234,6 +254,7 @@ export async function fetchOrders(): Promise<Order[] | null> {
       price: it.price as number,
       qty: it.qty as number,
       options: (it.options as SelectedOption[] | null) ?? [],
+      note: (it.note as string | null) ?? null,
     })) as OrderItem[],
   }));
 }
@@ -361,6 +382,7 @@ export function subscribeStoreBroadcast(handlers: {
           price: it.price as number,
           qty: it.qty as number,
           options: (it.options as SelectedOption[] | null) ?? [],
+          note: (it.note as string | null) ?? null,
         })),
       });
     })
@@ -473,6 +495,7 @@ function orderPayload(items: OrderItem[]) {
     menuItemId: it.menuItemId,
     qty: it.qty,
     optionIds: (it.options ?? []).map((o) => o.id),
+    ...(it.note ? { note: it.note } : {}),
   }));
 }
 
@@ -810,6 +833,14 @@ export async function dbUpdateStore(patch: Record<string, unknown>): Promise<boo
   const sb = getSupabase();
   if (!sb || !STORE_ID) return true;
   return ok(sb.from("stores").update(patch).eq("id", STORE_ID), "dbUpdateStore");
+}
+
+/** 売切の切替（step21）。sold_out 列だけを書き換える専用RPCなので、
+ *  メニューの書き込み権限を持たない厨房・ハンディのアカウントからも使える。 */
+export async function dbSetSoldOut(id: string, soldOut: boolean): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb) return true;
+  return ok(sb.rpc("set_sold_out", { p_item: id, p_sold_out: soldOut }), "dbSetSoldOut");
 }
 
 /* ---- メニュー管理 ---- */

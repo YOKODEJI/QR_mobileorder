@@ -52,6 +52,7 @@ export interface OrderItem {
    *  実売価は price + Σ priceDelta。金額表示は必ず lib/options.ts の
    *  unitPrice() / lineTotal() を通すこと（price を直接掛けない）。 */
   options?: SelectedOption[];
+  note?: string | null; // 備考（ハンディで入力。例: お湯割り、氷なし）
 }
 
 export interface Order {
@@ -100,6 +101,7 @@ export interface CheckoutRecord {
 }
 
 export type TaxMode = "inclusive" | "exclusive"; // 内税 / 外税
+export type OrderMode = "qr" | "handy"; // 客のQR注文 / スタッフのハンディ（step21）
 
 export interface Settings {
   storeName: string;
@@ -117,6 +119,9 @@ export interface Settings {
   squarePosMode: string | null; // null | 'mobile_web' | 'terminal'(将来)
   squareApplicationId: string | null;
   squareLocationId: string | null;
+  // よこでじがSQLで設定する（step21）。handyの店は金額を持たず、trackStock=falseなら在庫数を見ない
+  orderMode: OrderMode;
+  trackStock: boolean;
 }
 
 export interface DialogSpec {
@@ -145,6 +150,7 @@ export interface AppState {
   //   同じ商品でもオプションの組み合わせが違えば別行として数量を持つ）
   cart: Record<string, number>;
   staffCart: Record<string, number>;
+  staffNotes: Record<string, string>; // staffCart の行（cartKey）ごとの備考
   // テーブル
   customerTableId: string;
   customerToken: string | null; // 客ページURLの ?k=（=その卓の qr_token）
@@ -208,6 +214,8 @@ export interface AppState {
     squarePosMode: string | null;
     squareApplicationId: string | null;
     squareLocationId: string | null;
+    orderMode: OrderMode;
+    trackStock: boolean;
     categories: string[];
     tables: TableRec[];
     menu: MenuItem[];
@@ -244,11 +252,12 @@ export interface AppState {
   removeCart: (id: string, optionIds?: string[]) => void;
   addStaff: (id: string, optionIds?: string[]) => void;
   removeStaff: (id: string, optionIds?: string[]) => void;
+  setStaffNote: (key: string, note: string) => void;
 
   // ---- 注文 ----
   confirmOrder: () => void;
   submitOrder: (idem?: string) => void;
-  submitProxy: (idem?: string) => void;
+  submitProxy: (idem?: string) => Promise<boolean>; // 確定できたら true
   dismissSuccess: () => void;
 
   // ---- スタッフ呼び出し ----
@@ -368,7 +377,8 @@ function playBeep(soundOn: boolean) {
 function buildItems(
   cart: Record<string, number>,
   menu: MenuItem[],
-  itemOptions: Record<string, MenuOption[]> = {}
+  itemOptions: Record<string, MenuOption[]> = {},
+  notes: Record<string, string> = {}
 ): OrderItem[] {
   return Object.keys(cart)
     .map((key): OrderItem | null => {
@@ -381,7 +391,15 @@ function buildItems(
         .map((oid) => avail.find((o) => o.id === oid))
         .filter((o): o is MenuOption => !!o)
         .map((o) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta }));
-      return { menuItemId, name: m.name, qty: cart[key], price: m.price, options: sel };
+      const note = notes[key]?.trim();
+      return {
+        menuItemId,
+        name: m.name,
+        qty: cart[key],
+        price: m.price,
+        options: sel,
+        ...(note ? { note } : {}),
+      };
     })
     .filter((x): x is OrderItem => x !== null);
 }
@@ -395,15 +413,17 @@ function cartQtyOfItem(cart: Record<string, number>, menuItemId: string): number
   );
 }
 
-/** カートに1個足す（在庫上限まで）。cart/staffCart で共通のロジック。 */
+/** カートに1個足す（在庫上限まで。在庫を数えない店は売切だけ見る）。cart/staffCart で共通のロジック。 */
 function addToCart(
   cart: Record<string, number>,
   menu: MenuItem[],
   menuItemId: string,
-  optionIds: string[]
+  optionIds: string[],
+  trackStock: boolean
 ): Record<string, number> | null {
   const m = menu.find((x) => x.id === menuItemId);
-  if (!m || m.soldOut || cartQtyOfItem(cart, menuItemId) >= m.stock) return null;
+  if (!m || m.soldOut) return null;
+  if (trackStock && cartQtyOfItem(cart, menuItemId) >= m.stock) return null;
   const key = cartKey(menuItemId, optionIds);
   return { ...cart, [key]: (cart[key] || 0) + 1 };
 }
@@ -517,6 +537,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     squarePosMode: null,
     squareApplicationId: null,
     squareLocationId: null,
+    orderMode: "qr",
+    trackStock: true,
   },
   showSettings: false,
   customerCat: "すべて",
@@ -524,6 +546,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   adminCat: "すべて",
   cart: {},
   staffCart: {},
+  staffNotes: {},
   customerTableId: "t5",
   customerToken: null,
   sessionToken: null,
@@ -675,6 +698,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           squarePosMode: snap.squarePosMode,
           squareApplicationId: snap.squareApplicationId,
           squareLocationId: snap.squareLocationId,
+          orderMode: snap.orderMode,
+          trackStock: snap.trackStock,
         },
         tables: snap.tables,
         menu: snap.menu,
@@ -805,7 +830,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const t = get().tables.find((x) => x.id === id);
     return t ? t.name : "テーブル";
   },
-  avail: (m) => !m.soldOut && m.stock > 0,
+  avail: (m) => !m.soldOut && (!get().settings.trackStock || m.stock > 0),
 
   // ---- ナビ ----
   setTop: (t) => set({ topTab: t }),
@@ -819,7 +844,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   // またいだ「商品単位の合計個数」で行う。
   addCart: (id, optionIds = []) => {
     const s = get();
-    const next = addToCart(s.cart, s.menu, id, optionIds);
+    const next = addToCart(s.cart, s.menu, id, optionIds, s.settings.trackStock);
     if (!next) {
       get().pushToast("売り切れのため、これ以上ご注文いただけません。");
       return;
@@ -830,11 +855,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({ cart: removeFromCart(s.cart, id, optionIds) })),
   addStaff: (id, optionIds = []) =>
     set((s) => {
-      const next = addToCart(s.staffCart, s.menu, id, optionIds);
+      const next = addToCart(s.staffCart, s.menu, id, optionIds, s.settings.trackStock);
       return next ? { staffCart: next } : {};
     }),
   removeStaff: (id, optionIds = []) =>
-    set((s) => ({ staffCart: removeFromCart(s.staffCart, id, optionIds) })),
+    set((s) => {
+      const staffCart = removeFromCart(s.staffCart, id, optionIds);
+      const key = cartKey(id, optionIds);
+      if (staffCart[key]) return { staffCart };
+      const staffNotes = { ...s.staffNotes };
+      delete staffNotes[key]; // 行が消えたら備考も消す
+      return { staffCart, staffNotes };
+    }),
+  setStaffNote: (key, note) => set((s) => ({ staffNotes: { ...s.staffNotes, [key]: note } })),
 
   // ---- 注文 ----
   confirmOrder: () => {
@@ -917,9 +950,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   submitProxy: async (idem) => {
     const s = get();
     const t = s.selectedStaffTable;
-    if (t == null) return;
-    const items = buildItems(s.staffCart, s.menu, s.itemOptions);
-    if (items.length === 0) return;
+    if (t == null) return false;
+    const items = buildItems(s.staffCart, s.menu, s.itemOptions, s.staffNotes);
+    if (items.length === 0) return false;
     const configured = isSupabaseConfigured();
     const key = idem ?? newId();
     let id: string | null = null;
@@ -933,7 +966,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             get().submitProxy(key);
           }),
         });
-        return;
+        return false;
       }
       id = res.id;
     } else {
@@ -948,14 +981,16 @@ export const useAppStore = create<AppState>((set, get) => ({
         items,
         proxy: true,
       }),
-      menu: decrementStock(st.menu, items),
+      menu: st.settings.trackStock ? decrementStock(st.menu, items) : st.menu,
       staffCart: {},
+      staffNotes: {},
       highlightId: id,
     }));
     playBeep(get().soundOn);
     setTimeout(() => {
       if (get().highlightId === id) set({ highlightId: null });
     }, 2600);
+    return true;
   },
   dismissSuccess: () => set({ justOrdered: false }),
 
@@ -1406,7 +1441,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const t = s.selectedStaffTable;
     if (t == null) return;
     const m = s.menu.find((x) => x.id === menuItemId);
-    if (!m || m.soldOut || m.stock <= 0) {
+    if (!m || m.soldOut || (s.settings.trackStock && m.stock <= 0)) {
       get().pushToast("在庫がないため追加できません。");
       return;
     }
@@ -1688,7 +1723,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({
       menu: s.menu.map((m) => (m.id === id ? { ...m, soldOut: !m.soldOut } : m)),
     }));
-    const success = await db.dbUpdateMenu(id, { sold_out: !m0.soldOut });
+    const success = await db.dbSetSoldOut(id, !m0.soldOut);
     if (!success) {
       set({ menu: prevMenu });
       get().pushToast("売切状態の保存に失敗しました。もう一度お試しください。");

@@ -16,6 +16,7 @@ export default function OptionSheet({
   yen,
   onClose,
   onAdd,
+  hidePrice = false,
 }: {
   item: MenuItem;
   /** この商品に紐付いたオプション候補（並び順のまま） */
@@ -24,6 +25,8 @@ export default function OptionSheet({
   yen: (n: number) => string;
   onClose: () => void;
   onAdd: (optionIds: string[]) => void;
+  /** 金額を持たない店（ハンディモード）では価格を出さない */
+  hidePrice?: boolean;
 }) {
   const [selected, setSelected] = useState<string[]>([]);
   const chosen = options.filter((o) => selected.includes(o.id));
@@ -117,7 +120,7 @@ export default function OptionSheet({
                 <span style={{ flex: 1, fontSize: "16px", fontWeight: 600, color: "var(--text)" }}>
                   {o.name}
                 </span>
-                {o.priceDelta !== 0 && (
+                {!hidePrice && o.priceDelta !== 0 && (
                   <span
                     style={{
                       fontSize: "14px",
@@ -154,8 +157,8 @@ export default function OptionSheet({
             alignItems: "center",
           }}
         >
-          <span>カートに追加</span>
-          <span style={{ fontVariantNumeric: "tabular-nums" }}>{yen(total)}</span>
+          <span>{hidePrice ? "追加する" : "カートに追加"}</span>
+          {!hidePrice && <span style={{ fontVariantNumeric: "tabular-nums" }}>{yen(total)}</span>}
         </button>
       </div>
     </div>

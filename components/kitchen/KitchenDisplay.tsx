@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import { hm, elapsedMin, useNow } from "@/lib/time";
 import { BellIcon, BellSlashIcon, WarningIcon } from "@/components/ui/Icon";
 import { optionsLabel } from "@/lib/options";
+import SoldOutSheet from "@/components/kitchen/SoldOutSheet";
 
 /** 提供前伝票の経過時間による色エスカレーション */
 function ticketHeaderColor(
@@ -35,6 +37,8 @@ export default function KitchenDisplay() {
   );
   const accent = s.settings.theme;
   const now = useNow();
+  const [soldOutOpen, setSoldOutOpen] = useState(false);
+  const soldOutCount = useAppStore((st) => st.menu.filter((m) => m.soldOut).length);
 
   // FIFO: 提供前を先に、各グループ内は古い順（先に入った注文を先に作る）
   const sorted = [...s.orders].sort((a, b) => {
@@ -101,8 +105,15 @@ export default function KitchenDisplay() {
               {s.soundOn ? <BellIcon size={13} /> : <BellSlashIcon size={13} />}
               {s.soundOn ? "通知音 ON" : "通知音 OFF"}
             </button>
+            <button
+              onClick={() => setSoldOutOpen(true)}
+              style={{ ...pill, cursor: "pointer", background: "var(--control-tint)", color: "var(--text)" }}
+            >
+              売切{soldOutCount > 0 ? `（${soldOutCount}）` : ""}
+            </button>
           </div>
         </div>
+        {soldOutOpen && <SoldOutSheet onClose={() => setSoldOutOpen(false)} />}
 
         {/* スタッフ呼び出しバナー */}
         {s.calls.length > 0 && (
@@ -316,6 +327,11 @@ export default function KitchenDisplay() {
                           {optionsLabel(it.options) && (
                             <span style={{ display: "block", fontSize: "14px", fontWeight: 700, color: "var(--red-dark)" }}>
                               {optionsLabel(it.options)}
+                            </span>
+                          )}
+                          {it.note && (
+                            <span style={{ display: "block", fontSize: "14px", fontWeight: 700, color: "var(--red-dark)" }}>
+                              ※ {it.note}
                             </span>
                           )}
                         </span>

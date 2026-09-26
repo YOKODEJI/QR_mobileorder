@@ -119,6 +119,8 @@ export default function SupabaseSync({ staff = false }: { staff?: boolean }) {
         squarePosMode: store?.squarePosMode ?? cur.settings.squarePosMode,
         squareApplicationId: store?.squareApplicationId ?? cur.settings.squareApplicationId,
         squareLocationId: store?.squareLocationId ?? cur.settings.squareLocationId,
+        orderMode: store?.orderMode ?? cur.settings.orderMode,
+        trackStock: store?.trackStock ?? cur.settings.trackStock,
         categories: categories ?? cur.categories,
         tables: tables ?? cur.tables,
         menu: menu ?? cur.menu,

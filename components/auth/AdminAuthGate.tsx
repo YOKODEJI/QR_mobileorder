@@ -25,7 +25,14 @@ const IDLE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
  *   自前でlocalStorageに記録した最終操作時刻を基準に行っている。
  * ※ これはUI層の保護。DBレベルの最終的な制御はRLS（staff_store_id()ベース）で行う。
  */
-export default function AdminAuthGate({ children }: { children: React.ReactNode }) {
+export default function AdminAuthGate({
+  children,
+  label = "管理画面",
+}: {
+  children: React.ReactNode;
+  /** ログイン画面の見出し（/handy・/kitchen でも同じゲートを使うため） */
+  label?: string;
+}) {
   const [state, setState] = useState<AuthState>(
     isSupabaseConfigured() ? "loading" : "in"
   );
@@ -109,14 +116,19 @@ export default function AdminAuthGate({ children }: { children: React.ReactNode 
 
   if (state === "loading") return <LoadingScreen label="認証を確認中…" />;
   if (state === "wrong-store")
-    return <LoginForm initialError="このアカウントはこの店舗のスタッフとして登録されていません。" />;
+    return <LoginForm label={label} initialError="このアカウントはこの店舗のスタッフとして登録されていません。" />;
   if (state === "idle-out")
-    return <LoginForm initialError="12時間操作が無かったため自動的にログアウトしました。もう一度ログインしてください。" />;
-  if (state === "out") return <LoginForm />;
+    return (
+      <LoginForm
+        label={label}
+        initialError="12時間操作が無かったため自動的にログアウトしました。もう一度ログインしてください。"
+      />
+    );
+  if (state === "out") return <LoginForm label={label} />;
   return <>{children}</>;
 }
 
-function LoginForm({ initialError }: { initialError?: string }) {
+function LoginForm({ initialError, label }: { initialError?: string; label: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(initialError ?? null);
@@ -198,7 +210,7 @@ function LoginForm({ initialError }: { initialError?: string }) {
         }}
       >
         <div style={{ fontSize: "20px", fontWeight: 800, marginBottom: "4px", textWrap: "balance" }}>
-          {storeName ? `${storeName} 管理画面 ログイン` : "管理画面 ログイン"}
+          {storeName ? `${storeName} ${label} ログイン` : `${label} ログイン`}
         </div>
         <div style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "8px" }}>
           スタッフ用のメールアドレスとパスワードでログインしてください。
