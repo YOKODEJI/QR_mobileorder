@@ -1,5 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { normalizeForSearch, filterMenu, tableSummary, parseBulkMenu, billLines } from "./handy";
+import {
+  normalizeForSearch,
+  filterMenu,
+  tableSummary,
+  parseBulkMenu,
+  billLines,
+  sortByPopularity,
+  popularityFromOrders,
+  tableRepeatItems,
+} from "./handy";
 import type { MenuItem, Order } from "@/store/useAppStore";
 
 const item = (id: string, name: string, cat: string): MenuItem => ({
@@ -82,6 +91,47 @@ describe("billLines", () => {
     expect(billLines(orders, "A")).toEqual([
       { name: "山崎", optionsText: "ロック", qty: 3 },
       { name: "山崎", optionsText: "", qty: 1 },
+    ]);
+  });
+});
+
+describe("sortByPopularity", () => {
+  it("杯数の多い順。同数・注文なしは元の並びのまま", () => {
+    const items = [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }];
+    expect(sortByPopularity(items, { c: 5, b: 2, d: 2 }).map((x) => x.id)).toEqual(["c", "b", "d", "a"]);
+  });
+});
+
+describe("popularityFromOrders", () => {
+  it("注文の明細を品目ごとに合算する", () => {
+    const orders = [
+      { id: "1", table: "A", createdAt: "", status: "cooking" as const,
+        items: [{ menuItemId: "x", name: "", price: 0, qty: 2 }, { menuItemId: "y", name: "", price: 0, qty: 1 }] },
+      { id: "2", table: "B", createdAt: "", status: "served" as const,
+        items: [{ menuItemId: "x", name: "", price: 0, qty: 3 }] },
+    ];
+    expect(popularityFromOrders(orders)).toEqual({ x: 5, y: 1 });
+  });
+});
+
+describe("tableRepeatItems", () => {
+  it("この卓の品を商品＋飲み方ごとにまとめ、最近頼まれた順・直近の備考を持つ。他の卓と繰越伝票は含めない", () => {
+    const rock = [{ id: "r", name: "ロック", priceDelta: 0 }];
+    const orders: Order[] = [
+      { id: "1", table: "A", createdAt: "2026-09-26T10:00:00Z", status: "served",
+        items: [{ menuItemId: "w", name: "山崎", price: 0, qty: 1, options: rock, note: "氷少なめ" }] },
+      { id: "2", table: "A", createdAt: "2026-09-26T10:05:00Z", status: "served",
+        items: [{ menuItemId: "b", name: "ビール", price: 0, qty: 2 }] },
+      { id: "3", table: "A", createdAt: "2026-09-26T10:20:00Z", status: "cooking",
+        items: [{ menuItemId: "w", name: "山崎", price: 0, qty: 1, options: rock, note: "氷なし" }] },
+      { id: "4", table: "B", createdAt: "2026-09-26T10:30:00Z", status: "cooking",
+        items: [{ menuItemId: "x", name: "他卓", price: 0, qty: 1 }] },
+      { id: "5", table: "A", createdAt: "2026-09-26T09:00:00Z", status: "cooking", checkedOutAt: "x",
+        items: [{ menuItemId: "old", name: "前の客", price: 0, qty: 1 }] },
+    ];
+    expect(tableRepeatItems(orders, "A")).toEqual([
+      { key: "w|r", menuItemId: "w", optionIds: ["r"], name: "山崎", optionsText: "ロック", note: "氷なし", qty: 2 },
+      { key: "b|", menuItemId: "b", optionIds: [], name: "ビール", optionsText: "", note: null, qty: 2 },
     ]);
   });
 });

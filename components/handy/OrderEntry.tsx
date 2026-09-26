@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useAppStore, type MenuItem } from "@/store/useAppStore";
 import { parseCartKey, optionsLabel } from "@/lib/options";
-import { filterMenu } from "@/lib/handy";
+import { filterMenu, sortByPopularity, tableRepeatItems, type RepeatItem } from "@/lib/handy";
+import { useMenuPopularity } from "@/lib/useMenuPopularity";
 import OptionSheet from "@/components/ui/OptionSheet";
 
 /** 注文入力。種類の切替＋検索で品目を選び、確認画面（数量・備考）から送信する。金額は出さない。
@@ -13,6 +14,7 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
   const s = useAppStore(
     useShallow((st) => ({
       menu: st.menu,
+      orders: st.orders,
       categories: st.categories,
       itemOptions: st.itemOptions,
       staffCart: st.staffCart,
@@ -32,8 +34,19 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
   const [reviewing, setReviewing] = useState(false);
   const [sending, setSending] = useState(false);
 
+  const popularity = useMenuPopularity();
   const usedCats = s.categories.filter((c) => s.menu.some((m) => m.cat === c));
-  const items = filterMenu(s.menu, cat, query);
+  // 店全体の人気順（画面を開いた時点の順で固定。押している最中に並びが動かないように）
+  const items = sortByPopularity(filterMenu(s.menu, cat, query), popularity);
+  const repeats = tableRepeatItems(s.orders, tableId);
+  const soldOutIds = new Set(s.menu.filter((m) => m.soldOut).map((m) => m.id));
+
+  // おかわり: 同じ品・同じ飲み方を1杯足す。前回の備考は、この行にまだ備考が無ければ引き継ぐ
+  const repeat = (r: RepeatItem) => {
+    if (soldOutIds.has(r.menuItemId)) return;
+    s.addStaff(r.menuItemId, r.optionIds);
+    if (r.note && !s.staffNotes[r.key]) s.setStaffNote(r.key, r.note);
+  };
   const cartKeys = Object.keys(s.staffCart);
   const totalQty = cartKeys.reduce((a, k) => a + s.staffCart[k], 0);
   const qtyOf = (id: string) =>
@@ -103,6 +116,72 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
       </div>
 
       <div style={{ padding: "4px 12px 110px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        {!query && repeats.length > 0 && (
+          <div style={{ marginBottom: "6px" }}>
+            <div style={{ fontSize: "13px", fontWeight: 800, color: "var(--text-2)", margin: "2px 2px 6px" }}>
+              この卓の注文（タップでおかわり）
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              {repeats.map((r) => {
+                const soldOut = soldOutIds.has(r.menuItemId);
+                const inCart = s.staffCart[r.key] ?? 0;
+                return (
+                  <button
+                    key={r.key}
+                    onClick={() => repeat(r)}
+                    disabled={soldOut}
+                    aria-label={soldOut ? `${r.name}（売切）` : `${r.name}${r.optionsText ? "・" + r.optionsText : ""}をおかわり`}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      minHeight: "52px",
+                      padding: "8px 14px",
+                      borderRadius: "14px",
+                      border: inCart > 0 ? "2px solid var(--accent)" : "1px dashed var(--accent)",
+                      background: soldOut ? "var(--hairline)" : "var(--chip-tint)",
+                      fontFamily: "inherit",
+                      textAlign: "left",
+                      cursor: soldOut ? "default" : "pointer",
+                      width: "100%",
+                    }}
+                  >
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span
+                        style={{
+                          display: "block",
+                          fontSize: "16px",
+                          fontWeight: 700,
+                          color: soldOut ? "var(--text-3)" : "var(--text)",
+                        }}
+                      >
+                        {r.name}
+                      </span>
+                      {(r.optionsText || r.note) && (
+                        <span style={{ fontSize: "12px", color: "var(--text-2)" }}>
+                          {[r.optionsText, r.note && `※ ${r.note}`].filter(Boolean).join("　")}
+                        </span>
+                      )}
+                    </span>
+                    {soldOut ? (
+                      <span style={{ fontSize: "13px", fontWeight: 800, color: "var(--red-dark)" }}>売切</span>
+                    ) : (
+                      <span style={{ fontSize: "12px", color: "var(--text-2)", whiteSpace: "nowrap" }}>
+                        これまで{r.qty}
+                        {inCart > 0 && (
+                          <strong style={{ marginLeft: "6px", fontSize: "15px", color: "var(--accent)" }}>＋{inCart}</strong>
+                        )}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ fontSize: "13px", fontWeight: 800, color: "var(--text-2)", margin: "14px 2px 0" }}>
+              メニュー（人気順）
+            </div>
+          </div>
+        )}
         {items.length === 0 && (
           <div style={{ textAlign: "center", color: "var(--text-2)", padding: "40px 0" }}>該当する品目がありません</div>
         )}

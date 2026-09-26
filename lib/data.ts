@@ -845,6 +845,17 @@ export async function dbFetchStaffRole(): Promise<StaffRole | null> {
   return data === "owner" || data === "staff" || data === "kitchen" ? data : null;
 }
 
+/** 店全体の人気（品目id→直近30日の杯数。step23）。取れなければ null（並びは元のまま） */
+export async function fetchMenuPopularity(): Promise<Record<string, number> | null> {
+  const sb = getSupabase();
+  if (!sb) return null;
+  const { data, error } = await sb.rpc("menu_popularity", { p_days: 30 });
+  if (error || !data) return null;
+  const pop: Record<string, number> = {};
+  for (const r of data as Array<{ menu_item_id: string; qty: number }>) pop[r.menu_item_id] = Number(r.qty) || 0;
+  return pop;
+}
+
 /** 卓移動（step22）。移動先が空席のときだけ成功する。失敗理由をそのまま返す */
 export async function dbMoveTable(from: string, to: string): Promise<{ ok: true } | { ok: false; message: string }> {
   const sb = getSupabase();

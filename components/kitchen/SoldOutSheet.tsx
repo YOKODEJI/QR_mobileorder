@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useAppStore } from "@/store/useAppStore";
-import { filterMenu } from "@/lib/handy";
+import { filterMenu, sortByPopularity } from "@/lib/handy";
+import { useMenuPopularity } from "@/lib/useMenuPopularity";
 
 /** 厨房画面の売切切替。品目ごとにオン・オフし、切り替えた瞬間にハンディの注文画面へ反映される */
 export default function SoldOutSheet({ onClose }: { onClose: () => void }) {
@@ -17,7 +18,8 @@ export default function SoldOutSheet({ onClose }: { onClose: () => void }) {
   const [cat, setCat] = useState("すべて");
   const [query, setQuery] = useState("");
   const usedCats = s.categories.filter((c) => s.menu.some((m) => m.cat === c));
-  const items = filterMenu(s.menu, cat, query);
+  const popularity = useMenuPopularity();
+  const items = sortByPopularity(filterMenu(s.menu, cat, query), popularity);
   const soldOutCount = s.menu.filter((m) => m.soldOut).length;
 
   return (

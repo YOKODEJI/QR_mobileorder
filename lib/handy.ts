@@ -1,6 +1,74 @@
 // ハンディ画面（/handy）用の純粋関数。画面から切り離してテストできるようにしている。
 import type { MenuItem, Order } from "@/store/useAppStore";
-import { optionsLabel } from "@/lib/options";
+import { optionsLabel, cartKey } from "@/lib/options";
+
+/** 店全体の人気順（杯数の多い順）。同じ杯数・注文なしの品は元の並び（メニュー管理の順）のまま */
+export function sortByPopularity<T extends { id: string }>(items: T[], popularity: Record<string, number>): T[] {
+  return items
+    .map((item, index) => ({ item, index, qty: popularity[item.id] ?? 0 }))
+    .sort((a, b) => b.qty - a.qty || a.index - b.index)
+    .map((x) => x.item);
+}
+
+/** Supabase未設定（ローカル開発）用: 手元の注文から品目ごとの杯数を数える */
+export function popularityFromOrders(orders: Order[]): Record<string, number> {
+  const pop: Record<string, number> = {};
+  for (const o of orders) for (const it of o.items) pop[it.menuItemId] = (pop[it.menuItemId] ?? 0) + it.qty;
+  return pop;
+}
+
+export interface RepeatItem {
+  key: string; // staffCart のキー（商品＋オプション）
+  menuItemId: string;
+  optionIds: string[];
+  name: string;
+  optionsText: string;
+  note: string | null; // 直近の備考（おかわりでも同じことが多い）
+  qty: number; // この卓でこれまでに出た杯数
+}
+
+/** この卓でこれまでに頼まれた品（商品＋飲み方ごと）。おかわりしやすいよう、最近頼まれた順 */
+export function tableRepeatItems(orders: Order[], tableId: string): RepeatItem[] {
+  const map = new Map<string, RepeatItem & { lastAt: number }>();
+  for (const o of orders) {
+    if (o.table !== tableId || o.checkedOutAt) continue;
+    const at = new Date(o.createdAt).getTime();
+    for (const it of o.items) {
+      const optionIds = (it.options ?? []).map((x) => x.id);
+      const key = cartKey(it.menuItemId, optionIds);
+      const cur = map.get(key);
+      if (cur) {
+        cur.qty += it.qty;
+        if (at >= cur.lastAt) {
+          cur.lastAt = at;
+          cur.note = it.note ?? null;
+        }
+      } else {
+        map.set(key, {
+          key,
+          menuItemId: it.menuItemId,
+          optionIds,
+          name: it.name,
+          optionsText: optionsLabel(it.options),
+          note: it.note ?? null,
+          qty: it.qty,
+          lastAt: at,
+        });
+      }
+    }
+  }
+  return [...map.values()]
+    .sort((a, b) => b.lastAt - a.lastAt)
+    .map((r) => ({
+      key: r.key,
+      menuItemId: r.menuItemId,
+      optionIds: r.optionIds,
+      name: r.name,
+      optionsText: r.optionsText,
+      note: r.note,
+      qty: r.qty,
+    }));
+}
 
 /** 検索用の正規化: 全角/半角・大小文字・カタカナ/ひらがなの違いと空白を無視する */
 export function normalizeForSearch(s: string): string {
