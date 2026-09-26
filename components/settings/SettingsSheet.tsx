@@ -343,11 +343,15 @@ export default function SettingsSheet() {
           スタッフがこの管理画面をホーム画面に追加した際のアイコンです。正方形の画像を推奨します。未設定の間は仮アイコンが使われます。
         </div>
 
-        {/* QRコード管理 */}
-        <div style={{ ...labelStyle, marginTop: "20px" }}>QRコード管理</div>
-        <div style={{ background: "var(--surface)", borderRadius: "14px", padding: "16px" }}>
-          <QrCodes />
-        </div>
+        {/* QRコード管理（ハンディモードの店は客のQR注文を使わないので出さない） */}
+        {settings.orderMode !== "handy" && (
+          <>
+            <div style={{ ...labelStyle, marginTop: "20px" }}>QRコード管理</div>
+            <div style={{ background: "var(--surface)", borderRadius: "14px", padding: "16px" }}>
+              <QrCodes />
+            </div>
+          </>
+        )}
 
         {/* 危険な操作（設定の一番奥。取り消せない操作のみ。誤タップ防止のため控えめな表示） */}
         <div style={{ ...labelStyle, marginTop: "28px" }}>危険な操作</div>

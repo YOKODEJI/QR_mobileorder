@@ -8,6 +8,7 @@ import { useShallow } from "zustand/react/shallow";
 import type { MenuItem } from "@/store/useAppStore";
 import ChipRow from "@/components/ui/ChipRow";
 import Picker from "@/components/ui/Picker";
+import BulkAddMenu from "@/components/menu/BulkAddMenu";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { uploadPhoto, deletePhoto, resizeImage } from "@/lib/storage";
 
@@ -508,6 +509,8 @@ export default function MenuManagement() {
           </button>
         </div>
       </div>
+
+      {!showPrice && <BulkAddMenu defaultCat={s.newCat} />}
 
       {/* メニュー管理 */}
       <div

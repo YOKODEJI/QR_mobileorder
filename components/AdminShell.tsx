@@ -15,13 +15,25 @@ import CheckoutHistory from "@/components/history/CheckoutHistory";
 import SupabaseSync from "@/components/SupabaseSync";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 import { useSwipePager } from "@/lib/useSwipePager";
-import type { AppState } from "@/store/useAppStore";
+import type { AppState, StaffRole } from "@/store/useAppStore";
 
 const FONT =
   "-apple-system, BlinkMacSystemFont, 'Hiragino Sans', var(--font-noto-sans-jp), 'Noto Sans JP', sans-serif";
 
 // SegmentedControlの並び順と一致させる（左右スワイプでの前後移動がタブ表示順と揃うように）
-const MGMT_TABS: AppState["mgmtTab"][] = ["kitchen", "staff", "menu", "history"];
+const MGMT_SEGMENTS: { value: AppState["mgmtTab"]; label: string }[] = [
+  { value: "kitchen", label: "厨房" },
+  { value: "staff", label: "テーブル / 会計" },
+  { value: "menu", label: "メニュー管理" },
+  { value: "history", label: "会計履歴" },
+];
+
+/** 役割ごとに見せるタブ（step22）。役割が分からない間（null）は従来どおり全部出す */
+function tabsFor(role: StaffRole | null): AppState["mgmtTab"][] {
+  if (role === "kitchen") return ["kitchen"];
+  if (role === "staff") return ["kitchen", "staff"];
+  return ["kitchen", "staff", "menu", "history"];
+}
 
 /** 管理ツールの独立ページ（ログイン必須にする対象。厨房/会計/メニュー/履歴+設定を集約） */
 export default function AdminShell() {
@@ -32,11 +44,14 @@ export default function AdminShell() {
   const openSettings = useAppStore((s) => s.openSettings);
   const loaded = useAppStore((s) => s.loaded);
   const syncSoundPref = useAppStore((s) => s.syncSoundPref);
+  const staffRole = useAppStore((s) => s.staffRole);
   const loading = isSupabaseConfigured() && !loaded;
+  const tabs = tabsFor(staffRole);
+  const isOwner = staffRole === null || staffRole === "owner";
 
   const tabPager = useSwipePager({
-    items: MGMT_TABS,
-    current: mgmtTab,
+    items: tabs,
+    current: tabs.includes(mgmtTab) ? mgmtTab : tabs[0],
     onChange: (v) => setMgmt(v as AppState["mgmtTab"]),
   });
 
@@ -104,16 +119,13 @@ export default function AdminShell() {
             <span style={{ fontSize: "11px", color: "var(--text-2)", whiteSpace: "nowrap" }}>管理ツール</span>
           </div>
 
-          <SegmentedControl
-            segments={[
-              { value: "kitchen", label: "厨房" },
-              { value: "staff", label: "テーブル / 会計" },
-              { value: "menu", label: "メニュー管理" },
-              { value: "history", label: "会計履歴" },
-            ]}
-            value={mgmtTab}
-            onChange={setMgmt}
-          />
+          {tabs.length > 1 && (
+            <SegmentedControl
+              segments={MGMT_SEGMENTS.filter((seg) => tabs.includes(seg.value))}
+              value={tabs.includes(mgmtTab) ? mgmtTab : tabs[0]}
+              onChange={setMgmt}
+            />
+          )}
 
           <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
             {isSupabaseConfigured() && (
@@ -135,6 +147,7 @@ export default function AdminShell() {
                 ログアウト
               </button>
             )}
+            {isOwner && (
             <button
               onClick={openSettings}
               style={{
@@ -155,6 +168,7 @@ export default function AdminShell() {
             >
               <GearIcon size={15} />設定
             </button>
+            )}
           </div>
         </div>
       </header>

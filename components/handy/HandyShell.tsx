@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useAppStore } from "@/store/useAppStore";
 import { isSupabaseConfigured, getSupabase } from "@/lib/supabase";
 import SupabaseSync from "@/components/SupabaseSync";
@@ -24,6 +25,7 @@ export default function HandyShell() {
   const tableName = useAppStore((s) => s.tableName);
   const selectStaffTable = useAppStore((s) => s.selectStaffTable);
   const muteSound = useAppStore((s) => s.muteSound);
+  const staffRole = useAppStore((s) => s.staffRole);
   const loading = isSupabaseConfigured() && !loaded;
   const [view, setView] = useState<View>({ name: "tables" });
   // 入力中の注文（staffCart）がどの卓のものか。別の卓の注文入力に入ったら持ち越さない
@@ -111,10 +113,25 @@ export default function HandyShell() {
       <main style={{ flex: 1, display: "flex", flexDirection: "column", position: "relative", zIndex: 1 }}>
         {loading ? (
           <LoadingScreen />
+        ) : staffRole === "kitchen" ? (
+          <div style={{ padding: "60px 24px", textAlign: "center", color: "var(--text-2)", lineHeight: 1.7 }}>
+            厨房用のアカウントではハンディは使えません。
+            <br />
+            厨房の画面は <Link href="/kitchen" style={{ color: "var(--accent)", fontWeight: 700 }}>/kitchen</Link> です。
+          </div>
         ) : view.name === "tables" ? (
           <TableGrid onOpenTable={openTableView} onOrder={openOrder} />
         ) : view.name === "table" ? (
-          <TableView tableId={view.id} onOrder={() => openOrder(view.id)} />
+          <TableView
+            tableId={view.id}
+            onOrder={() => openOrder(view.id)}
+            onMoved={(to) => {
+              // 移動先で注文入力を続けられるよう、入力中の注文も新しい卓のものとして引き継ぐ
+              if (cartOwner.current === view.id) cartOwner.current = to;
+              openTableView(to);
+            }}
+            onClosedTable={() => setView({ name: "tables" })}
+          />
         ) : (
           <OrderEntry tableId={view.id} onSent={() => setView({ name: "table", id: view.id })} />
         )}

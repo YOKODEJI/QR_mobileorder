@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { getSupabase, isSupabaseConfigured, STORE_ID } from "@/lib/supabase";
-import { fetchStoreSettings } from "@/lib/data";
+import { fetchStoreSettings, dbFetchStaffRole } from "@/lib/data";
+import { useAppStore } from "@/store/useAppStore";
 import { recordActivity, isIdleExpired, clearActivity, IDLE_LIMIT_MS } from "@/lib/idleTimeout";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 
@@ -70,6 +71,9 @@ export default function AdminAuthGate({
         return;
       }
       recordActivity();
+      // 役割で画面を出し分ける（owner以外にはメニュー管理・設定・会計履歴を出さない。制限の本体はDB側）
+      useAppStore.getState().setStaffRole(await dbFetchStaffRole());
+      if (!mounted) return;
       setState("in");
     };
 

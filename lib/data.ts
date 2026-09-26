@@ -14,6 +14,7 @@ import type {
   MenuOption,
   SelectedOption,
   OrderMode,
+  StaffRole,
 } from "@/store/useAppStore";
 
 export interface Snapshot {
@@ -833,6 +834,39 @@ export async function dbUpdateStore(patch: Record<string, unknown>): Promise<boo
   const sb = getSupabase();
   if (!sb || !STORE_ID) return true;
   return ok(sb.from("stores").update(patch).eq("id", STORE_ID), "dbUpdateStore");
+}
+
+/** ログイン中のスタッフの役割（step22）。owner / staff / kitchen。未登録・未適用なら null */
+export async function dbFetchStaffRole(): Promise<StaffRole | null> {
+  const sb = getSupabase();
+  if (!sb) return null;
+  const { data, error } = await sb.rpc("staff_role");
+  if (error) return null;
+  return data === "owner" || data === "staff" || data === "kitchen" ? data : null;
+}
+
+/** 卓移動（step22）。移動先が空席のときだけ成功する。失敗理由をそのまま返す */
+export async function dbMoveTable(from: string, to: string): Promise<{ ok: true } | { ok: false; message: string }> {
+  const sb = getSupabase();
+  if (!sb || !STORE_ID) return { ok: true };
+  const { error } = await sb.rpc("move_table", { p_store: STORE_ID, p_from: from, p_to: to });
+  if (error) {
+    console.error("dbMoveTable:", error.message);
+    return { ok: false, message: error.message };
+  }
+  return { ok: true };
+}
+
+/** メニューのまとめて登録（step22、オーナーのみ）。追加できた件数を返す（失敗は null） */
+export async function dbAddMenuItems(items: { cat: string; name: string }[]): Promise<number | null> {
+  const sb = getSupabase();
+  if (!sb) return null;
+  const { data, error } = await sb.rpc("add_menu_items", { p_items: items });
+  if (error) {
+    console.error("dbAddMenuItems:", error.message);
+    return null;
+  }
+  return (data as number) ?? 0;
 }
 
 /** 売切の切替（step21）。sold_out 列だけを書き換える専用RPCなので、

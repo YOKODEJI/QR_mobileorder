@@ -1,13 +1,27 @@
 "use client";
 
+import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useAppStore } from "@/store/useAppStore";
 import { hm, useNow } from "@/lib/time";
 import { optionsLabel } from "@/lib/options";
 import { BellIcon } from "@/components/ui/Icon";
+import MoveTableSheet from "@/components/handy/MoveTableSheet";
+import BillSheet from "@/components/handy/BillSheet";
 
-/** 卓画面。この卓のドリンクと提供状況を新しい順に出し、下の「追加注文」から注文入力へ */
-export default function TableView({ tableId, onOrder }: { tableId: string; onOrder: () => void }) {
+/** 卓画面。この卓のドリンクと提供状況を新しい順に出し、下のボタンから追加注文・卓移動・レジ用の一覧へ */
+export default function TableView({
+  tableId,
+  onOrder,
+  onMoved,
+  onClosedTable,
+}: {
+  tableId: string;
+  onOrder: () => void;
+  onMoved: (toId: string) => void;
+  onClosedTable: () => void;
+}) {
+  const [sheet, setSheet] = useState<"move" | "bill" | null>(null);
   const s = useAppStore(
     useShallow((st) => ({
       orders: st.orders,
@@ -23,7 +37,7 @@ export default function TableView({ tableId, onOrder }: { tableId: string; onOrd
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-      <div style={{ flex: 1, padding: "14px 12px 110px", display: "flex", flexDirection: "column", gap: "10px" }}>
+      <div style={{ flex: 1, padding: "14px 12px 170px", display: "flex", flexDirection: "column", gap: "10px" }}>
         {calls.map((c) => (
           <div
             key={c.id}
@@ -126,6 +140,14 @@ export default function TableView({ tableId, onOrder }: { tableId: string; onOrd
           borderTop: "1px solid var(--glass-edge)",
         }}
       >
+        <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
+          <button onClick={() => setSheet("move")} style={secondaryButton}>
+            卓移動
+          </button>
+          <button onClick={() => setSheet("bill")} style={secondaryButton}>
+            レジ用の一覧
+          </button>
+        </div>
         <button
           onClick={onOrder}
           style={{
@@ -144,6 +166,40 @@ export default function TableView({ tableId, onOrder }: { tableId: string; onOrd
           ＋ 追加注文
         </button>
       </div>
+
+      {sheet === "move" && (
+        <MoveTableSheet
+          fromId={tableId}
+          onClose={() => setSheet(null)}
+          onMoved={(to) => {
+            setSheet(null);
+            onMoved(to);
+          }}
+        />
+      )}
+      {sheet === "bill" && (
+        <BillSheet
+          tableId={tableId}
+          onClose={() => setSheet(null)}
+          onClosedTable={() => {
+            setSheet(null);
+            onClosedTable();
+          }}
+        />
+      )}
     </div>
   );
 }
+
+const secondaryButton: React.CSSProperties = {
+  flex: 1,
+  padding: "12px",
+  borderRadius: "14px",
+  border: "none",
+  background: "var(--control-tint)",
+  color: "var(--text)",
+  fontFamily: "inherit",
+  fontSize: "15px",
+  fontWeight: 700,
+  cursor: "pointer",
+};

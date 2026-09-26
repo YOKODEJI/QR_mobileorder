@@ -102,6 +102,7 @@ export interface CheckoutRecord {
 
 export type TaxMode = "inclusive" | "exclusive"; // 内税 / 外税
 export type OrderMode = "qr" | "handy"; // 客のQR注文 / スタッフのハンディ（step21）
+export type StaffRole = "owner" | "staff" | "kitchen"; // step22。画面の出し分け用（本当の制限はDB側）
 
 export interface Settings {
   storeName: string;
@@ -179,6 +180,7 @@ export interface AppState {
   highlightId: string | null;
   // データ層
   loaded: boolean; // Supabaseからの初回読込が完了したか
+  staffRole: StaffRole | null; // ログイン中のスタッフの役割。null=不明（従来どおり全部出す。DBが最終的に止める）
   // UI一時状態
   submitting: boolean;
   justOrdered: boolean;
@@ -225,6 +227,8 @@ export interface AppState {
     checkouts: CheckoutRecord[];
   }) => void;
   setConnected: (v: boolean) => void;
+  setStaffRole: (r: StaffRole | null) => void;
+  moveTable: (from: string, to: string) => Promise<boolean>; // 卓移動（成功したら true）
   applyRemoteOrder: (order: Order) => void; // 親機: DBからのBroadcastで届いた確定注文を即反映
   applyRemoteCall: (call: StaffCall) => void; // 親機: 同じくスタッフ呼び出し
   setCustomerTable: (id: string) => void;
@@ -311,6 +315,7 @@ export interface AppState {
   setNewCat: (c: Cat) => void;
   setCat: (id: string, cat: string) => void;
   addItem: () => void;
+  bulkAddMenu: (items: { cat: string; name: string }[]) => Promise<number | null>; // まとめて登録。追加件数
   setPhoto: (id: string, url: string) => void;
   removePhoto: (id: string) => void;
   confirmRemovePhoto: (id: string) => void; // メニュー写真の削除（1回確認）
@@ -664,6 +669,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   dialog: null,
   toasts: [],
   loaded: false,
+  staffRole: null,
 
   // ---- データ層（Supabase） ----
   hydrate: (snap) => {
@@ -717,6 +723,31 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (shouldBeep) playBeep(true);
   },
   setConnected: (v) => set({ connected: v }),
+  setStaffRole: (r) => set({ staffRole: r }),
+  moveTable: async (from, to) => {
+    const res = await db.dbMoveTable(from, to);
+    if (!res.ok) {
+      get().pushToast(
+        /occupied/.test(res.message)
+          ? "移動先の卓にはお客様がいます。空いている卓を選んでください。"
+          : "卓移動に失敗しました。もう一度お試しください。"
+      );
+      return false;
+    }
+    // DB(move_table)と同じ形にローカルも合わせる（Realtimeの取り直しでも一致する）
+    set((s) => {
+      const since = s.tables.find((t) => t.id === from)?.openSince ?? new Date().toISOString();
+      return {
+        orders: s.orders.map((o) => (o.table === from && !o.checkedOutAt ? { ...o, table: to } : o)),
+        calls: s.calls.map((c) => (c.table === from ? { ...c, table: to } : c)),
+        tables: s.tables.map((t) =>
+          t.id === to ? { ...t, openSince: since } : t.id === from ? { ...t, openSince: null } : t
+        ),
+        selectedStaffTable: to,
+      };
+    });
+    return true;
+  },
   applyRemoteOrder: (order) => {
     const s = get();
     if (s.orders.some((o) => o.id === order.id)) return;
@@ -1761,6 +1792,34 @@ export const useAppStore = create<AppState>((set, get) => ({
       newPrice: "",
       newStock: "",
     }));
+  },
+  bulkAddMenu: async (items) => {
+    if (items.length === 0) return 0;
+    if (!isSupabaseConfigured()) {
+      // ローカル開発: DBの add_menu_items と同じ規則（無いカテゴリは作る・同じカテゴリの同名は飛ばす）
+      let added = 0;
+      set((s) => {
+        const menu = [...s.menu];
+        const categories = [...s.categories];
+        for (const { cat, name } of items) {
+          if (!categories.includes(cat)) categories.splice(Math.max(0, categories.indexOf("その他")), 0, cat);
+          if (menu.some((m) => m.name === name && m.cat === cat)) continue;
+          menu.push({ id: newId(), name, cat, price: 0, stock: 0, soldOut: false, photo: null });
+          added++;
+        }
+        return { menu, categories };
+      });
+      return added;
+    }
+    const added = await db.dbAddMenuItems(items);
+    if (added == null) {
+      get().pushToast("まとめて登録に失敗しました。もう一度お試しください。");
+      return null;
+    }
+    // Realtimeの取り直しを待たずに一覧へ出す
+    const [menu, categories] = await Promise.all([db.fetchMenu(), db.fetchCategories()]);
+    set((s) => ({ menu: menu ?? s.menu, categories: categories ?? s.categories }));
+    return added;
   },
   setPhoto: async (id, url) => {
     const prevMenu = get().menu;
