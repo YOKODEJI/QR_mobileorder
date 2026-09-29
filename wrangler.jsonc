@@ -1,0 +1,20 @@
+{
+  // Cloudflare Workers で公開するための設定（OpenNext）。無料プランで動かすため、
+  // 有料機能（R2・Images）は使わない。Supabase の値は Cloudflare の環境変数ではなく
+  // ビルド時に .env から埋め込まれる（NEXT_PUBLIC_*）。
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "main": ".open-next/worker.js",
+  "name": "qr-order-yokodeji",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "qr-order-yokodeji"
+    }
+  ]
+}
