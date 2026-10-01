@@ -1,5 +1,6 @@
 // Supabase Storage: 店舗写真・メニュー写真のアップロード。
-// バケット "photos" は公開読み取り／書込はスタッフ(authenticated)のみ（supabase/step6-storage.sql）。
+// バケット "photos" は公開読み取り／書込は自店舗のオーナーのみ、かつパスの先頭が自店舗idのときだけ
+// （supabase/step6-storage.sql → step24-storage-staff-only.sql）。パスの形を変えるときはポリシーも直すこと。
 import { getSupabase, STORE_ID } from "./supabase";
 
 const BUCKET = "photos";

@@ -176,7 +176,7 @@
 
 1. **GitHub**（店のGoogleアカウントで作成）→ 非公開リポジトリを作り、長谷川さんのGitHubを共同編集者に招待 → Claude Code がこのリポジトリの内容を push
 2. **Supabase**（店のアカウントで組織とプロジェクトを作成、地域は Tokyo）→ 長谷川さんのSupabaseを組織のメンバーに招待 →
-   Claude Code が CLI でリンクし、`schema.sql` → `functions.sql` → `step4`〜`step23` を順に流して、よこでじの本番と関数・ポリシーの定義を突き合わせる
+   Claude Code が CLI でリンクし、`schema.sql` → `functions.sql` → `step4`〜`step24` を順に流して、よこでじの本番と関数・ポリシーの定義を突き合わせる
    - Authentication → Sign In / Providers で「Allow new users to sign up」をオフ（スタッフのアカウントはオーナーが作るだけにする）。匿名ログインもオフのまま
    - 店舗1行を作り（`order_mode='handy'`、`track_stock=false`）、その id を公開先の `NEXT_PUBLIC_STORE_ID` にする
 3. **Vercel**（店のGitHubでログイン）→ 1のリポジトリを取り込み、環境変数（Supabase の URL・anonキー・`NEXT_PUBLIC_STORE_ID`・`NEXT_PUBLIC_ORDER_VIA_FUNCTION=true`）を入れて公開。
