@@ -9,3 +9,6 @@
 
 /** Google Fonts のスタイルシート */
 export const FONT_STYLESHEET = "https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&display=swap";
+
+/** ホーム画面のアイコンに入れる屋号の書体（Google Fonts の family の書き方）。よこでじ版: 画面と同じゴシックの太字 */
+export const ICON_NAME_FONT = "Zen+Kaku+Gothic+New:wght@700";
