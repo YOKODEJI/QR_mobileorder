@@ -24,12 +24,13 @@ export default function BillSheet({
       tableName: st.tableName,
       selectStaffTable: st.selectStaffTable,
       checkout: st.checkout,
+      itemOptions: st.itemOptions,
       openDialog: st.openDialog,
       closeDialog: st.closeDialog,
     }))
   );
   const [busy, setBusy] = useState(false);
-  const lines = billLines(s.orders, tableId);
+  const lines = billLines(s.orders, tableId, s.itemOptions);
   const total = lines.reduce((a, l) => a + l.qty, 0);
   const unserved = s.orders
     .filter((o) => o.table === tableId && !o.checkedOutAt && o.status === "cooking")

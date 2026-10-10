@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { MenuItem, MenuOption } from "@/store/useAppStore";
 import { unitPrice, toggleOptionId, hasMissingChoice } from "@/lib/options";
+import { useBackHandler } from "@/lib/backGuard";
 
 /**
  * 商品にオプションが設定されているときの選択シート（複数選択）。
@@ -30,6 +31,8 @@ export default function OptionSheet({
   hidePrice?: boolean;
 }) {
   const [selected, setSelected] = useState<string[]>([]);
+  // 端末の「戻る」では、この選択を閉じる（ハンディ・管理画面。お客様の画面では何も起きない）
+  useBackHandler(true, onClose);
   const chosen = options.filter((o) => selected.includes(o.id));
   const total = unitPrice(item.price, chosen);
 

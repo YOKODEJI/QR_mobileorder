@@ -10,6 +10,7 @@ import ChipRow from "@/components/ui/ChipRow";
 import Picker from "@/components/ui/Picker";
 import BulkAddMenu from "@/components/menu/BulkAddMenu";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { useBackHandler } from "@/lib/backGuard";
 import { uploadPhoto, deletePhoto, resizeImage } from "@/lib/storage";
 
 function DragDots() {
@@ -38,6 +39,7 @@ function ItemOptionsButton({ item, accent, showPrice }: { item: MenuItem; accent
   const updateOption = useAppStore((s) => s.updateOption);
   const confirmDeleteOption = useAppStore((s) => s.confirmDeleteOption);
   const [open, setOpen] = useState(false);
+  useBackHandler(open, () => setOpen(false));
   const [name, setName] = useState("");
   const [delta, setDelta] = useState("");
   const list = options ?? [];
@@ -268,6 +270,38 @@ function ItemOptionsButton({ item, accent, showPrice }: { item: MenuItem; accent
   );
 }
 
+/** 編集中の品名の欄。書き換えて欄を出る（または Enter）と保存する */
+function NameInput({ item, onSave }: { item: MenuItem; onSave: (id: string, name: string) => void }) {
+  const [value, setValue] = useState(item.name);
+  return (
+    <input
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={(e) => {
+        const next = e.currentTarget.value;
+        if (next.trim()) onSave(item.id, next);
+        else setValue(item.name); // 空にはできない
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+      }}
+      aria-label={`${item.name}の品名`}
+      style={{
+        width: "100%",
+        padding: "8px 10px",
+        borderRadius: "10px",
+        border: "none",
+        background: "var(--surface)",
+        boxShadow: "0 0 0 1.5px var(--hairline-strong)",
+        fontSize: "16px",
+        fontWeight: 700,
+        fontFamily: "inherit",
+        color: "var(--text)",
+      }}
+    />
+  );
+}
+
 function PhotoCell({ item }: { item: MenuItem }) {
   const setPhoto = useAppStore((s) => s.setPhoto);
   const confirmRemovePhoto = useAppStore((s) => s.confirmRemovePhoto);
@@ -409,6 +443,7 @@ export default function MenuManagement() {
       newName: st.newName,
       newPrice: st.newPrice,
       newStock: st.newStock,
+      renameItem: st.renameItem,
       requestDelete: st.requestDelete,
       saveEditCategory: st.saveEditCategory,
       selectedIds: st.selectedIds,
@@ -653,7 +688,9 @@ export default function MenuManagement() {
                   : showStock
                     ? "在庫は増減できます。"
                     : ""}
-              行をドラッグ&ドロップで並び替え。
+              {s.deleteMode
+                ? "品名を書き換えられます。消したい品は、左の丸で選んで「選んだ品を削除」。"
+                : "行をドラッグ&ドロップで並び替え。品名の変更と削除は「メニューを編集」から。"}
             </div>
           </div>
           {s.deleteMode ? (
@@ -671,21 +708,18 @@ export default function MenuManagement() {
                   color: s.selectedIds.length === 0 ? "var(--text-3)" : "#fff",
                 }}
               >
-                削除する
+                選んだ品を削除
               </button>
-              <button
-                onClick={s.cancelDeleteMode}
-                style={{ ...pill, border: "none", background: "var(--control-tint)", color: "var(--text-2)" }}
-              >
-                キャンセル
+              <button onClick={s.cancelDeleteMode} style={{ ...pill, border: "none", background: accent, color: "#fff" }}>
+                完了
               </button>
             </div>
           ) : (
             <button
               onClick={s.enterDeleteMode}
-              style={{ ...pill, border: "1px solid var(--red-bg)", background: "var(--surface)", color: "var(--red)" }}
+              style={{ ...pill, border: "1px solid var(--hairline)", background: "var(--surface)", color: "var(--text)" }}
             >
-              メニューを削除
+              メニューを編集
             </button>
           )}
         </div>
@@ -754,22 +788,26 @@ export default function MenuManagement() {
                   </div>
                 )}
 
-                {/* 写真 */}
-                <PhotoCell item={m} />
+                {/* 写真（ハンディの店は注文画面に写真を出さないので、追加の入口も出さない） */}
+                {showPrice && <PhotoCell item={m} />}
 
                 {/* 名前 + カテゴリ */}
                 <div style={{ flex: 1, minWidth: "120px" }}>
-                  <div
-                    style={{
-                      fontSize: "15px",
-                      fontWeight: 700,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {m.name}
-                  </div>
+                  {s.deleteMode ? (
+                    <NameInput key={m.id + m.name} item={m} onSave={s.renameItem} />
+                  ) : (
+                    <div
+                      style={{
+                        fontSize: "15px",
+                        fontWeight: 700,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {m.name}
+                    </div>
+                  )}
                   <div style={{ marginTop: "3px" }}>
                     <Picker
                       value={m.cat}

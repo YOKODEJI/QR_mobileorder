@@ -1,10 +1,13 @@
 "use client";
 
 import { useAppStore } from "@/store/useAppStore";
+import { useBackHandler } from "@/lib/backGuard";
 
 export default function AlertDialog() {
   const dialog = useAppStore((s) => s.dialog);
   const closeDialog = useAppStore((s) => s.closeDialog);
+  // 端末の「戻る」では、確認を取り消して閉じる
+  useBackHandler(!!dialog, closeDialog);
   if (!dialog) return null;
 
   return (

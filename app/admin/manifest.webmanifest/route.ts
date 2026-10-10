@@ -6,7 +6,7 @@ import { manifestResponse } from "@/lib/manifest";
 export async function GET() {
   return manifestResponse({
     label: "管理画面",
-    path: "/admin",
+    path: "/admin", app: "admin",
     description: "厨房・会計・メニュー管理をまとめた店舗用管理ツール",
   });
 }

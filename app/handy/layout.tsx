@@ -7,7 +7,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: store?.storeName ? `${store.storeName} ハンディ` : "ハンディ",
     manifest: "/handy/manifest.webmanifest",
-    icons: { apple: "/admin/pwa-icon/192" },
+    icons: { apple: "/admin/pwa-icon/192?app=handy" },
     appleWebApp: { capable: true, title: "ハンディ", statusBarStyle: "default" },
   };
 }

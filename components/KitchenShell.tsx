@@ -9,6 +9,7 @@ import AlertDialog from "@/components/ui/AlertDialog";
 import Toast from "@/components/ui/Toast";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 import { smallButton } from "@/components/handy/ui";
+import { useBackGuard } from "@/lib/backGuard";
 
 type WakeLockSentinelLike = { release: () => Promise<void> };
 
@@ -21,6 +22,8 @@ export default function KitchenShell() {
   const loading = isSupabaseConfigured() && !loaded;
   // ブラウザは一度画面に触れるまで音を鳴らせない。最初のタップで音と画面点灯の維持を有効にする
   const [started, setStarted] = useState(false);
+  // 端末の「戻る」で厨房の画面が閉じないようにする
+  useBackGuard();
 
   useEffect(() => {
     document.documentElement.style.setProperty("--accent", theme);

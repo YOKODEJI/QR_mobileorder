@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import { dateLabel, dateTimeLabel } from "@/lib/time";
-import { lineTotal, optionsLabel } from "@/lib/options";
+import { lineTotal, optionsLabelSplit } from "@/lib/options";
 import type { CheckoutRecord } from "@/store/useAppStore";
 
 const DISCOUNT_LABEL = { percent: "%割引", amount: "円引き" } as const;
@@ -30,6 +30,7 @@ export default function CheckoutHistory() {
   const s = useAppStore(
     useShallow((st) => ({
       checkouts: st.checkouts,
+      itemOptions: st.itemOptions,
       settings: st.settings,
       yen: st.yen,
     }))
@@ -188,8 +189,8 @@ export default function CheckoutHistory() {
                               >
                                 <span>
                                   {it.name}
-                                  {optionsLabel(it.options) && (
-                                    <span style={{ color: "var(--text-2)" }}>（{optionsLabel(it.options)}）</span>
+                                  {optionsLabelSplit(s.itemOptions[it.menuItemId], it.options) && (
+                                    <span style={{ color: "var(--text-2)" }}>（{optionsLabelSplit(s.itemOptions[it.menuItemId], it.options)}）</span>
                                   )}{" "}
                                   <span style={{ color: "var(--text-2)" }}>×{it.qty}</span>
                                 </span>

@@ -306,6 +306,8 @@ export interface AppState {
   // checkoutViaSquareの内部実装(重複開始の警告確認後に呼ばれる実処理)
   checkoutViaSquareForce: (discountType: DiscountType, discountValue: number, chargeEnabled: boolean) => Promise<void>;
   cancelUnit: (menuItemId: string, options?: SelectedOption[]) => void;
+  /** 伝票を指定して、その中の1品を1つ取り消す（ハンディの卓画面） */
+  cancelOrderUnit: (orderId: string, menuItemId: string, options?: SelectedOption[]) => Promise<void>;
   addUnit: (menuItemId: string, options?: SelectedOption[], idem?: string) => void;
   setOrderEditMode: (v: boolean) => void;
   confirmFinishOrderEdit: () => void;
@@ -333,6 +335,8 @@ export interface AppState {
 
   // ---- メニュー管理 ----
   setPrice: (id: string, val: string) => void;
+  /** 品名を変える（メニューの編集）。すでに確定した注文の品名は変わらない */
+  renameItem: (id: string, name: string) => Promise<void>;
   setStock: (id: string, val: string) => void;
   bumpStock: (id: string, d: number) => void;
   toggleSoldOut: (id: string) => void;
@@ -465,7 +469,10 @@ function decrementStock(menu: MenuItem[], items: OrderItem[]): MenuItem[] {
 
 type PlaceResult =
   | { ok: true; id: string }
-  | { ok: false; code: "out_of_stock" | "session" | "rate_limited" | "closed" | "error"; message: string };
+  | { ok: false; code: "out_of_stock" | "session" | "rate_limited" | "closed" | "error" | "timeout"; message: string };
+
+/** 注文の送信を待つ上限。これを過ぎたら「届いたか分からない」と伝えて、送り直せるようにする */
+const ORDER_TIMEOUT_MS = 12_000;
 
 /** 注文を先頭に足す。親機ではDBからのBroadcastが自分のRPC応答より先に届くことがあるため、
  *  同じidが既にあれば足さない（二重表示防止）。 */
@@ -483,19 +490,32 @@ async function placeOrder(
   menu: MenuItem[],
   token: string | null
 ): Promise<PlaceResult> {
-  if (ORDER_VIA_FUNCTION) {
-    const res = await db.dbSubmitOrder(tableId, items, proxy, idem, token);
-    return res.ok
-      ? { ok: true, id: res.orderId }
-      : { ok: false, code: res.code, message: res.message };
+  const send = async (): Promise<PlaceResult> => {
+    if (ORDER_VIA_FUNCTION) {
+      const res = await db.dbSubmitOrder(tableId, items, proxy, idem, token);
+      return res.ok
+        ? { ok: true, id: res.orderId }
+        : { ok: false, code: res.code, message: res.message };
+    }
+    const id = await db.dbInsertOrder(tableId, items, proxy, menu);
+    return id ? { ok: true, id } : { ok: false, code: "error", message: "insert failed" };
+  };
+  // 電波が弱いと返事が来ないまま待ち続けることがある。上限で切り上げて、画面に出す。
+  // 送り直しは同じ合言葉（idem）で行うので、最初の送信が実は届いていても二重にはならない
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<PlaceResult>((resolve) => {
+    timer = setTimeout(() => resolve({ ok: false, code: "timeout", message: "timeout" }), ORDER_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([send(), timeout]);
+  } finally {
+    clearTimeout(timer);
   }
-  const id = await db.dbInsertOrder(tableId, items, proxy, menu);
-  return id ? { ok: true, id } : { ok: false, code: "error", message: "insert failed" };
 }
 
 /** 注文エラーのダイアログ（売切れ / セッション切れ / レート制限 / 通信失敗）。onConfirmで再試行 */
 function orderErrorDialog(
-  res: { code: "out_of_stock" | "session" | "rate_limited" | "closed" | "error"; message: string },
+  res: { code: "out_of_stock" | "session" | "rate_limited" | "closed" | "error" | "timeout"; message: string },
   onRetry: () => void
 ): DialogSpec {
   const map = {
@@ -514,6 +534,10 @@ function orderErrorDialog(
     rate_limited: {
       title: "少し時間をおいてください",
       body: "短時間に注文が集中しました。数秒おいてから、もう一度お試しください。",
+    },
+    timeout: {
+      title: "送信を確認できませんでした",
+      body: "返事が戻ってきませんでした。電波が弱いか、通信が混んでいるようです。注文が届いたかどうかは分かっていません。\n\n「もう一度」を押すと送り直します。すでに届いていた場合も、二重にはなりません。",
     },
     error: {
       title: "送信できませんでした",
@@ -1606,6 +1630,36 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().pushToast("取消の保存に失敗しました。もう一度お試しください。");
     }
   },
+  // ハンディの卓画面からの取消。どの伝票の品かを指定して、1つ減らす（伝票が空になったら伝票ごと消える）
+  cancelOrderUnit: async (orderId, menuItemId, options = []) => {
+    const prevOrders = get().orders;
+    const prevMenu = get().menu;
+    const key = cartKey(menuItemId, options.map((o) => o.id));
+    let changed = false;
+    set((s) => {
+      const orders = s.orders
+        .map((o) => {
+          if (o.id !== orderId || changed) return o;
+          const items = o.items
+            .map((it) => {
+              if (changed || cartKey(it.menuItemId, (it.options ?? []).map((x) => x.id)) !== key) return it;
+              changed = true;
+              return { ...it, qty: it.qty - 1 };
+            })
+            .filter((it) => it.qty > 0);
+          return { ...o, items };
+        })
+        .filter((o) => o.items.length > 0);
+      if (!changed) return {};
+      return { orders, menu: s.menu.map((m) => (m.id === menuItemId ? { ...m, stock: m.stock + 1 } : m)) };
+    });
+    if (!changed) return;
+    const success = await db.dbCancelOrderItem(orderId, menuItemId, options);
+    if (!success) {
+      set({ orders: prevOrders, menu: prevMenu });
+      get().pushToast("取消の保存に失敗しました。もう一度お試しください。");
+    }
+  },
   // 「−」(cancelUnit)の対称操作。代理注文と同じplace_order経路で1個ぶんの新規伝票を追加する
   // （在庫チェック/減算がRPC側でアトミックに行われる既存の仕組みをそのまま再利用する）。
   // cancelUnitと同様、まずローカルを楽観更新してからバックグラウンドで永続化する
@@ -1934,6 +1988,18 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // ---- メニュー管理 ----
+  renameItem: async (id, name) => {
+    const next = name.trim();
+    const prevMenu = get().menu;
+    const cur = prevMenu.find((m) => m.id === id);
+    if (!cur || !next || next === cur.name) return;
+    set((s) => ({ menu: s.menu.map((m) => (m.id === id ? { ...m, name: next } : m)) }));
+    const success = await db.dbUpdateMenu(id, { name: next });
+    if (!success) {
+      set({ menu: prevMenu });
+      get().pushToast("品名を保存できませんでした。同じカテゴリに同じ名前の品が無いか確かめて、もう一度お試しください。");
+    }
+  },
   setPrice: async (id, val) => {
     const n = Math.max(0, parseInt(val, 10) || 0);
     const prevMenu = get().menu;

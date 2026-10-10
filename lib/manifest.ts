@@ -2,8 +2,8 @@ import { fetchStoreSettings } from "@/lib/data";
 
 /** ホーム画面に追加する画面ごとのPWAマニフェスト（/admin・/handy・/kitchen）。
  *  scope/start_url をその画面に限定し、追加したアイコンから必ずその画面が開くようにする。
- *  アイコンは /admin/pwa-icon（店舗の設定画像、無ければ店名イニシャルの仮アイコン）を共用する。 */
-export async function manifestResponse(opts: { label: string; path: string; description: string }) {
+ *  アイコンは画面ごとに別のもの（/admin/pwa-icon?app=…）。ホーム画面に3つ並べても見分けがつくように */
+export async function manifestResponse(opts: { label: string; path: string; description: string; app: "admin" | "handy" | "kitchen" }) {
   const store = await fetchStoreSettings();
   const storeName = store?.storeName ?? "QRオーダー";
   const manifest = {
@@ -19,9 +19,9 @@ export async function manifestResponse(opts: { label: string; path: string; desc
     theme_color: store?.theme ?? "#cf4b2c",
     lang: "ja",
     icons: [
-      { src: "/admin/pwa-icon/192", sizes: "192x192", type: "image/png" },
-      { src: "/admin/pwa-icon/512", sizes: "512x512", type: "image/png" },
-      { src: "/admin/pwa-icon/512", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: `/admin/pwa-icon/192?app=${opts.app}`, sizes: "192x192", type: "image/png" },
+      { src: `/admin/pwa-icon/512?app=${opts.app}`, sizes: "512x512", type: "image/png" },
+      { src: `/admin/pwa-icon/512?app=${opts.app}&maskable=1`, sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
   return Response.json(manifest, { headers: { "Content-Type": "application/manifest+json" } });

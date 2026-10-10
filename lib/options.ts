@@ -50,6 +50,51 @@ export function countSteps(options: readonly MenuOption[]): CountSteps | null {
   return { label: label ?? "", steps };
 }
 
+/** 数を合わせる組で選ばれている数（例: グラス 3） */
+export interface CountPick {
+  /** 何の数か（例: 「グラス」） */
+  label: string;
+  value: number;
+}
+
+/** 選んだオプションを、「数を合わせる組のもの」（瓶に付けるグラスの数）と「それ以外」（飲み方・Cドリンク）に分ける。
+ *  数を合わせる組は、品の数とは別の数（その注文の行ぜんぶでの数）。「瓶ビール グラス3 ×2」と並べると
+ *  1本あたりの数に読めてしまうので、表示では必ず品名と分ける。defs はその品のオプションの定義（無ければ分けない） */
+export function splitCountOptions<T extends { id: string }>(
+  defs: readonly MenuOption[] | undefined,
+  selected: readonly T[] | undefined
+): { rest: T[]; counts: CountPick[] } {
+  const picked = selected ?? [];
+  const byId = new Map<string, CountPick>();
+  for (const g of choiceGroups(defs ?? [])) {
+    const count = countSteps(g.options);
+    if (!count) continue;
+    for (const st of count.steps) byId.set(st.option.id, { label: count.label.trim(), value: st.value });
+  }
+  const rest: T[] = [];
+  const counts: CountPick[] = [];
+  for (const o of picked) {
+    const c = byId.get(o.id);
+    if (c) counts.push(c);
+    else rest.push(o);
+  }
+  return { rest, counts };
+}
+
+/** 数を合わせる組の表示（1行にまとめて書くとき用）。「グラス 計3個」／0なら「グラスなし」 */
+export function countPickText(c: CountPick): string {
+  return c.value === 0 ? `${c.label}なし` : `${c.label} 計${c.value}個`;
+}
+
+/** 表示用のオプション名。数を合わせる組は「グラス 計3個」と、品の数と取り違えない書き方にする */
+export function optionsLabelSplit(
+  defs: readonly MenuOption[] | undefined,
+  selected: readonly SelectedOption[] | undefined
+): string {
+  const { rest, counts } = splitCountOptions(defs, selected);
+  return [...rest.map((o) => o.name), ...counts.map(countPickText)].join("・");
+}
+
 /** 個別に付け外しするオプション（組に入っていないもの。例: Cドリンク）。 */
 export function freeOptions(options: readonly MenuOption[]): MenuOption[] {
   return options.filter((o) => !o.choiceGroup);

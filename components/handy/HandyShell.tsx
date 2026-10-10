@@ -13,12 +13,18 @@ import TableGrid from "@/components/handy/TableGrid";
 import TableView from "@/components/handy/TableView";
 import OrderEntry from "@/components/handy/OrderEntry";
 import TableEditSheet from "@/components/handy/TableEditSheet";
+import SentView, { type SentLine } from "@/components/handy/SentView";
 import { PHONE_MAX_WIDTH, glassBar, smallButton } from "@/components/handy/ui";
 import { STAFF_CAN_EDIT_TABLES } from "@/lib/storeRules";
+import { useBackGuard, useBackHandler } from "@/lib/backGuard";
 
-type View = { name: "tables" } | { name: "table"; id: string } | { name: "order"; id: string };
+type View =
+  | { name: "tables" }
+  | { name: "table"; id: string }
+  | { name: "order"; id: string }
+  | { name: "sent"; id: string; lines: SentLine[] };
 
-/** スタッフのスマホ用ハンディ（/handy）。卓一覧 → 卓 → 注文入力 の3画面。金額は一切出さない。
+/** スタッフのスマホ用ハンディ（/handy）。卓一覧 → 卓 → 注文入力 → 送信の完了 の4画面。金額は一切出さない。
  *  スマホで使う前提（片手・縦持ち）。見た目は視認性を最優先にする */
 export default function HandyShell() {
   const storeName = useAppStore((s) => s.settings.storeName);
@@ -100,8 +106,18 @@ export default function HandyShell() {
     else setView({ name: "tables" });
   };
 
+  // 端末の「戻る」でアプリが閉じないようにし、奥の画面から1つずつ戻る（注文入力 → 卓 → 卓一覧）
+  useBackGuard();
+  useBackHandler(view.name !== "tables", back);
+
   const title =
-    view.name === "tables" ? storeName : view.name === "table" ? tableName(view.id) : `${tableName(view.id)} の注文`;
+    view.name === "tables"
+      ? storeName
+      : view.name === "table"
+        ? tableName(view.id)
+        : view.name === "sent"
+          ? "送信完了"
+          : `${tableName(view.id)} の注文`;
   // 卓の編集ができる役割は店の決まり（lib/storeRules.ts。DBのポリシーと合わせること）。
   // 役割が分からない＝Supabase未設定のローカルでは出す
   const canEditTables =
@@ -121,6 +137,8 @@ export default function HandyShell() {
         color: "var(--text)",
         display: "flex",
         flexDirection: "column",
+        // 種類の切替で横にずらした一覧がはみ出しても、横スクロールにしない（clip は sticky を壊さない）
+        overflowX: "clip",
       }}
     >
       {/* すりガラスの背後に敷く、店の色の光 */}
@@ -204,8 +222,16 @@ export default function HandyShell() {
             }}
             onClosedTable={() => setView({ name: "tables" })}
           />
+        ) : view.name === "sent" ? (
+          <SentView
+            tableName={tableName(view.id)}
+            lines={view.lines}
+            onTables={() => setView({ name: "tables" })}
+            onTable={() => openTableView(view.id)}
+            onMore={() => openOrder(view.id)}
+          />
         ) : (
-          <OrderEntry tableId={view.id} onSent={() => setView({ name: "table", id: view.id })} />
+          <OrderEntry tableId={view.id} onSent={(lines) => setView({ name: "sent", id: view.id, lines })} />
         )}
       </main>
 

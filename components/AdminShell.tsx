@@ -16,6 +16,7 @@ import SupabaseSync from "@/components/SupabaseSync";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 import { useSwipePager } from "@/lib/useSwipePager";
 import type { AppState, StaffRole } from "@/store/useAppStore";
+import { useBackGuard } from "@/lib/backGuard";
 
 const FONT = "var(--font-ui)";
 
@@ -52,6 +53,8 @@ export default function AdminShell() {
     handy && seg.value === "staff" ? { ...seg, label: "テーブル" } : handy && seg.value === "history" ? { ...seg, label: "卓の履歴" } : seg
   );
   const isOwner = staffRole === null || staffRole === "owner";
+  // 端末の「戻る」で管理画面が閉じないようにする（開いている設定や確認は閉じる）
+  useBackGuard();
 
   const tabPager = useSwipePager({
     items: tabs,

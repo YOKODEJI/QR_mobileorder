@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: name,
     manifest: "/admin/manifest.webmanifest",
     icons: {
-      apple: "/admin/pwa-icon/192",
+      apple: "/admin/pwa-icon/192?app=admin",
     },
     appleWebApp: {
       capable: true,

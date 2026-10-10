@@ -9,7 +9,7 @@ import { disabledLook, primaryButton, stepButton, tapFeedback } from "@/componen
 const MAX_QTY = 20;
 
 /** 品目を押したときに、本体の数と、付ける数（瓶に付けるグラスの数）を＋−で合わせてから入れるシート。
- *  どちらも最初は1。付ける数は「この注文ぜんぶで」の数として伝票に出る（例: 瓶ビール グラス3 ×2 ＝ 瓶2本・グラス3個） */
+ *  どちらも最初は1。付ける数は「この注文ぜんぶで」の数で、伝票や一覧では品名と分けて出す（例: 「瓶ビール ×2」「グラス ×3」） */
 export default function CountChoiceSheet({
   itemName,
   title,

@@ -4,11 +4,11 @@ import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useAppStore } from "@/store/useAppStore";
 import { hm, useNow } from "@/lib/time";
-import { optionsLabel } from "@/lib/options";
+import { optionsLabel, splitCountOptions } from "@/lib/options";
 import { BellIcon } from "@/components/ui/Icon";
 import MoveTableSheet from "@/components/handy/MoveTableSheet";
 import BillSheet from "@/components/handy/BillSheet";
-import { bottomBar, card, itemName, primaryButton, secondaryButton, statusTag, subText } from "@/components/handy/ui";
+import { bottomBar, card, itemName, primaryButton, secondaryButton, smallButton, statusTag, subText } from "@/components/handy/ui";
 
 /** 卓画面。この卓のドリンクと提供状況を新しい順に出し、下のボタンから追加注文・卓移動・レジ用の一覧へ */
 export default function TableView({
@@ -23,11 +23,17 @@ export default function TableView({
   onClosedTable: () => void;
 }) {
   const [sheet, setSheet] = useState<"move" | "bill" | null>(null);
+  // 注文の取消は、押し間違えないよう「取り消す」を押してからだけ出す
+  const [cancelMode, setCancelMode] = useState(false);
   const s = useAppStore(
     useShallow((st) => ({
       orders: st.orders,
+      itemOptions: st.itemOptions,
       calls: st.calls,
       confirmClearCall: st.confirmClearCall,
+      cancelOrderUnit: st.cancelOrderUnit,
+      openDialog: st.openDialog,
+      closeDialog: st.closeDialog,
     }))
   );
   const now = useNow();
@@ -35,6 +41,23 @@ export default function TableView({
     .filter((o) => o.table === tableId && !o.checkedOutAt)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   const calls = s.calls.filter((c) => c.table === tableId);
+  const cancelling = cancelMode && orders.length > 0;
+
+  const confirmCancel = (order: (typeof orders)[number], it: (typeof orders)[number]["items"][number]) => {
+    const opts = optionsLabel(splitCountOptions(s.itemOptions[it.menuItemId], it.options).rest);
+    s.openDialog({
+      title: `${it.name}${opts ? `（${opts}）` : ""} を1つ取り消しますか？`,
+      body:
+        (order.status === "cooking" ? "" : "この品は提供済みになっています。\n\n") +
+        "この卓の注文から1つ減らします。厨房の伝票からも消えます。",
+      confirmText: "取り消す",
+      danger: true,
+      onConfirm: () => {
+        s.closeDialog();
+        s.cancelOrderUnit(order.id, it.menuItemId, it.options ?? []);
+      },
+    });
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
@@ -74,6 +97,20 @@ export default function TableView({
           </div>
         ))}
 
+        {orders.length > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", minHeight: "40px" }}>
+            <span style={{ flex: 1, minWidth: 0, fontSize: "15px", fontWeight: 700, color: cancelling ? "var(--red-dark)" : "var(--text-2)" }}>
+              {cancelling ? "取り消す品の「取消」を押してください" : "この卓の注文"}
+            </span>
+            <button
+              onClick={() => setCancelMode(!cancelling)}
+              style={{ ...smallButton, ...(cancelling ? { background: "var(--text)", color: "#fff", border: "1px solid var(--text)" } : { color: "var(--red-dark)" }) }}
+            >
+              {cancelling ? "取消を終わる" : "注文を取り消す"}
+            </button>
+          </div>
+        )}
+
         {orders.length === 0 ? (
           <div style={{ textAlign: "center", color: "var(--text-2)", fontSize: "16px", padding: "48px 0" }}>まだ注文はありません</div>
         ) : (
@@ -105,25 +142,51 @@ export default function TableView({
                     {cooking ? "提供前" : "✓ 提供済み"}
                   </span>
                 </div>
-                {o.items.map((it, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: "flex",
-                      alignItems: "baseline",
-                      gap: "8px",
-                      padding: "6px 0",
-                      borderTop: i === 0 ? "none" : "1px solid var(--hairline)",
-                    }}
-                  >
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={itemName}>{it.name}</span>
-                      {optionsLabel(it.options) && <span style={subText}>{optionsLabel(it.options)}</span>}
-                      {it.note && <span style={subText}>※ {it.note}</span>}
-                    </span>
-                    <span style={{ fontSize: "20px", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>×{it.qty}</span>
-                  </div>
-                ))}
+                {o.items.map((it, i) => {
+                  // グラスの数は品の数とは別の数なので、品名の行には混ぜず、下の行に分けて出す
+                  const split = splitCountOptions(s.itemOptions[it.menuItemId], it.options);
+                  const opts = optionsLabel(split.rest);
+                  return (
+                    <div key={i} style={{ padding: "6px 0", borderTop: i === 0 ? "none" : "1px solid var(--hairline)" }}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={itemName}>{it.name}</span>
+                          {opts && <span style={subText}>{opts}</span>}
+                          {it.note && <span style={subText}>※ {it.note}</span>}
+                        </span>
+                        <span style={{ fontSize: "20px", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>×{it.qty}</span>
+                        {cancelling && (
+                          <button
+                            onClick={() => confirmCancel(o, it)}
+                            aria-label={`${it.name}を1つ取り消す`}
+                            style={{
+                              alignSelf: "center",
+                              flexShrink: 0,
+                              minHeight: "44px",
+                              padding: "8px 14px",
+                              borderRadius: "12px",
+                              border: "none",
+                              background: "var(--red)",
+                              color: "#fff",
+                              fontFamily: "inherit",
+                              fontSize: "16px",
+                              fontWeight: 800,
+                              cursor: "pointer",
+                            }}
+                          >
+                            取消
+                          </button>
+                        )}
+                      </div>
+                      {split.counts.map((c) => (
+                        <div key={c.label} style={{ display: "flex", alignItems: "baseline", gap: "8px", marginTop: "2px" }}>
+                          <span style={{ ...itemName, flex: 1, minWidth: 0 }}>{c.value === 0 ? `${c.label}なし` : c.label}</span>
+                          {c.value > 0 && <span style={{ fontSize: "20px", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>×{c.value}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
               </div>
             );
           })

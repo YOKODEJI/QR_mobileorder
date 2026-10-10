@@ -759,6 +759,13 @@ export async function dbCancelUnit(
   );
 }
 
+/** 伝票を指定して、その中の1品を1つ取り消す（ハンディの卓画面から）。DB側は cancel_order_item（自店舗のスタッフのみ） */
+export async function dbCancelOrderItem(orderId: string, menuItemId: string, options: SelectedOption[] = []): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb) return true;
+  return ok(sb.rpc("cancel_order_item", { p_order: orderId, p_menu_item: menuItemId, p_options: options }), "dbCancelOrderItem");
+}
+
 /** SQL側 options_key() と同じ正規化（id昇順のカンマ連結）。取消対象の突合に使う。 */
 function optionsKeyOf(options?: SelectedOption[] | null): string {
   return (options ?? []).map((o) => o.id).sort().join(",");

@@ -1,18 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useAppStore, type MenuItem } from "@/store/useAppStore";
-import { parseCartKey, choiceGroups, countSteps, optionsLabel } from "@/lib/options";
+import { parseCartKey, choiceGroups, countSteps, optionsLabel, splitCountOptions } from "@/lib/options";
 import { filterMenu, sortByPopularity, tableRepeatItems, type RepeatItem } from "@/lib/handy";
 import { useMenuPopularity } from "@/lib/useMenuPopularity";
+import { useSwipePager } from "@/lib/useSwipePager";
 import OptionSheet from "@/components/ui/OptionSheet";
 import SearchField from "@/components/ui/SearchField";
 import CategoryChips from "@/components/ui/CategoryChips";
 import Sheet from "@/components/handy/Sheet";
 import ReviewSheet from "@/components/handy/ReviewSheet";
 import CountChoiceSheet from "@/components/handy/CountChoiceSheet";
+import CountStepper from "@/components/handy/CountStepper";
 import QtyStepper from "@/components/handy/QtyStepper";
+import type { SentLine } from "@/components/handy/SentView";
 import {
   bottomBar,
   card,
@@ -59,7 +62,7 @@ const plusHint: React.CSSProperties = {
  *  品名を押すと1つ入る。入れたあとは行の − ＋ でも数を合わせられる（お客様の注文画面と同じ）。
  *  「どれか1つを選ぶ」オプション（日本酒の一合／グラス、焼酎の飲み方、瓶のグラスの数）は品目を押したときに聞き、
  *  個別のチェック（Cドリンク）は確認画面で行ごとに付ける（普通の品は1回押すだけで入るように） */
-export default function OrderEntry({ tableId, onSent }: { tableId: string; onSent: () => void }) {
+export default function OrderEntry({ tableId, onSent }: { tableId: string; onSent: (lines: SentLine[]) => void }) {
   const s = useAppStore(
     useShallow((st) => ({
       menu: st.menu,
@@ -70,6 +73,7 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
       staffNotes: st.staffNotes,
       addStaff: st.addStaff,
       removeStaff: st.removeStaff,
+      toggleStaffLineOption: st.toggleStaffLineOption,
       setStaffNote: st.setStaffNote,
       submitProxy: st.submitProxy,
       yen: st.yen,
@@ -85,28 +89,57 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
   const popularity = useMenuPopularity();
   const usedCats = s.categories.filter((c) => s.menu.some((m) => m.cat === c));
   // 店全体の人気順（画面を開いた時点の順で固定。押している最中に並びが動かないように）
-  const items = sortByPopularity(filterMenu(s.menu, cat, query), popularity);
-  const repeats = tableRepeatItems(s.orders, tableId);
+  const itemsFor = (c: string) => sortByPopularity(filterMenu(s.menu, c, query), popularity);
+  const repeats = tableRepeatItems(s.orders, tableId, s.itemOptions);
   const soldOutIds = new Set(s.menu.filter((m) => m.soldOut).map((m) => m.id));
 
   const cartKeys = Object.keys(s.staffCart);
   const totalQty = cartKeys.reduce((a, k) => a + s.staffCart[k], 0);
-  /** 入力中の注文のうち、この品の行（飲み方などの組み合わせごとに1行） */
-  const linesOf = (id: string) =>
-    cartKeys
+  /** この品の「数を合わせる組」（瓶に付けるグラスの数）。品の数とは別の数なので、行でも別の ＋− で出す */
+  const countGroupsOf = (id: string) =>
+    choiceGroups(s.itemOptions[id] ?? [])
+      .map((g) => ({ group: g.group, count: countSteps(g.options) }))
+      .filter((g): g is { group: string; count: NonNullable<ReturnType<typeof countSteps>> } => g.count !== null);
+  /** 入力中の注文のうち、この品の行（飲み方などの組み合わせごとに1行）。label には数を合わせる組を含めない */
+  const linesOf = (id: string) => {
+    const countIds = new Set(countGroupsOf(id).flatMap((g) => g.count.steps.map((st) => st.option.id)));
+    return cartKeys
       .map((key) => ({ key, ...parseCartKey(key) }))
       .filter((l) => l.menuItemId === id)
-      .map((l) => ({
-        ...l,
-        qty: s.staffCart[l.key],
-        label: optionsLabel(
-          (s.itemOptions[id] ?? []).filter((o) => l.optionIds.includes(o.id)).map((o) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta }))
-        ),
-      }));
+      .map((l) => {
+        const otherIds = l.optionIds.filter((o) => !countIds.has(o));
+        return {
+          ...l,
+          otherIds,
+          qty: s.staffCart[l.key],
+          label: optionsLabel(
+            (s.itemOptions[id] ?? []).filter((o) => otherIds.includes(o.id)).map((o) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta }))
+          ),
+        };
+      });
+  };
 
   const add = (menuItemId: string, optionIds: string[] = [], qty = 1) => {
     for (let i = 0; i < qty; i++) s.addStaff(menuItemId, optionIds);
     tapFeedback();
+  };
+
+  // 本体の数と付ける数（瓶とグラス）を足す。すでに入力中の行があれば、別の行にせず、本体もグラスもそこへ足す
+  // （「瓶2本・グラス3個」が、行の中で2つの数として並ぶように）
+  const addCounted = (m: MenuItem, optionId: string, qty: number) => {
+    const group = countGroupsOf(m.id)[0];
+    const existing = linesOf(m.id).find((l) => l.otherIds.length === 0);
+    if (!group || !existing) {
+      add(m.id, [optionId], qty);
+      return;
+    }
+    const steps = group.count.steps;
+    const current = steps.find((st) => existing.optionIds.includes(st.option.id));
+    const sum = (current?.value ?? 0) + (steps.find((st) => st.option.id === optionId)?.value ?? 0);
+    // 用意されている数の中で、合計を超えないいちばん大きい数にする
+    const target = steps.filter((st) => st.value <= sum).pop() ?? steps[0];
+    add(m.id, existing.optionIds, qty);
+    if (target.option.id !== current?.option.id) s.toggleStaffLineOption(m.id, existing.optionIds, target.option.id);
   };
 
   // おかわり: 同じ品・同じ飲み方を1杯足す。前回の備考は、この行にまだ備考が無ければ引き継ぐ
@@ -128,15 +161,36 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
     setCat(c);
     window.scrollTo({ top: 0 });
   };
+  // 左右スライドで隣の種類へ（お客様の注文画面・管理画面と同じ動き。隣の一覧が指について入ってくる）。
+  // 検索中は種類の切替が無いので、スライドも止める
+  const pager = useSwipePager({ items: ["すべて", ...usedCats], current: cat, onChange: changeCat });
+  const pages = (render: (c: string) => React.ReactNode) => (query ? render(cat) : pager.wrap(render));
 
   const send = async () => {
     if (sending) return;
     setSending(true);
+    // 送る内容の控え（送信が済むと入力中の注文は空になるので、先に取っておく）
+    const sent: SentLine[] = cartKeys.flatMap((k) => {
+      const { menuItemId, optionIds } = parseCartKey(k);
+      const m = s.menu.find((x) => x.id === menuItemId);
+      if (!m) return [];
+      const defs = s.itemOptions[menuItemId] ?? [];
+      const split = splitCountOptions(defs, defs.filter((o) => optionIds.includes(o.id)));
+      return [
+        {
+          name: m.name,
+          optionsText: split.rest.map((o) => o.name).join("・"),
+          counts: split.counts,
+          note: s.staffNotes[k] ?? "",
+          qty: s.staffCart[k],
+        },
+      ];
+    });
     const ok = await s.submitProxy();
     setSending(false);
     if (ok) {
       setReviewing(false);
-      onSent();
+      onSent(sent);
     }
   };
 
@@ -160,8 +214,12 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
         {!query && <CategoryChips categories={usedCats} value={cat} onChange={changeCat} />}
       </div>
 
-      <div style={{ padding: "10px 12px 120px", display: "flex", flexDirection: "column", gap: "10px" }}>
-        {!query && cat === "すべて" && repeats.length > 0 && (
+      <div {...(query ? {} : pager.handlers)} style={{ flex: 1, padding: "10px 12px 120px" }}>
+        {pages((c) => {
+          const items = itemsFor(c);
+          return (
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        {!query && c === "すべて" && repeats.length > 0 && (
           <section
             aria-label="おかわり"
             // 入れ子のカードにせず、1つの面の中を線で区切る
@@ -203,14 +261,11 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
                       {soldOut ? (
                         <span style={{ ...statusTag, background: "var(--text)", color: "#fff" }}>売切</span>
                       ) : (
-                        <>
-                          <span style={{ fontSize: "15px", fontWeight: 600, color: "var(--text-2)", whiteSpace: "nowrap" }}>前回まで {r.qty}</span>
-                          {inCart === 0 && (
-                            <span aria-hidden style={plusHint}>
-                              ＋
-                            </span>
-                          )}
-                        </>
+                        inCart === 0 && (
+                          <span aria-hidden style={plusHint}>
+                            ＋
+                          </span>
+                        )
                       )}
                     </button>
                     {!soldOut && inCart > 0 && (
@@ -222,15 +277,16 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
             </div>
           </section>
         )}
-        {!query && cat === "すべて" && repeats.length > 0 && <h2 style={{ ...sectionTitle, margin: "6px 2px 0" }}>メニュー（人気順）</h2>}
+        {!query && c === "すべて" && repeats.length > 0 && <h2 style={{ ...sectionTitle, margin: "6px 2px 0" }}>メニュー（人気順）</h2>}
         {items.length === 0 && (
           <div style={{ textAlign: "center", color: "var(--text-2)", fontSize: "16px", padding: "40px 0" }}>該当する品目がありません</div>
         )}
         {items.map((m) => {
           const lines = linesOf(m.id);
+          const counts = countGroupsOf(m.id);
           const q = lines.reduce((a, l) => a + l.qty, 0);
           // 飲み方などの違いが無い品は、行の右で − ＋。違いがある品は、下に組み合わせごとの行を出す
-          const plain = lines.length === 1 && lines[0].optionIds.length === 0;
+          const plain = lines.length === 1 && lines[0].otherIds.length === 0;
           const inline = plain && !m.soldOut;
           return (
             <div
@@ -253,7 +309,7 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
                     <span style={{ ...itemName, color: m.soldOut ? "var(--text-2)" : "var(--text)", textDecoration: m.soldOut ? "line-through" : "none" }}>
                       {m.name}
                     </span>
-                    {(query || cat === "すべて") && <span style={subText}>{m.cat}</span>}
+                    {(query || c === "すべて") && <span style={subText}>{m.cat}</span>}
                   </span>
                   {m.soldOut ? (
                     <span style={{ ...statusTag, background: "var(--text)", color: "#fff" }}>売切</span>
@@ -267,23 +323,37 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
                 </button>
                 {inline && <QtyStepper qty={q} label={m.name} onDec={() => s.removeStaff(m.id)} onInc={() => add(m.id)} />}
               </div>
-              {!plain &&
-                !m.soldOut &&
+              {!m.soldOut &&
                 lines.map((l) => (
-                  <div
-                    key={l.key}
-                    style={{ display: "flex", alignItems: "center", gap: "10px", padding: "6px 10px 6px 14px", borderTop: "1px solid var(--rule)" }}
-                  >
-                    <span style={{ flex: 1, minWidth: 0, fontSize: "16px", fontWeight: 800 }}>{l.label || "そのまま"}</span>
-                    <QtyStepper
-                      qty={l.qty}
-                      label={`${m.name}（${l.label || "そのまま"}）`}
-                      onDec={() => s.removeStaff(m.id, l.optionIds)}
-                      onInc={() => add(m.id, l.optionIds)}
-                    />
-                  </div>
+                  <Fragment key={l.key}>
+                    {!plain && (
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "6px 10px 6px 14px", borderTop: "1px solid var(--rule)" }}>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: "16px", fontWeight: 800 }}>{l.label || "そのまま"}</span>
+                        <QtyStepper
+                          qty={l.qty}
+                          label={`${m.name}（${l.label || "そのまま"}）`}
+                          onDec={() => s.removeStaff(m.id, l.optionIds)}
+                          onInc={() => add(m.id, l.optionIds)}
+                        />
+                      </div>
+                    )}
+                    {/* グラスの数は、品の数とは別の ＋− で（この行ぜんぶでの数） */}
+                    {counts.map((c) => (
+                      <div key={c.group} style={{ padding: "0 10px 8px" }}>
+                        <CountStepper
+                          title={c.group}
+                          count={c.count}
+                          selectedId={c.count.steps.find((st) => l.optionIds.includes(st.option.id))?.option.id}
+                          onChange={(o) => s.toggleStaffLineOption(m.id, l.optionIds, o.id)}
+                        />
+                      </div>
+                    ))}
+                  </Fragment>
                 ))}
             </div>
+          );
+        })}
+      </div>
           );
         })}
       </div>
@@ -310,7 +380,7 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
           count={optionCount}
           onClose={() => setOptionItem(null)}
           onAdd={(optionId, qty) => {
-            add(optionItem.id, [optionId], qty);
+            addCounted(optionItem, optionId, qty);
             setOptionItem(null);
           }}
         />

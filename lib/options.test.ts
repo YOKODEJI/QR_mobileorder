@@ -12,8 +12,11 @@ import {
   toggleOptionId,
   hasMissingChoice,
   moveCartLine,
-  countSteps,
+  splitCountOptions,
+  optionsLabelSplit,
+  countPickText,
   type MenuOption,
+  countSteps,
 } from "./options";
 
 describe("countSteps（数を＋−で合わせる組）", () => {
@@ -171,5 +174,38 @@ describe("optionsLabel", () => {
   it("無選択なら空文字", () => {
     expect(optionsLabel([])).toBe("");
     expect(optionsLabel(undefined)).toBe("");
+  });
+});
+
+describe("splitCountOptions（瓶とグラスを分けて表示する）", () => {
+  const defs: MenuOption[] = [
+    { id: "g0", name: "グラス0", priceDelta: 0, sort: 0, choiceGroup: "グラスの数" },
+    { id: "g1", name: "グラス1", priceDelta: 0, sort: 1, choiceGroup: "グラスの数" },
+    { id: "g3", name: "グラス3", priceDelta: 0, sort: 3, choiceGroup: "グラスの数" },
+    { id: "c", name: "Cドリンク", priceDelta: 0, sort: 99, choiceGroup: null },
+  ];
+  const sel = (ids: string[]) => defs.filter((d) => ids.includes(d.id)).map((d) => ({ id: d.id, name: d.name, priceDelta: 0 }));
+
+  it("グラスの数を、ほかのオプションと分ける", () => {
+    const s = splitCountOptions(defs, sel(["g3", "c"]));
+    expect(s.rest.map((o) => o.name)).toEqual(["Cドリンク"]);
+    expect(s.counts).toEqual([{ label: "グラス", value: 3 }]);
+  });
+  it("定義が分からないとき（消したオプションなど）は分けない", () => {
+    const s = splitCountOptions(undefined, sel(["g3"]));
+    expect(s.rest.map((o) => o.name)).toEqual(["グラス3"]);
+    expect(s.counts).toEqual([]);
+  });
+  it("1行に書くときは、品の数と取り違えない書き方にする", () => {
+    expect(optionsLabelSplit(defs, sel(["g3", "c"]))).toBe("Cドリンク・グラス 計3個");
+    expect(optionsLabelSplit(defs, sel(["g0"]))).toBe("グラスなし");
+    expect(countPickText({ label: "グラス", value: 1 })).toBe("グラス 計1個");
+  });
+  it("一合／グラスのような、数ではない組は分けない", () => {
+    const amount: MenuOption[] = [
+      { id: "a", name: "一合", priceDelta: 0, sort: 0, choiceGroup: "量" },
+      { id: "b", name: "グラス", priceDelta: 0, sort: 1, choiceGroup: "量" },
+    ];
+    expect(splitCountOptions(amount, [{ id: "b", name: "グラス", priceDelta: 0 }]).counts).toEqual([]);
   });
 });

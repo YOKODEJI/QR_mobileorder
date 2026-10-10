@@ -7,6 +7,7 @@ import PhotoSlot from "@/components/ui/PhotoSlot";
 import QrCodes from "@/components/qr/QrCodes";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 import { getStoredThemeMode, setThemeMode, type ThemeMode } from "@/lib/themeMode";
+import { useBackHandler } from "@/lib/backGuard";
 
 const SWATCHES = ["#cf4b2c", "#e0902a", "#248a3d", "#0a84ff", "#8a4fd0"];
 
@@ -15,6 +16,7 @@ export default function SettingsSheet() {
   const settings = useAppStore((s) => s.settings);
   const setSetting = useAppStore((s) => s.setSetting);
   const closeSettings = useAppStore((s) => s.closeSettings);
+  useBackHandler(showSettings, closeSettings);
   const clearCheckoutHistory = useAppStore((s) => s.clearCheckoutHistory);
   const confirmRemoveStorePhoto = useAppStore((s) => s.confirmRemoveStorePhoto);
 

@@ -5,7 +5,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import { hm, elapsedMin, useNow } from "@/lib/time";
 import { BellIcon, BellSlashIcon, WarningIcon } from "@/components/ui/Icon";
-import { optionsLabel } from "@/lib/options";
+import { optionsLabel, splitCountOptions } from "@/lib/options";
 import SoldOutSheet from "@/components/kitchen/SoldOutSheet";
 import { card } from "@/components/handy/ui";
 
@@ -50,6 +50,7 @@ export default function KitchenDisplay() {
       highlightId: st.highlightId,
       orders: st.orders,
       handy: st.settings.orderMode === "handy",
+      itemOptions: st.itemOptions,
       soundOn: st.soundOn,
       tableName: st.tableName,
       toggleSound: st.toggleSound,
@@ -222,9 +223,12 @@ export default function KitchenDisplay() {
                     )}
                   </div>
                   {o.items.map((it, i) => {
-                    const opts = optionsLabel(it.options);
+                    // グラスの数は品の数とは別の数なので、品名の行には混ぜず、下の行に分けて出す
+                    const split = splitCountOptions(s.itemOptions[it.menuItemId], it.options);
+                    const opts = optionsLabel(split.rest);
                     return (
-                      <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "7px 0", borderTop: i === 0 ? "none" : "1px solid var(--hairline-2)" }}>
+                      <div key={i} style={{ padding: "7px 0", borderTop: i === 0 ? "none" : "1px solid var(--hairline-2)" }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
                         <span style={{ flex: 1, fontSize: "19px", fontWeight: 700, lineHeight: 1.3 }}>
                           {it.name}
                           {/* 飲み方（一合・ロック・Cドリンク）は品名と同じ強さで。備考だけ赤 */}
@@ -240,6 +244,17 @@ export default function KitchenDisplay() {
                         <span style={{ fontSize: "22px", fontWeight: 800, color: "var(--accent)", fontVariantNumeric: "tabular-nums", lineHeight: 1.3 }}>
                           ×{it.qty}
                         </span>
+                      </div>
+                      {split.counts.map((c) => (
+                        <div key={c.label} style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginTop: "4px" }}>
+                          <span style={{ flex: 1, fontSize: "19px", fontWeight: 700, lineHeight: 1.3 }}>{c.value === 0 ? `${c.label}なし` : c.label}</span>
+                          {c.value > 0 && (
+                            <span style={{ fontSize: "22px", fontWeight: 800, color: "var(--accent)", fontVariantNumeric: "tabular-nums", lineHeight: 1.3 }}>
+                              ×{c.value}
+                            </span>
+                          )}
+                        </div>
+                      ))}
                       </div>
                     );
                   })}

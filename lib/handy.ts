@@ -1,6 +1,6 @@
 // ハンディ画面（/handy）用の純粋関数。画面から切り離してテストできるようにしている。
 import type { MenuItem, Order } from "@/store/useAppStore";
-import { optionsLabel, cartKey } from "@/lib/options";
+import { optionsLabel, optionsLabelSplit, splitCountOptions, cartKey, type MenuOption } from "@/lib/options";
 
 /** 並びの index 番目を1つ前(-1)/後ろ(1)へ動かした新しい配列。動かせないときは元の配列をそのまま返す */
 export function shiftInList<T>(list: T[], index: number, dir: -1 | 1): T[] {
@@ -37,7 +37,7 @@ export interface RepeatItem {
 }
 
 /** この卓でこれまでに頼まれた品（商品＋飲み方ごと）。おかわりしやすいよう、最近頼まれた順 */
-export function tableRepeatItems(orders: Order[], tableId: string): RepeatItem[] {
+export function tableRepeatItems(orders: Order[], tableId: string, itemOptions: Record<string, MenuOption[]> = {}): RepeatItem[] {
   const map = new Map<string, RepeatItem & { lastAt: number }>();
   for (const o of orders) {
     if (o.table !== tableId || o.checkedOutAt) continue;
@@ -58,7 +58,7 @@ export function tableRepeatItems(orders: Order[], tableId: string): RepeatItem[]
           menuItemId: it.menuItemId,
           optionIds,
           name: it.name,
-          optionsText: optionsLabel(it.options),
+          optionsText: optionsLabelSplit(itemOptions[it.menuItemId], it.options),
           note: it.note ?? null,
           qty: it.qty,
           lastAt: at,
@@ -132,15 +132,16 @@ export interface BillLine {
 }
 
 /** レジ用の一覧: この卓の未会計のドリンクを「品名＋オプション」ごとにまとめる。
- *  並びは品名が初めて出た順で、同じ品のオプション違い（Cドリンクの分など）は隣り合わせにする */
-export function billLines(orders: Order[], tableId: string): BillLine[] {
+ *  並びは品名が初めて出た順で、同じ品のオプション違い（Cドリンクの分など）は隣り合わせにする。
+ *  数を合わせる組（瓶に付けるグラスの数）はレジに打つものではないので出さず、同じ品は1行にまとめる */
+export function billLines(orders: Order[], tableId: string, itemOptions: Record<string, MenuOption[]> = {}): BillLine[] {
   const map = new Map<string, BillLine>();
   const sorted = orders
     .filter((o) => o.table === tableId && !o.checkedOutAt)
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   for (const o of sorted) {
     for (const it of o.items) {
-      const optionsText = optionsLabel(it.options);
+      const optionsText = optionsLabel(splitCountOptions(itemOptions[it.menuItemId], it.options).rest);
       const key = it.name + "\u0000" + optionsText;
       const line = map.get(key);
       if (line) line.qty += it.qty;

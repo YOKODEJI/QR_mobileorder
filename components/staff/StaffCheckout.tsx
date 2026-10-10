@@ -9,7 +9,7 @@ import OptionSheet from "@/components/ui/OptionSheet";
 import Toggle from "@/components/ui/Toggle";
 import { proxyCardStyle, proxyAddStyle, proxySubStyle, addBtnStyle } from "@/lib/styles";
 import { computeCheckoutBreakdown, type DiscountType } from "@/lib/pricing";
-import { cartKey, parseCartKey, lineTotal, unitPrice, optionsLabel } from "@/lib/options";
+import { cartKey, parseCartKey, lineTotal, unitPrice, optionsLabel, optionsLabelSplit } from "@/lib/options";
 import { useSwipePager } from "@/lib/useSwipePager";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { settleTargets } from "@/lib/handy";
@@ -593,9 +593,9 @@ export default function StaffCheckout() {
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: "15px", fontWeight: 700 }}>{it.name}</div>
-                        {optionsLabel(it.options) && (
+                        {optionsLabelSplit(s.itemOptions[it.menuItemId], it.options) && (
                           <div style={{ fontSize: "13px", fontWeight: 600, color: accent }}>
-                            {optionsLabel(it.options)}
+                            {optionsLabelSplit(s.itemOptions[it.menuItemId], it.options)}
                           </div>
                         )}
                         {!handy && (
@@ -864,7 +864,7 @@ export default function StaffCheckout() {
 
                       {/* オプションの組み合わせごとの内訳 */}
                       {rows.map((r) => {
-                        const label = optionsLabel(r.opts) || "オプションなし";
+                        const label = optionsLabelSplit(s.itemOptions[m.id], r.opts) || "オプションなし";
                         return (
                           <div
                             key={r.key}

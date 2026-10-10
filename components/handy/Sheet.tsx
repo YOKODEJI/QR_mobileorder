@@ -1,6 +1,7 @@
 "use client";
 
 import { PHONE_MAX_WIDTH, smallButton } from "@/components/handy/ui";
+import { useBackHandler } from "@/lib/backGuard";
 
 /** ハンディ・厨房の画面の下から出るシート。
  *  title の下に header（検索やタブなど、スクロールしないもの）、真ん中に children（スクロールする）、下に footer。 */
@@ -25,6 +26,8 @@ export default function Sheet({
   /** 中身の量で高さが変わらないようにする（絞り込みで一覧が増減するシート向け） */
   tall?: boolean;
 }) {
+  // 端末の「戻る」では、このシートを閉じる
+  useBackHandler(true, onClose);
   return (
     <div
       onClick={onClose}
