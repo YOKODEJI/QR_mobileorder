@@ -123,10 +123,13 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
         {!query && cat === "すべて" && repeats.length > 0 && (
           <section
             aria-label="おかわり"
-            style={{ marginBottom: "6px", padding: "10px", borderRadius: "16px", background: "var(--accent-bg)", border: "1px solid var(--accent)" }}
+            // 入れ子のカードにせず、1つの枠の中を罫線で区切る（帳面の欄のように）
+            style={{ marginBottom: "6px", borderRadius: "8px", background: "var(--surface)", border: "1.5px solid var(--accent)", overflow: "hidden" }}
           >
-            <h2 style={{ ...sectionTitle, margin: "0 2px 8px", color: "var(--text)" }}>おかわり（この卓が前に頼んだもの）</h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <h2 style={{ ...sectionTitle, margin: 0, padding: "7px 12px", color: "var(--text)", background: "var(--accent-bg)" }}>
+              おかわり（この卓が前に頼んだもの）
+            </h2>
+            <div style={{ display: "flex", flexDirection: "column" }}>
               {repeats.map((r) => {
                 const soldOut = soldOutIds.has(r.menuItemId);
                 const inCart = s.staffCart[r.key] ?? 0;
@@ -138,9 +141,11 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
                     aria-label={soldOut ? `${r.name}（売切）` : `${r.name}${r.optionsText ? "・" + r.optionsText : ""}をおかわり`}
                     style={{
                       ...rowCard,
-                      minHeight: "58px",
-                      border: inCart > 0 ? "2.5px solid var(--accent)" : rowCard.border,
-                      background: soldOut ? "var(--inset)" : "var(--surface)",
+                      minHeight: "60px",
+                      border: "none",
+                      borderTop: "1px solid var(--rule)",
+                      borderRadius: 0,
+                      background: soldOut ? "var(--inset)" : inCart > 0 ? "var(--accent-bg)" : "var(--surface)",
                       cursor: soldOut ? "default" : "pointer",
                     }}
                   >
@@ -153,14 +158,14 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
                       )}
                     </span>
                     {soldOut ? (
-                      <span style={{ ...statusTag, background: "var(--red)", color: "#fff" }}>売切</span>
+                      <span style={{ ...statusTag, background: "var(--text)", color: "var(--surface)" }}>売切</span>
                     ) : (
                       <>
                         <span style={{ fontSize: "15px", fontWeight: 600, color: "var(--text-2)", whiteSpace: "nowrap" }}>前回まで {r.qty}</span>
                         {inCart > 0 ? (
                           <span style={countBadge}>＋{inCart}</span>
                         ) : (
-                          <span aria-hidden style={{ ...countBadge, background: "var(--surface)", color: "var(--accent)", border: "2px solid var(--accent)" }}>
+                          <span aria-hidden style={{ ...countBadge, minWidth: "38px", height: "38px", background: "var(--surface)", color: "var(--accent)", border: "2px solid var(--accent)" }}>
                             ＋
                           </span>
                         )}
@@ -198,7 +203,7 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
                 {(query || cat === "すべて") && <span style={subText}>{m.cat}</span>}
               </span>
               {m.soldOut ? (
-                <span style={{ ...statusTag, background: "var(--red)", color: "#fff" }}>売切</span>
+                <span style={{ ...statusTag, background: "var(--text)", color: "var(--surface)" }}>売切</span>
               ) : (
                 q > 0 && <span style={countBadge}>{q}</span>
               )}
@@ -238,7 +243,7 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
       {/* 選ぶ組が1つだけ（一合／グラス、飲み方）なら、押した時点でそのまま入れる */}
       {optionItem && optionItemGroups.length === 1 && !optionCount && (
         <Sheet title={optionItem.name} subtitle={`${optionItemGroups[0].group}を選んでください`} onClose={() => setOptionItem(null)}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px", paddingBottom: "6px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px", paddingBottom: "4px" }}>
             {optionItemGroups[0].options.map((o) => (
               <button
                 key={o.id}

@@ -366,7 +366,7 @@ export default function SettingsSheet() {
               border: "1px solid var(--red-bg)",
               background: "transparent",
               color: "var(--red)",
-              borderRadius: "999px",
+              borderRadius: "8px",
               padding: "8px 16px",
               fontSize: "13px",
               fontWeight: 700,

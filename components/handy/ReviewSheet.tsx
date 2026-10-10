@@ -65,7 +65,7 @@ export default function ReviewSheet({
           return (
             <div
               key={k}
-              style={{ background: "var(--surface)", border: "1px solid var(--hairline-strong)", borderRadius: "14px", padding: "10px 12px" }}
+              style={{ background: "var(--surface)", border: "1.5px solid var(--rule)", borderRadius: "8px", padding: "10px 12px" }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 <span style={{ flex: 1, minWidth: 0 }}>
@@ -109,8 +109,8 @@ export default function ReviewSheet({
                           gap: "8px",
                           minHeight: "44px",
                           padding: "6px 14px 6px 10px",
-                          borderRadius: "12px",
-                          border: on ? "2px solid var(--accent)" : "2px solid var(--hairline-strong)",
+                          borderRadius: "8px",
+                          border: on ? "2px solid var(--accent)" : "2px solid var(--rule)",
                           background: on ? "var(--accent)" : "var(--surface)",
                           color: on ? "var(--accent-ink)" : "var(--text)",
                           fontFamily: "inherit",
@@ -124,7 +124,7 @@ export default function ReviewSheet({
                           style={{
                             width: "24px",
                             height: "24px",
-                            borderRadius: "7px",
+                            borderRadius: "4px",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",

@@ -70,7 +70,7 @@ export default function BillSheet({
       {lines.length === 0 ? (
         <div style={{ textAlign: "center", color: "var(--text-2)", fontSize: "16px", padding: "30px 0" }}>注文はありません</div>
       ) : (
-        <div style={{ background: "var(--surface)", border: "1px solid var(--hairline-strong)", borderRadius: "14px", padding: "4px 14px" }}>
+        <div style={{ background: "var(--surface)", border: "1.5px solid var(--rule)", borderRadius: "8px", padding: "4px 14px" }}>
           {lines.map((l, i) => (
             <div
               key={i}
@@ -95,7 +95,7 @@ export default function BillSheet({
               display: "flex",
               justifyContent: "space-between",
               padding: "10px 0",
-              borderTop: "2px solid var(--hairline-strong)",
+              borderTop: "1.5px solid var(--text)",
               fontSize: "18px",
               fontWeight: 800,
             }}

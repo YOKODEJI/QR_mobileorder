@@ -68,7 +68,7 @@ export default function OptionSheet({
           style={{
             width: "38px",
             height: "5px",
-            borderRadius: "999px",
+            borderRadius: "8px",
             background: "var(--soldout-bg)",
             margin: "0 auto 14px",
           }}

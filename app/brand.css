@@ -1,0 +1,27 @@
+/* 【店ごとのファイル】色・書体・背後の光。画面の作り（globals.css・各部品）は全店共通で、ここだけ差し替える。
+   よこでじ版: よこでじのHP（https://yokodeji2026.jp）に合わせ、紺・白・薄いグレー。
+   避けること（docs/10-ui-principles.md）: システムの書体のまま、白地に iOS の青いボタン、紫〜青のグラデーション。 */
+:root {
+  /* 書体は BIZ UDPGothic（app/fonts.ts）。太さは 400 と 700 だけなので、700 より太い指定は 700 で出る */
+  --font-ui: "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+  /* 見出し・屋号も同じ書体（店によっては明朝や筆文字に差し替える） */
+  --font-head: var(--font-ui);
+  --font-brand: var(--font-ui);
+  --brand-name-weight: 700;
+  --brand-name-size: 20px;
+  --brand-name-spacing: 0.02em;
+
+  /* 色 */
+  --brand-ground: #eef0f4; /* 地 */
+  --brand-ink: #10131a; /* 文字 */
+  --brand-accent: #001543; /* 主操作・提供前。店の設定（テーマ色）が読めたらそちらで上書きされる */
+  --brand-mark: #001543; /* 屋号の色 */
+
+  /* すりガラスの背後の光（お客様の画面・管理画面）。紺と青緑に、琥珀を少し */
+  --brand-wash:
+    radial-gradient(52% 30% at 8% -2%, rgba(0, 21, 67, 0.2), transparent 70%),
+    radial-gradient(46% 32% at 100% 12%, rgba(40, 150, 170, 0.2), transparent 70%),
+    radial-gradient(50% 36% at -4% 56%, rgba(60, 110, 200, 0.13), transparent 72%),
+    radial-gradient(48% 34% at 104% 70%, rgba(240, 170, 70, 0.17), transparent 70%),
+    radial-gradient(60% 36% at 40% 104%, rgba(0, 21, 67, 0.13), transparent 70%);
+}

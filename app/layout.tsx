@@ -1,13 +1,7 @@
 import type { Metadata } from "next";
-import { Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
-
-const notoSansJP = Noto_Sans_JP({
-  variable: "--font-noto-sans-jp",
-  subsets: ["latin"],
-  weight: ["400", "500", "700", "900"],
-  display: "swap",
-});
+// 書体は店ごとに違う（app/fonts.ts）。色などの店ごとの値は app/brand.css
+import { FONT_STYLESHEET } from "./fonts";
 
 export const metadata: Metadata = {
   title: "QRオーダー",
@@ -20,7 +14,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ja" className={notoSansJP.variable}>
+    <html lang="ja">
+      <head>
+        {/* 書体は表示時に Google Fonts から読む（理由は app/fonts.ts） */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="stylesheet" href={FONT_STYLESHEET} />
+      </head>
       <body>{children}</body>
     </html>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { PHONE_MAX_WIDTH, pillButton } from "@/components/handy/ui";
+import { PHONE_MAX_WIDTH, smallButton } from "@/components/handy/ui";
 
 /** ハンディ・厨房の画面の下から出るシート。
  *  title の下に header（検索やタブなど、スクロールしないもの）、真ん中に children（スクロールする）、下に footer。 */
@@ -50,18 +50,19 @@ export default function Sheet({
           flexDirection: "column",
           gap: "12px",
           background: "var(--app-bg)",
-          borderRadius: "24px 24px 0 0",
+          borderTop: "1.5px solid var(--text)",
+          borderRadius: "14px 14px 0 0",
           padding: "10px 14px calc(16px + env(safe-area-inset-bottom))",
           animation: "sheetup .3s ease-out",
         }}
       >
-        <div aria-hidden style={{ width: "38px", height: "5px", borderRadius: "999px", background: "var(--soldout-bg)", margin: "0 auto" }} />
+        <div aria-hidden style={{ width: "40px", height: "4px", borderRadius: "2px", background: "var(--rule)", margin: "0 auto" }} />
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: "20px", fontWeight: 800, lineHeight: 1.25 }}>{title}</div>
             {subtitle && <div style={{ fontSize: "15px", fontWeight: 600, color: "var(--text-2)", marginTop: "2px" }}>{subtitle}</div>}
           </div>
-          <button onClick={onClose} style={pillButton}>
+          <button onClick={onClose} style={smallButton}>
             閉じる
           </button>
         </div>

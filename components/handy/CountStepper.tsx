@@ -34,8 +34,6 @@ export default function CountStepper({
   const button = (off: boolean): React.CSSProperties => ({
     ...stepButton,
     ...(large ? { width: "72px", height: "64px", fontSize: "30px" } : {}),
-    background: "var(--surface)",
-    border: "1px solid var(--hairline-strong)",
     ...disabledLook(off),
   });
 
@@ -49,9 +47,9 @@ export default function CountStepper({
         alignItems: "center",
         gap: "12px",
         padding: large ? "14px 16px 18px" : "8px 10px",
-        borderRadius: "14px",
+        borderRadius: "8px",
         background: "var(--inset)",
-        border: "1px solid var(--hairline-strong)",
+        border: "1.5px solid var(--rule)",
       }}
     >
       <span style={{ flex: large ? "none" : 1, minWidth: 0, fontSize: large ? "18px" : "16px", fontWeight: 800 }}>{title}</span>

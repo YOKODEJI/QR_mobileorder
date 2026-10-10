@@ -183,7 +183,7 @@ export default function CustomerOrder() {
                       fontSize: "14px",
                       fontWeight: 700,
                       padding: "6px 12px",
-                      borderRadius: "999px",
+                      borderRadius: "8px",
                     }}
                   >
                     売切
@@ -360,7 +360,7 @@ export default function CustomerOrder() {
                 border: "none",
                 background: "var(--control-tint)",
                 color: "var(--text)",
-                borderRadius: "999px",
+                borderRadius: "8px",
                 padding: "7px 12px",
                 fontSize: "13px",
                 fontWeight: 700,
@@ -381,7 +381,7 @@ export default function CustomerOrder() {
                 border: "none",
                 background: called ? "var(--control-tint)" : accent,
                 color: called ? "var(--text-2)" : "var(--accent-ink)",
-                borderRadius: "999px",
+                borderRadius: "8px",
                 padding: "7px 12px",
                 fontSize: "13px",
                 fontWeight: 700,
@@ -589,7 +589,7 @@ export default function CustomerOrder() {
               style={{
                 width: "38px",
                 height: "5px",
-                borderRadius: "999px",
+                borderRadius: "8px",
                 background: "var(--soldout-bg)",
                 margin: "0 auto 14px",
               }}
@@ -622,7 +622,7 @@ export default function CustomerOrder() {
                               fontSize: "13px",
                               fontWeight: 700,
                               padding: "2px 9px",
-                              borderRadius: "999px",
+                              borderRadius: "8px",
                               background: o.status === "served" ? "var(--green-bg)" : "var(--amber-bg)",
                               color: o.status === "served" ? "var(--green-dark)" : "var(--amber-dark)",
                             }}

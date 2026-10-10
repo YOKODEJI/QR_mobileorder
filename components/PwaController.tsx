@@ -127,7 +127,7 @@ export default function PwaController({ scope = "/admin/" }: { scope?: string })
             border: "none",
             background: accent,
             color: "#fff",
-            borderRadius: "999px",
+            borderRadius: "8px",
             padding: "8px 16px",
             fontSize: "13px",
             fontWeight: 700,

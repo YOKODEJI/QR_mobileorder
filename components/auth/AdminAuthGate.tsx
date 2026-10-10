@@ -188,7 +188,7 @@ function LoginForm({ initialError, label }: { initialError?: string; label: stri
         color: "var(--text)",
         padding: "20px",
         fontFamily:
-          "-apple-system, BlinkMacSystemFont, 'Hiragino Sans', var(--font-noto-sans-jp), 'Noto Sans JP', sans-serif",
+          "var(--font-ui)",
       }}
     >
       {/* ガラスは背後に何か無いと透明感が見えない。画面全体を覆う連続的な階調を敷く

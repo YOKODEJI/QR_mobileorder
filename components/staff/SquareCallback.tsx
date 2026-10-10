@@ -21,8 +21,7 @@ type PendingCheckout = {
  *  古い(=別の会計操作で上書きされずに放置された)エントリを誤って使わないための上限。 */
 const PENDING_MAX_AGE_MS = 30 * 60 * 1000;
 
-const FONT =
-  "-apple-system, BlinkMacSystemFont, 'Hiragino Sans', var(--font-noto-sans-jp), 'Noto Sans JP', sans-serif";
+const FONT = "var(--font-ui)";
 
 /** Square側に実際の決済を問い合わせて確認する（Edge Function square_verify_payment）。
  *  Square POSアプリのコールバックが返す status=ok / transaction_id は、しょせん
@@ -191,7 +190,7 @@ export default function SquareCallback() {
           style={{
             marginTop: "10px",
             padding: "12px 28px",
-            borderRadius: "999px",
+            borderRadius: "8px",
             background: "var(--control-tint)",
             color: "var(--text)",
             fontWeight: 700,

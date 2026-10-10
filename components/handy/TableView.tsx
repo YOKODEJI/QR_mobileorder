@@ -48,7 +48,7 @@ export default function TableView({
               gap: "10px",
               background: "var(--amber-bg)",
               border: "1px solid var(--amber-edge)",
-              borderRadius: "14px",
+              borderRadius: "8px",
               padding: "10px 12px",
             }}
           >
@@ -59,7 +59,7 @@ export default function TableView({
               style={{
                 minHeight: "40px",
                 padding: "8px 14px",
-                borderRadius: "999px",
+                borderRadius: "8px",
                 border: "none",
                 background: "var(--amber-dark)",
                 color: "#fff",
@@ -84,10 +84,9 @@ export default function TableView({
                 key={o.id}
                 style={{
                   background: "var(--surface)",
-                  borderRadius: "14px",
-                  border: "1px solid var(--hairline-strong)",
-                  // 提供前の伝票は左の太い帯でも分かるようにする
-                  borderLeft: cooking ? "6px solid var(--accent)" : "6px solid var(--soldout-bg)",
+                  borderRadius: "8px",
+                  // 提供前の伝票は、強調色の太い枠と右上の印で分かるようにする（左の色線は使わない）
+                  border: cooking ? "2.5px solid var(--accent)" : "1.5px solid var(--rule)",
                   padding: "10px 14px",
                 }}
               >
@@ -101,7 +100,7 @@ export default function TableView({
                       // 提供前は色つき、提供済みは白地に黒文字とチェック。色の濃淡だけに頼らない
                       background: cooking ? "var(--accent)" : "var(--surface)",
                       color: cooking ? "var(--accent-ink)" : "var(--text)",
-                      border: cooking ? "1.5px solid var(--accent)" : "1.5px solid var(--text-2)",
+                      border: cooking ? "1.5px solid var(--accent)" : "1.5px solid var(--rule)",
                     }}
                   >
                     {cooking ? "提供前" : "✓ 提供済み"}

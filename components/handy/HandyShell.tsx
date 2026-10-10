@@ -13,7 +13,8 @@ import TableGrid from "@/components/handy/TableGrid";
 import TableView from "@/components/handy/TableView";
 import OrderEntry from "@/components/handy/OrderEntry";
 import TableEditSheet from "@/components/handy/TableEditSheet";
-import { PHONE_MAX_WIDTH, pillButton } from "@/components/handy/ui";
+import { PHONE_MAX_WIDTH, smallButton } from "@/components/handy/ui";
+import { STAFF_CAN_EDIT_TABLES } from "@/lib/storeRules";
 
 type View = { name: "tables" } | { name: "table"; id: string } | { name: "order"; id: string };
 
@@ -101,9 +102,12 @@ export default function HandyShell() {
 
   const title =
     view.name === "tables" ? storeName : view.name === "table" ? tableName(view.id) : `${tableName(view.id)} の注文`;
-  // 卓の編集はオーナーだけ（DB側の step22 と同じ条件。役割が分からない＝Supabase未設定のローカルでは出す）。
-  // スタッフにも開けたい店は、DBのポリシーと合わせてここを変える（店舗ごとのカスタマイズ）
-  const canEditTables = view.name === "tables" && !loading && (staffRole === "owner" || staffRole === null);
+  // 卓の編集ができる役割は店の決まり（lib/storeRules.ts。DBのポリシーと合わせること）。
+  // 役割が分からない＝Supabase未設定のローカルでは出す
+  const canEditTables =
+    view.name === "tables" &&
+    !loading &&
+    (staffRole === "owner" || staffRole === null || (STAFF_CAN_EDIT_TABLES && staffRole === "staff"));
 
   return (
     <div
@@ -130,24 +134,25 @@ export default function HandyShell() {
           height: "var(--handy-header-h)",
           padding: "env(safe-area-inset-top) 12px 0",
           background: "var(--surface)",
-          borderBottom: "1px solid var(--hairline)",
+          borderBottom: "1.5px solid var(--text)",
         }}
       >
         {view.name !== "tables" && (
-          <button onClick={back} aria-label="戻る" style={{ ...pillButton, paddingLeft: "10px" }}>
+          <button onClick={back} aria-label="戻る" style={{ ...smallButton, paddingLeft: "10px" }}>
             <span aria-hidden style={{ fontSize: "20px", lineHeight: 1, marginRight: "2px" }}>
               ‹
             </span>
             戻る
           </button>
         )}
+        {/* 卓一覧では屋号を店の書体で出す。ほかの画面は卓名を大きく */}
         <h1
+          className={view.name === "tables" ? "brand-name" : undefined}
           style={{
             flex: 1,
             minWidth: 0,
             margin: 0,
-            fontWeight: 800,
-            fontSize: "20px",
+            ...(view.name === "tables" ? {} : { fontWeight: 800, fontSize: "21px" }),
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -156,14 +161,14 @@ export default function HandyShell() {
           {title}
         </h1>
         {canEditTables && (
-          <button onClick={() => setEditingTables(true)} style={pillButton}>
+          <button onClick={() => setEditingTables(true)} style={smallButton}>
             卓の編集
           </button>
         )}
         {view.name === "tables" && isSupabaseConfigured() && (
           <button
             onClick={() => getSupabase()?.auth.signOut()}
-            style={{ ...pillButton, background: "transparent", color: "var(--text-2)", padding: "8px 4px" }}
+            style={{ ...smallButton, border: "none", background: "transparent", color: "var(--text-2)", padding: "8px 4px" }}
           >
             ログアウト
           </button>

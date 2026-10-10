@@ -63,8 +63,8 @@ export default function MoveTableSheet({
               style={{
                 minHeight: "72px",
                 padding: "10px",
-                borderRadius: "14px",
-                border: "1px solid var(--hairline-strong)",
+                borderRadius: "10px",
+                border: "1.5px solid var(--rule)",
                 background: "var(--surface)",
                 fontFamily: "inherit",
                 fontSize: "26px",

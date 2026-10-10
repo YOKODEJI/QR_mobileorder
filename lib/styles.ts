@@ -22,8 +22,8 @@ export const segBtn = (active: boolean): CSSProperties => ({
 
 export const chipStyle = (active: boolean, accent: string): CSSProperties => ({
   minHeight: "40px",
-  padding: "8px 16px",
-  borderRadius: "999px",
+  padding: "8px 14px",
+  borderRadius: "10px",
   cursor: "pointer",
   fontFamily: "inherit",
   fontSize: "15px",

@@ -8,7 +8,7 @@ import SupabaseSync from "@/components/SupabaseSync";
 import AlertDialog from "@/components/ui/AlertDialog";
 import Toast from "@/components/ui/Toast";
 import LoadingScreen from "@/components/ui/LoadingScreen";
-import { pillButton } from "@/components/handy/ui";
+import { smallButton } from "@/components/handy/ui";
 
 type WakeLockSentinelLike = { release: () => Promise<void> };
 
@@ -83,7 +83,7 @@ export default function KitchenShell() {
         {isSupabaseConfigured() && (
           <button
             onClick={() => getSupabase()?.auth.signOut()}
-            style={{ ...pillButton, background: "transparent", color: "var(--text-2)", fontSize: "13px" }}
+            style={{ ...smallButton, background: "transparent", color: "var(--text-2)", fontSize: "13px" }}
           >
             ログアウト
           </button>

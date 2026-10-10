@@ -182,7 +182,7 @@ export default function StaffCheckout() {
                   style={{
                     border: "none",
                     background: "var(--control-tint)",
-                    borderRadius: "999px",
+                    borderRadius: "8px",
                     padding: "6px 12px",
                     fontSize: "14px",
                     fontWeight: 700,
@@ -198,7 +198,7 @@ export default function StaffCheckout() {
                   style={{
                     border: "none",
                     background: accent,
-                    borderRadius: "999px",
+                    borderRadius: "8px",
                     padding: "6px 14px",
                     fontSize: "14px",
                     fontWeight: 700,
@@ -216,7 +216,7 @@ export default function StaffCheckout() {
                 style={{
                   border: "none",
                   background: "var(--control-tint)",
-                  borderRadius: "999px",
+                  borderRadius: "8px",
                   padding: "6px 14px",
                   fontSize: "14px",
                   fontWeight: 700,
@@ -327,7 +327,7 @@ export default function StaffCheckout() {
                                 fontWeight: 700,
                                 color: "var(--green-dark)",
                                 background: "var(--green-bg)",
-                                borderRadius: "999px",
+                                borderRadius: "8px",
                                 padding: "2px 8px",
                               }}
                             >
@@ -340,7 +340,7 @@ export default function StaffCheckout() {
                                 fontWeight: 700,
                                 color: "var(--soldout-text)",
                                 background: "var(--soldout-bg)",
-                                borderRadius: "999px",
+                                borderRadius: "8px",
                                 padding: "2px 8px",
                               }}
                             >
@@ -355,7 +355,7 @@ export default function StaffCheckout() {
                               fontWeight: 700,
                               color: "var(--red-dark)",
                               background: "var(--red-bg)",
-                              borderRadius: "999px",
+                              borderRadius: "8px",
                               padding: "2px 8px",
                             }}
                           >
@@ -381,7 +381,7 @@ export default function StaffCheckout() {
                               fontSize: "14px",
                               fontWeight: 700,
                               fontFamily: "inherit",
-                              borderRadius: "999px",
+                              borderRadius: "8px",
                               padding: "8px 0",
                               cursor: "pointer",
                             }}
@@ -469,7 +469,7 @@ export default function StaffCheckout() {
                         border: "none",
                         background: accent,
                         color: "#fff",
-                        borderRadius: "999px",
+                        borderRadius: "8px",
                         padding: "5px 14px",
                         fontSize: "13px",
                         fontWeight: 700,
@@ -487,7 +487,7 @@ export default function StaffCheckout() {
                         border: "1px solid var(--soldout-bg)",
                         background: "var(--surface)",
                         color: "var(--text-2)",
-                        borderRadius: "999px",
+                        borderRadius: "8px",
                         padding: "5px 14px",
                         fontSize: "13px",
                         fontWeight: 700,
@@ -520,7 +520,7 @@ export default function StaffCheckout() {
                         border: "1px solid var(--hairline)",
                         background: "var(--surface)",
                         color: "var(--text-2)",
-                        borderRadius: "999px",
+                        borderRadius: "8px",
                         padding: "8px 16px",
                         fontSize: "14px",
                         fontWeight: 700,
@@ -637,7 +637,7 @@ export default function StaffCheckout() {
                         onClick={() => setDiscountType(opt.v)}
                         style={{
                           border: "none",
-                          borderRadius: "999px",
+                          borderRadius: "8px",
                           padding: "7px 16px",
                           fontSize: "14px",
                           fontWeight: 700,

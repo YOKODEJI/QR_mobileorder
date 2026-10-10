@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* 店ごとの色・書体・背後の光（このファイルより先に読み、下のトークンから参照する） */
+@import "./brand.css";
 
 /* ============================================================
    デザイントークン（_planning/01-design-tokens.md 準拠）
@@ -12,13 +14,13 @@
    ============================================================ */
 :root {
   /* サーフェス（systemGroupedBackground / systemBackground） */
-  --app-bg: #f2f2f7;
+  --app-bg: var(--brand-ground, #f2f2f7);
   --surface: #ffffff;
   --header-bg: rgba(248, 248, 250, 0.82);
   --inset: #f0f0f2;
 
   /* テキスト（label / secondaryLabel / tertiaryLabel / quaternaryLabel） */
-  --text: #000000;
+  --text: var(--brand-ink, #000000);
   --text-2: rgba(60, 60, 67, 0.6);
   --text-3: rgba(60, 60, 67, 0.3);
   --text-4: rgba(60, 60, 67, 0.18);
@@ -29,6 +31,8 @@
   --hairline-2: rgba(60, 60, 67, 0.05);
   /* 面の輪郭をはっきり見せたいところ用（ハンディの行・入力欄） */
   --hairline-strong: rgba(60, 60, 67, 0.22);
+  /* ハンディ・厨房の罫線（帳面の線。枠と区切りはこれで引く。影は使わない） */
+  --rule: rgba(26, 29, 33, 0.3);
 
   /* コントロール（systemFill / secondarySystemFill） */
   --control-tint: rgba(120, 120, 128, 0.16);
@@ -65,7 +69,7 @@
   --ticket-done: #8e8e93;
 
   /* テーマアクセント（設定で上書き。既定 red-orange） */
-  --accent: #cf4b2c;
+  --accent: var(--brand-accent, #cf4b2c);
   --accent-ink: #ffffff;
   /* アクセントの淡い面（選択中の行・おかわりの行など）。アクセントが変わっても追従するよう色混合で作る */
   --accent-bg: color-mix(in srgb, var(--accent) 12%, var(--surface));
@@ -132,12 +136,14 @@
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background:
-    radial-gradient(36% 30% at 8% 6%, rgba(120, 120, 150, 0.22), transparent 68%),
-    radial-gradient(40% 34% at 92% 16%, rgba(150, 140, 170, 0.18), transparent 70%),
-    radial-gradient(48% 42% at 50% 48%, rgba(130, 130, 145, 0.14), transparent 74%),
-    radial-gradient(38% 32% at 12% 88%, rgba(110, 120, 150, 0.19), transparent 70%),
-    radial-gradient(42% 36% at 90% 94%, rgba(150, 150, 160, 0.16), transparent 70%);
+  background: var(
+    --brand-wash,
+      radial-gradient(36% 30% at 8% 6%, rgba(120, 120, 150, 0.22), transparent 68%),
+      radial-gradient(40% 34% at 92% 16%, rgba(150, 140, 170, 0.18), transparent 70%),
+      radial-gradient(48% 42% at 50% 48%, rgba(130, 130, 145, 0.14), transparent 74%),
+      radial-gradient(38% 32% at 12% 88%, rgba(110, 120, 150, 0.19), transparent 70%),
+      radial-gradient(42% 36% at 90% 94%, rgba(150, 150, 160, 0.16), transparent 70%)
+  );
 }
 :root[data-theme="dark"] .ambient-wash {
   background:
@@ -211,6 +217,15 @@ html:has(.handy:not([data-view="tables"])) .pwa-banner,
 html:has(.handy [role="dialog"]) .pwa-banner {
   display: none !important;
 }
+/* 屋号（ハンディの卓一覧・管理画面のヘッダー）。店ごとの書体と色で出す */
+.brand-name {
+  font-family: var(--font-brand);
+  font-weight: var(--brand-name-weight, 800);
+  font-size: var(--brand-name-size, 20px);
+  letter-spacing: var(--brand-name-spacing, 0);
+  color: var(--brand-mark, var(--text));
+  line-height: 1.2;
+}
 /* 横に流す列（種類の切替）のスクロールバーは出さない */
 .no-scrollbar {
   scrollbar-width: none;
@@ -253,8 +268,8 @@ body {
   padding: 0;
 }
 body {
-  /* iPhone はシステムのヒラギノ、それ以外は Noto Sans JP（layout.tsx で読み込み）。各画面で指定し直さない */
-  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", var(--font-noto-sans-jp), "Noto Sans JP", sans-serif;
+  /* 書体は店ごと（app/brand.css の --font-ui）。システムの書体のままにしない。各画面で指定し直さない */
+  font-family: var(--font-ui);
   -webkit-font-smoothing: antialiased;
 }
 html {

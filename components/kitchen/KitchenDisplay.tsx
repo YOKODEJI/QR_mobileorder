@@ -22,9 +22,9 @@ const pill: React.CSSProperties = {
   alignItems: "center",
   gap: "6px",
   minHeight: "36px",
-  padding: "8px 14px",
-  borderRadius: "999px",
-  fontSize: "13px",
+  padding: "8px 12px",
+  borderRadius: "8px",
+  fontSize: "14px",
   fontWeight: 700,
   border: "none",
   fontFamily: "inherit",
@@ -34,7 +34,7 @@ const notice: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: "10px",
-  borderRadius: "14px",
+  borderRadius: "8px",
   padding: "12px 16px",
   marginBottom: "16px",
 };
@@ -188,9 +188,9 @@ export default function KitchenDisplay() {
                 aria-label={`${s.tableName(o.table)} の伝票`}
                 style={{
                   background: "var(--surface)",
-                  borderRadius: "18px",
-                  border: highlight ? "2px solid var(--red)" : "none",
-                  boxShadow: "0 2px 12px rgba(0,0,0,.07)",
+                  borderRadius: "10px",
+                  // 影は使わず、罫線の枠で区切る
+                  border: highlight ? "2.5px solid var(--red)" : "1.5px solid var(--rule)",
                   overflow: "hidden",
                   animation: highlight ? "kpulse 1s ease-out 2" : undefined,
                 }}
@@ -205,7 +205,7 @@ export default function KitchenDisplay() {
                         {elapsed}分
                       </span>
                     )}
-                    <span style={{ background: "rgba(255,255,255,.25)", borderRadius: "999px", padding: "3px 10px", fontSize: "12px", fontWeight: 700 }}>
+                    <span style={{ background: "rgba(255,255,255,.25)", borderRadius: "3px", padding: "3px 9px", fontSize: "13px", fontWeight: 700 }}>
                       {carryOver ? "会計済・未提供" : cooking ? "提供前" : "提供済み"}
                     </span>
                   </div>
@@ -216,7 +216,7 @@ export default function KitchenDisplay() {
                     <span style={{ fontSize: "13px", color: "var(--text-2)", fontVariantNumeric: "tabular-nums" }}>{now > 0 ? hm(o.createdAt) : "—"}</span>
                     {/* ハンディの店は全部スタッフの注文なので、印は出さない */}
                     {o.proxy && !s.handy && (
-                      <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-2)", background: "var(--hairline)", borderRadius: "999px", padding: "2px 8px" }}>
+                      <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-2)", background: "var(--hairline)", borderRadius: "3px", padding: "2px 8px" }}>
                         スタッフ代理
                       </span>
                     )}
@@ -229,7 +229,7 @@ export default function KitchenDisplay() {
                           {it.name}
                           {/* 飲み方（一合・ロック・Cドリンク）は品名と同じ強さで。備考だけ赤 */}
                           {opts && (
-                            <span style={{ display: "inline-block", marginLeft: "8px", padding: "2px 9px", borderRadius: "8px", background: "var(--chip-tint)", fontSize: "15px", fontWeight: 800, verticalAlign: "2px" }}>
+                            <span style={{ display: "inline-block", marginLeft: "8px", padding: "2px 8px", borderRadius: "3px", background: "var(--chip-tint)", fontSize: "15px", fontWeight: 800, verticalAlign: "2px" }}>
                               {opts}
                             </span>
                           )}
@@ -250,7 +250,7 @@ export default function KitchenDisplay() {
                       marginTop: "10px",
                       minHeight: "46px",
                       padding: "11px",
-                      borderRadius: "12px",
+                      borderRadius: "8px",
                       border: "none",
                       fontFamily: "inherit",
                       fontSize: "15px",

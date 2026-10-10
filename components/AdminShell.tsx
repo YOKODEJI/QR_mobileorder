@@ -17,8 +17,7 @@ import LoadingScreen from "@/components/ui/LoadingScreen";
 import { useSwipePager } from "@/lib/useSwipePager";
 import type { AppState, StaffRole } from "@/store/useAppStore";
 
-const FONT =
-  "-apple-system, BlinkMacSystemFont, 'Hiragino Sans', var(--font-noto-sans-jp), 'Noto Sans JP', sans-serif";
+const FONT = "var(--font-ui)";
 
 // SegmentedControlの並び順と一致させる（左右スワイプでの前後移動がタブ表示順と揃うように）
 const MGMT_SEGMENTS: { value: AppState["mgmtTab"]; label: string }[] = [
@@ -114,7 +113,7 @@ export default function AdminShell() {
           }}
         >
           <div style={{ display: "flex", alignItems: "baseline", gap: "8px", minWidth: 0 }}>
-            <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-.02em", whiteSpace: "nowrap" }}>
+            <span className="brand-name" style={{ whiteSpace: "nowrap" }}>
               {storeName}
             </span>
             <span style={{ fontSize: "13px", color: "var(--text-2)", whiteSpace: "nowrap" }}>管理ツール</span>
@@ -137,7 +136,7 @@ export default function AdminShell() {
                 style={{
                   minHeight: "40px",
                   padding: "7px 14px",
-                  borderRadius: "999px",
+                  borderRadius: "8px",
                   border: "none",
                   background: "var(--control-tint)",
                   color: "var(--text-2)",
@@ -160,7 +159,7 @@ export default function AdminShell() {
                 gap: "6px",
                 minHeight: "40px",
                 padding: "7px 14px",
-                borderRadius: "999px",
+                borderRadius: "8px",
                 border: "none",
                 background: "var(--control-tint)",
                 color: "var(--text)",

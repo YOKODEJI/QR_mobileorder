@@ -27,11 +27,12 @@ export default function CategoryChips({
             style={{
               flexShrink: 0,
               minHeight: "42px",
-              padding: "8px 16px",
-              borderRadius: "999px",
-              border: on ? "1px solid var(--accent)" : "1px solid var(--hairline-strong)",
-              background: on ? "var(--accent)" : "var(--surface)",
-              color: on ? "var(--accent-ink)" : "var(--text)",
+              padding: "8px 14px",
+              borderRadius: "8px",
+              // 選択中は墨で塗る（強調色は主操作と「提供前」に取っておく）
+              border: on ? "1.5px solid var(--text)" : "1.5px solid var(--rule)",
+              background: on ? "var(--text)" : "var(--surface)",
+              color: on ? "var(--surface)" : "var(--text)",
               fontFamily: "inherit",
               fontSize: "16px",
               fontWeight: 700,

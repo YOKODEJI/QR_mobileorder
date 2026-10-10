@@ -68,7 +68,7 @@ export default function BulkAddMenu({ defaultCat }: { defaultCat: string }) {
           disabled={busy || items.length === 0}
           style={{
             padding: "11px 22px",
-            borderRadius: "999px",
+            borderRadius: "8px",
             border: "none",
             background: items.length === 0 ? "var(--text-3)" : "var(--accent)",
             color: "#fff",

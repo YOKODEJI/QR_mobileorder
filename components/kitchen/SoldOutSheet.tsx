@@ -73,8 +73,8 @@ export default function SoldOutSheet({ onClose }: { onClose: () => void }) {
                 ...statusTag,
                 padding: "7px 14px",
                 fontSize: "14px",
-                background: m.soldOut ? "var(--red)" : "var(--green-bg)",
-                color: m.soldOut ? "#fff" : "var(--green-dark)",
+                background: m.soldOut ? "var(--text)" : "var(--green-bg)",
+                color: m.soldOut ? "var(--surface)" : "var(--green-dark)",
               }}
             >
               {m.soldOut ? "売切" : "販売中"}

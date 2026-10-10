@@ -75,8 +75,8 @@ export default function TableGrid({
               position: "relative",
               minHeight: "104px",
               padding: "12px 14px",
-              borderRadius: "16px",
-              border: open ? "2.5px solid var(--text)" : "1px solid var(--hairline-strong)",
+              borderRadius: "10px",
+              border: open ? "2.5px solid var(--text)" : "1.5px solid var(--rule)",
               background: open ? "var(--surface)" : "var(--inset)",
               fontFamily: "inherit",
               color: "var(--text)",
@@ -104,7 +104,7 @@ export default function TableGrid({
             {open ? (
               <span style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "6px", fontSize: "15px", fontWeight: 700 }}>
                 {sum.pendingQty > 0 ? (
-                  <span style={{ padding: "3px 9px", borderRadius: "8px", background: "var(--accent)", color: "var(--accent-ink)", fontWeight: 800 }}>
+                  <span style={{ padding: "3px 8px", borderRadius: "3px", background: "var(--accent)", color: "var(--accent-ink)", fontWeight: 800 }}>
                     提供前 {sum.pendingQty}
                   </span>
                 ) : (

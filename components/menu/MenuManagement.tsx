@@ -65,7 +65,7 @@ function ItemOptionsButton({ item, accent }: { item: MenuItem; accent: string })
         onClick={() => setOpen(true)}
         aria-label={`${item.name}のオプションを設定`}
         style={{
-          borderRadius: "999px",
+          borderRadius: "8px",
           padding: "8px 14px",
           fontSize: "13px",
           fontWeight: 700,
@@ -142,7 +142,7 @@ function ItemOptionsButton({ item, accent }: { item: MenuItem; accent: string })
               <button
                 onClick={submit}
                 style={{
-                  borderRadius: "999px",
+                  borderRadius: "8px",
                   padding: "10px 18px",
                   fontSize: "14px",
                   fontWeight: 700,
@@ -450,7 +450,7 @@ export default function MenuManagement() {
     color: "var(--text)",
   };
   const pill: React.CSSProperties = {
-    borderRadius: "999px",
+    borderRadius: "8px",
     padding: "8px 14px",
     fontSize: "13px",
     fontWeight: 700,
@@ -771,7 +771,7 @@ export default function MenuManagement() {
                       background: "var(--surface)",
                       boxShadow: `0 0 0 2px ${accent}`,
                       color: "var(--text)",
-                      borderRadius: "999px",
+                      borderRadius: "8px",
                       padding: "6px 14px",
                       fontSize: "13px",
                       fontWeight: 700,
@@ -791,7 +791,7 @@ export default function MenuManagement() {
                   gap: "6px",
                   background: "var(--hairline)",
                   color: "var(--text)",
-                  borderRadius: "999px",
+                  borderRadius: "8px",
                   padding: "6px 8px 6px 14px",
                   fontSize: "13px",
                   fontWeight: 700,

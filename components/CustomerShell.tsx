@@ -10,8 +10,7 @@ import Toast from "@/components/ui/Toast";
 import SupabaseSync from "@/components/SupabaseSync";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 
-const FONT =
-  "-apple-system, BlinkMacSystemFont, 'Hiragino Sans', var(--font-noto-sans-jp), 'Noto Sans JP', sans-serif";
+const FONT = "var(--font-ui)";
 
 /** 卓が閉じている（来店受付前/会計後）間の待機画面(step17)。
  *  スタッフが「来店受付」するとRealtime経由でtables.open_sinceが更新され、

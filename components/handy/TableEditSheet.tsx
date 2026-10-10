@@ -84,7 +84,7 @@ export default function TableEditSheet({ onClose }: { onClose: () => void }) {
               flexShrink: 0,
               minHeight: "46px",
               padding: "0 18px",
-              borderRadius: "14px",
+              borderRadius: "8px",
               border: "none",
               background: "var(--accent)",
               color: "var(--accent-ink)",
@@ -118,9 +118,9 @@ export default function TableEditSheet({ onClose }: { onClose: () => void }) {
                   alignItems: "center",
                   gap: "6px",
                   padding: "8px",
-                  borderRadius: "14px",
+                  borderRadius: "8px",
                   background: "var(--surface)",
-                  border: "1px solid var(--hairline-strong)",
+                  border: "1.5px solid var(--rule)",
                 }}
               >
                 <button
