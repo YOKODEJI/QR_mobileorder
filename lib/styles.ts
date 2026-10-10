@@ -3,12 +3,13 @@ import type { CSSProperties } from "react";
 /* プロトタイプの style helper を移植（QRオーダーシステム.dc.html 695-702行） */
 
 export const segBtn = (active: boolean): CSSProperties => ({
-  padding: "7px 20px",
+  minHeight: "40px",
+  padding: "7px 18px",
   border: "none",
   borderRadius: "9px",
   cursor: "pointer",
   fontFamily: "inherit",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: active ? 700 : 600,
   background: active ? "var(--surface)" : "transparent",
   color: active ? "var(--text)" : "var(--text-2)",
@@ -20,11 +21,12 @@ export const segBtn = (active: boolean): CSSProperties => ({
 });
 
 export const chipStyle = (active: boolean, accent: string): CSSProperties => ({
-  padding: "8px 15px",
+  minHeight: "40px",
+  padding: "8px 16px",
   borderRadius: "999px",
   cursor: "pointer",
   fontFamily: "inherit",
-  fontSize: "13px",
+  fontSize: "15px",
   whiteSpace: "nowrap",
   border: active ? "1px solid transparent" : "1px solid var(--glass-edge)",
   background: active ? accent : "var(--glass)",
@@ -33,7 +35,7 @@ export const chipStyle = (active: boolean, accent: string): CSSProperties => ({
   boxShadow: active
     ? "inset 0 1px 0 rgba(255,255,255,.3)"
     : "inset 0 1px 0 var(--glass-spec)",
-  color: active ? "var(--accent-ink)" : "var(--text-2)",
+  color: active ? "var(--accent-ink)" : "var(--text)",
   fontWeight: active ? 700 : 600,
   flexShrink: 0,
 });
@@ -50,7 +52,7 @@ export const itemCardStyle = (soldOut: boolean): CSSProperties => ({
   border: "1px solid var(--glass-edge)",
   borderRadius: "20px",
   boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)",
-  opacity: soldOut ? 0.55 : 1,
+  opacity: soldOut ? 0.7 : 1,
 });
 
 export const addBtnStyle = (accent: string): CSSProperties => ({
@@ -101,7 +103,8 @@ export const proxyCardStyle = (soldOut: boolean): CSSProperties => ({
   alignItems: "center",
   justifyContent: "space-between",
   gap: "8px",
-  padding: "9px 10px",
+  minHeight: "60px",
+  padding: "8px 10px 8px 12px",
   background: soldOut ? "var(--chip-tint)" : "var(--surface)",
   border: "none",
   borderRadius: "14px",
@@ -110,26 +113,28 @@ export const proxyCardStyle = (soldOut: boolean): CSSProperties => ({
 });
 
 export const proxyAddStyle = (accent: string): CSSProperties => ({
-  width: "32px",
-  height: "32px",
-  borderRadius: "9px",
+  flexShrink: 0,
+  width: "44px",
+  height: "44px",
+  borderRadius: "12px",
   border: "none",
   background: accent,
   color: "#fff",
-  fontSize: "18px",
+  fontSize: "22px",
   fontWeight: 600,
   cursor: "pointer",
   lineHeight: 1,
 });
 
 export const proxySubStyle = (accent: string): CSSProperties => ({
-  width: "32px",
-  height: "32px",
-  borderRadius: "9px",
+  flexShrink: 0,
+  width: "44px",
+  height: "44px",
+  borderRadius: "12px",
   border: "none",
   background: "var(--hairline)",
   color: accent,
-  fontSize: "18px",
+  fontSize: "22px",
   fontWeight: 600,
   cursor: "pointer",
   lineHeight: 1,

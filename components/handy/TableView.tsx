@@ -8,6 +8,7 @@ import { optionsLabel } from "@/lib/options";
 import { BellIcon } from "@/components/ui/Icon";
 import MoveTableSheet from "@/components/handy/MoveTableSheet";
 import BillSheet from "@/components/handy/BillSheet";
+import { bottomBar, itemName, primaryButton, secondaryButton, statusTag, subText } from "@/components/handy/ui";
 
 /** 卓画面。この卓のドリンクと提供状況を新しい順に出し、下のボタンから追加注文・卓移動・レジ用の一覧へ */
 export default function TableView({
@@ -37,7 +38,7 @@ export default function TableView({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-      <div style={{ flex: 1, padding: "14px 12px 170px", display: "flex", flexDirection: "column", gap: "10px" }}>
+      <div style={{ flex: 1, padding: "12px 12px 190px", display: "flex", flexDirection: "column", gap: "10px" }}>
         {calls.map((c) => (
           <div
             key={c.id}
@@ -45,24 +46,25 @@ export default function TableView({
               display: "flex",
               alignItems: "center",
               gap: "10px",
-              background: "#fff8e6",
-              border: "1px solid #ffe2a8",
+              background: "var(--amber-bg)",
+              border: "1px solid var(--amber-edge)",
               borderRadius: "14px",
               padding: "10px 12px",
             }}
           >
-            <BellIcon size={18} style={{ color: "#a8791a", flexShrink: 0 }} />
-            <span style={{ flex: 1, fontWeight: 800, fontSize: "15px", color: "#1c1c1e" }}>呼び出し中</span>
+            <BellIcon size={20} style={{ color: "var(--amber-dark)", flexShrink: 0 }} />
+            <span style={{ flex: 1, fontWeight: 800, fontSize: "16px", color: "#1c1c1e" }}>呼び出し中</span>
             <button
               onClick={() => s.confirmClearCall(c.id)}
               style={{
+                minHeight: "40px",
                 padding: "8px 14px",
                 borderRadius: "999px",
                 border: "none",
-                background: "#a8791a",
+                background: "var(--amber-dark)",
                 color: "#fff",
                 fontFamily: "inherit",
-                fontSize: "13px",
+                fontSize: "15px",
                 fontWeight: 700,
                 cursor: "pointer",
               }}
@@ -73,7 +75,7 @@ export default function TableView({
         ))}
 
         {orders.length === 0 ? (
-          <div style={{ textAlign: "center", color: "var(--text-2)", padding: "48px 0" }}>まだ注文はありません</div>
+          <div style={{ textAlign: "center", color: "var(--text-2)", fontSize: "16px", padding: "48px 0" }}>まだ注文はありません</div>
         ) : (
           orders.map((o) => {
             const cooking = o.status === "cooking";
@@ -82,42 +84,46 @@ export default function TableView({
                 key={o.id}
                 style={{
                   background: "var(--surface)",
-                  borderRadius: "16px",
-                  boxShadow: "0 1px 6px rgba(0,0,0,.06)",
+                  borderRadius: "14px",
+                  border: "1px solid var(--hairline-strong)",
+                  // 提供前の伝票は左の太い帯でも分かるようにする
+                  borderLeft: cooking ? "6px solid var(--accent)" : "6px solid var(--soldout-bg)",
                   padding: "10px 14px",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
-                  <span style={{ fontSize: "12px", color: "var(--text-2)" }}>{now > 0 ? hm(o.createdAt) : "—"}</span>
+                  <span style={{ fontSize: "15px", fontWeight: 600, color: "var(--text-2)", fontVariantNumeric: "tabular-nums" }}>
+                    {now > 0 ? hm(o.createdAt) : "—"}
+                  </span>
                   <span
                     style={{
-                      fontSize: "12px",
-                      fontWeight: 800,
-                      padding: "3px 10px",
-                      borderRadius: "999px",
-                      background: cooking ? "#ffedd5" : "var(--hairline)",
-                      color: cooking ? "#c2410c" : "var(--text-2)",
+                      ...statusTag,
+                      // 提供前は色つき、提供済みは白地に黒文字とチェック。色の濃淡だけに頼らない
+                      background: cooking ? "var(--accent)" : "var(--surface)",
+                      color: cooking ? "var(--accent-ink)" : "var(--text)",
+                      border: cooking ? "1.5px solid var(--accent)" : "1.5px solid var(--text-2)",
                     }}
                   >
-                    {cooking ? "作成中" : "提供済み"}
+                    {cooking ? "提供前" : "✓ 提供済み"}
                   </span>
                 </div>
                 {o.items.map((it, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "baseline", gap: "8px", padding: "4px 0" }}>
-                    <span style={{ flex: 1, fontSize: "16px", fontWeight: 700 }}>
-                      {it.name}
-                      {optionsLabel(it.options) && (
-                        <span style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "var(--text-2)" }}>
-                          {optionsLabel(it.options)}
-                        </span>
-                      )}
-                      {it.note && (
-                        <span style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "var(--text-2)" }}>
-                          ※ {it.note}
-                        </span>
-                      )}
+                  <div
+                    key={i}
+                    style={{
+                      display: "flex",
+                      alignItems: "baseline",
+                      gap: "8px",
+                      padding: "6px 0",
+                      borderTop: i === 0 ? "none" : "1px solid var(--hairline)",
+                    }}
+                  >
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={itemName}>{it.name}</span>
+                      {optionsLabel(it.options) && <span style={subText}>{optionsLabel(it.options)}</span>}
+                      {it.note && <span style={subText}>※ {it.note}</span>}
                     </span>
-                    <span style={{ fontSize: "17px", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>×{it.qty}</span>
+                    <span style={{ fontSize: "20px", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>×{it.qty}</span>
                   </div>
                 ))}
               </div>
@@ -126,20 +132,7 @@ export default function TableView({
         )}
       </div>
 
-      <div
-        style={{
-          position: "fixed",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 20,
-          padding: "12px 12px calc(12px + env(safe-area-inset-bottom))",
-          background: "var(--glass)",
-          backdropFilter: "blur(26px) saturate(180%)",
-          WebkitBackdropFilter: "blur(26px) saturate(180%)",
-          borderTop: "1px solid var(--glass-edge)",
-        }}
-      >
+      <div style={bottomBar}>
         <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
           <button onClick={() => setSheet("move")} style={secondaryButton}>
             卓移動
@@ -148,21 +141,7 @@ export default function TableView({
             レジ用の一覧
           </button>
         </div>
-        <button
-          onClick={onOrder}
-          style={{
-            width: "100%",
-            padding: "16px",
-            borderRadius: "16px",
-            border: "none",
-            background: "var(--accent)",
-            color: "var(--accent-ink)",
-            fontFamily: "inherit",
-            fontSize: "17px",
-            fontWeight: 800,
-            cursor: "pointer",
-          }}
-        >
+        <button onClick={onOrder} style={primaryButton}>
           ＋ 追加注文
         </button>
       </div>
@@ -190,16 +169,3 @@ export default function TableView({
     </div>
   );
 }
-
-const secondaryButton: React.CSSProperties = {
-  flex: 1,
-  padding: "12px",
-  borderRadius: "14px",
-  border: "none",
-  background: "var(--control-tint)",
-  color: "var(--text)",
-  fontFamily: "inherit",
-  fontSize: "15px",
-  fontWeight: 700,
-  cursor: "pointer",
-};

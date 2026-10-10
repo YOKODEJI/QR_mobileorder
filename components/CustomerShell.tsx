@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { isSupabaseConfigured, ensureAnonymousSession } from "@/lib/supabase";
+import { customerDraft } from "@/lib/handyDraft";
 import CustomerOrder from "@/components/customer/CustomerOrder";
 import AlertDialog from "@/components/ui/AlertDialog";
 import Toast from "@/components/ui/Toast";
@@ -153,7 +154,9 @@ export default function CustomerShell({ table }: { table?: string }) {
   const customerToken = useAppStore((s) => s.customerToken);
   const customerTableId = useAppStore((s) => s.customerTableId);
   const muteSound = useAppStore((s) => s.muteSound);
+  const restoreCart = useAppStore((s) => s.restoreCart);
   const loading = isSupabaseConfigured() && !loaded;
+  const draftChecked = useRef(false);
 
   // 客用画面には通知音は不要（厨房/管理側だけの機能）。soundOnはこの端末の
   // ローカルstate（他端末には影響しない）で、既定値がONのままだと
@@ -213,8 +216,44 @@ export default function CustomerShell({ table }: { table?: string }) {
     openSession();
   }, [loading, authReady, customerToken, customerTableId, tableClosed, openSession]);
 
+  // カートの中身は、変わるたびにこの端末へ控える。画面を下に引いて再読み込みになったり、
+  // 別のアプリから戻ってページが読み直されたりしても、選んだ品が消えないようにする。
+  // 控えは卓と「どの着席か」（来店受付の時刻）ごと。会計後に次の方が同じ卓に座っても引き継がない。
+  const seat = currentTable?.openSince ?? "";
+  useEffect(
+    () =>
+      useAppStore.subscribe((st, prev) => {
+        // 控えを戻す前の「空のカート」で、残っている控えを消してしまわない
+        if (st.cart === prev.cart || !draftChecked.current || !st.customerTableId) return;
+        const t = st.tables.find((x) => x.id === st.customerTableId);
+        customerDraft.save({ tableId: st.customerTableId, cart: st.cart, seat: t?.openSince ?? "" });
+      }),
+    []
+  );
+  // 会計などで卓が閉じられたら、控えも捨てる（次に開いたときに前の内容を出さない）
+  useEffect(() => {
+    if (tableClosed) customerDraft.clear();
+  }, [tableClosed]);
+  useEffect(() => {
+    if (loading || !customerTableId || tableClosed) return;
+    // 読み込みが終わって卓が決まった直後に1回だけ。描画の途中で状態を変えないよう、ひと呼吸おいて行う
+    const timer = window.setTimeout(() => {
+      if (draftChecked.current) return;
+      draftChecked.current = true;
+      const draft = customerDraft.load();
+      if (!draft) return;
+      if (draft.tableId !== customerTableId || (draft.seat ?? "") !== seat) {
+        customerDraft.clear();
+        return;
+      }
+      restoreCart(draft.cart);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loading, customerTableId, tableClosed, seat, restoreCart]);
+
   return (
     <div
+      className="customer-ui"
       style={{
         minHeight: "100dvh",
         background: "var(--app-bg)",

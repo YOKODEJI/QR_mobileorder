@@ -8,9 +8,7 @@ import SupabaseSync from "@/components/SupabaseSync";
 import AlertDialog from "@/components/ui/AlertDialog";
 import Toast from "@/components/ui/Toast";
 import LoadingScreen from "@/components/ui/LoadingScreen";
-
-const FONT =
-  "-apple-system, BlinkMacSystemFont, 'Hiragino Sans', var(--font-noto-sans-jp), 'Noto Sans JP', sans-serif";
+import { pillButton } from "@/components/handy/ui";
 
 type WakeLockSentinelLike = { release: () => Promise<void> };
 
@@ -59,49 +57,38 @@ export default function KitchenShell() {
   return (
     <div
       style={{
-        minHeight: "100vh",
+        minHeight: "100dvh",
         background: "var(--app-bg)",
-        fontFamily: FONT,
         color: "var(--text)",
         display: "flex",
         flexDirection: "column",
       }}
     >
       <div aria-hidden className="ambient-wash" />
-      <div
+      <header
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           gap: "10px",
-          padding: "12px 20px 0",
+          padding: "12px 18px 0",
           position: "relative",
           zIndex: 1,
         }}
       >
-        <span style={{ fontWeight: 800, fontSize: "17px" }}>
+        <h1 style={{ margin: 0, fontWeight: 800, fontSize: "17px" }}>
           {storeName}
-          <span style={{ fontSize: "12px", color: "var(--text-2)", marginLeft: "8px", fontWeight: 600 }}>厨房</span>
-        </span>
+          <span style={{ fontSize: "13px", color: "var(--text-2)", marginLeft: "8px", fontWeight: 600 }}>厨房</span>
+        </h1>
         {isSupabaseConfigured() && (
           <button
             onClick={() => getSupabase()?.auth.signOut()}
-            style={{
-              padding: "7px 14px",
-              borderRadius: "999px",
-              border: "none",
-              background: "var(--control-tint)",
-              color: "var(--text-2)",
-              fontFamily: "inherit",
-              fontSize: "13px",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
+            style={{ ...pillButton, background: "transparent", color: "var(--text-2)", fontSize: "13px" }}
           >
             ログアウト
           </button>
         )}
-      </div>
+      </header>
 
       <main style={{ flex: 1, position: "relative", zIndex: 1 }}>
         {loading ? <LoadingScreen /> : <KitchenDisplay />}

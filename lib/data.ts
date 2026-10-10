@@ -209,7 +209,7 @@ export async function fetchItemOptions(): Promise<Record<string, MenuOption[]>> 
   if (ids.length === 0) return {};
   const { data, error } = await sb
     .from("menu_item_options")
-    .select("id,menu_item_id,name,price_delta,sort")
+    .select("id,menu_item_id,name,price_delta,sort,choice_group")
     .in("menu_item_id", ids)
     .order("sort");
   if (error) {
@@ -224,6 +224,7 @@ export async function fetchItemOptions(): Promise<Record<string, MenuOption[]>> 
       name: r.name as string,
       priceDelta: (r.price_delta as number) ?? 0,
       sort: (r.sort as number) ?? 0,
+      choiceGroup: (r.choice_group as string | null) ?? null,
     });
   }
   return map;

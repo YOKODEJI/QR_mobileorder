@@ -170,8 +170,8 @@ export default function CustomerOrder() {
                   />
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "15px", fontWeight: 700, color: "var(--text)" }}>{m.name}</div>
-                  <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-2)", fontVariantNumeric: "tabular-nums" }}>
+                  <div style={{ fontSize: "17px", fontWeight: 700, color: "var(--text)", lineHeight: 1.3 }}>{m.name}</div>
+                  <div style={{ fontSize: "15px", fontWeight: 700, color: "var(--text-2)", fontVariantNumeric: "tabular-nums" }}>
                     {s.yen(m.price)}
                   </div>
                 </div>
@@ -179,8 +179,8 @@ export default function CustomerOrder() {
                   <span
                     style={{
                       background: "var(--soldout-bg)",
-                      color: "var(--soldout-text)",
-                      fontSize: "12px",
+                      color: "var(--text)",
+                      fontSize: "14px",
                       fontWeight: 700,
                       padding: "6px 12px",
                       borderRadius: "999px",
@@ -262,8 +262,8 @@ export default function CustomerOrder() {
                     }}
                   >
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>{label}</div>
-                      <div style={{ fontSize: "12px", color: "var(--text-2)", fontVariantNumeric: "tabular-nums" }}>
+                      <div style={{ fontSize: "15px", fontWeight: 700, color: "var(--text)" }}>{label}</div>
+                      <div style={{ fontSize: "14px", color: "var(--text-2)", fontVariantNumeric: "tabular-nums" }}>
                         {s.yen(unitPrice(m.price, r.opts))}
                       </div>
                     </div>
@@ -337,7 +337,7 @@ export default function CustomerOrder() {
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: "10px", color: "var(--text-2)", whiteSpace: "nowrap" }}>
+            <div style={{ fontSize: "12px", color: "var(--text-2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               ようこそ {s.settings.storeName} へ
             </div>
             <div
@@ -418,9 +418,10 @@ export default function CustomerOrder() {
         <div
           style={{
             textAlign: "center",
-            fontSize: "10px",
+            fontSize: "13px",
+            fontWeight: 600,
             color: "var(--text-2)",
-            marginBottom: "3px",
+            marginBottom: "4px",
           }}
         >
           変更・キャンセルはスタッフにお声がけください
@@ -469,7 +470,7 @@ export default function CustomerOrder() {
         >
           {s.submitting ? "送信中…" : "注文する"}
         </button>
-        <div style={{ textAlign: "center", fontSize: "10px", color: "var(--text-3)", marginTop: "4px" }}>
+        <div style={{ textAlign: "center", fontSize: "12px", color: "var(--text-2)", marginTop: "5px" }}>
           {s.settings.taxMode === "exclusive"
             ? `表示価格は税抜です（税込 ${s.yen(priceWithTax(cartTotal, "exclusive", s.settings.taxRate))}）`
             : "表示価格は税込です"}
@@ -530,7 +531,7 @@ export default function CustomerOrder() {
             <div style={{ fontSize: "14px", color: "var(--text-2)", marginTop: "8px" }}>
               厨房で確認しています。少々お待ちください。
             </div>
-            <div style={{ fontSize: "12px", color: "var(--text-3)", marginTop: "14px" }}>
+            <div style={{ fontSize: "13px", color: "var(--text-2)", marginTop: "14px" }}>
               変更・キャンセルはスタッフにお声がけください
             </div>
             <button
@@ -618,23 +619,23 @@ export default function CustomerOrder() {
                           <span style={{ fontSize: "15px", fontWeight: 700, color: "var(--text)" }}>{it.name}</span>
                           <span
                             style={{
-                              fontSize: "11px",
+                              fontSize: "13px",
                               fontWeight: 700,
-                              padding: "2px 8px",
+                              padding: "2px 9px",
                               borderRadius: "999px",
-                              background: o.status === "served" ? "var(--green-bg)" : "#fff3d6",
-                              color: o.status === "served" ? "var(--green-dark)" : "#a8791a",
+                              background: o.status === "served" ? "var(--green-bg)" : "var(--amber-bg)",
+                              color: o.status === "served" ? "var(--green-dark)" : "var(--amber-dark)",
                             }}
                           >
-                            {o.status === "served" ? "提供済み" : "調理中"}
+                            {o.status === "served" ? "提供済み" : "準備中"}
                           </span>
                         </div>
                         {optionsLabel(it.options) && (
-                          <div style={{ fontSize: "12px", color: "var(--text-2)", marginTop: "2px" }}>
+                          <div style={{ fontSize: "14px", color: "var(--text-2)", marginTop: "2px" }}>
                             {optionsLabel(it.options)}
                           </div>
                         )}
-                        <div style={{ fontSize: "12px", color: "var(--text-2)", marginTop: "2px" }}>
+                        <div style={{ fontSize: "14px", color: "var(--text-2)", marginTop: "2px" }}>
                           ×{it.qty}
                           {now > 0 ? " · " + hm(o.createdAt) : ""}
                         </div>

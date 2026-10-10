@@ -21,9 +21,13 @@ function isStandalone(): boolean {
   );
 }
 
-/** 管理画面(/admin)専用: Service Worker登録 + ホーム画面追加バナー。
- *  客用ページ(/order/[table])には一切マウントしない。 */
-export default function PwaController() {
+/** スタッフ用の画面（/admin・/handy・/kitchen）: Service Worker登録 + ホーム画面追加バナー。
+ *  客用ページ(/order/[table])には一切マウントしない。
+ *  scope: Service Worker が受け持つ範囲。管理画面は従来どおり "/admin/"、ハンディと厨房は
+ *  その画面自身も含めるため末尾の / を付けない（"/handy"）。圏外で開いたときに案内ページを出せる。
+ *  ブラウザの「インストールできます」の合図（beforeinstallprompt）はページを開いた直後に1回だけ来るので、
+ *  ログイン画面より外側（ページ直下）に置いて取りこぼさないようにする。 */
+export default function PwaController({ scope = "/admin/" }: { scope?: string }) {
   const accent = useAppStore((s) => s.settings.theme);
   const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
   const [showIosHint, setShowIosHint] = useState(false);
@@ -32,7 +36,7 @@ export default function PwaController() {
   useEffect(() => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
-        .register("/admin-sw.js", { scope: "/admin/" })
+        .register("/admin-sw.js", { scope })
         .catch((e) => console.error("admin-sw registration failed:", e));
     }
 
@@ -65,7 +69,7 @@ export default function PwaController() {
       window.removeEventListener("beforeinstallprompt", onPrompt);
       window.removeEventListener("appinstalled", onInstalled);
     };
-  }, []);
+  }, [scope]);
 
   const dismiss = () => {
     sessionStorage.setItem(DISMISS_KEY, "1");
@@ -86,11 +90,13 @@ export default function PwaController() {
 
   return (
     <div
+      // ハンディでは、下のボタンやシートに重ならないよう卓一覧とログイン画面でだけ出す（globals.css の .pwa-banner）
+      className="pwa-banner"
       style={{
         position: "fixed",
         left: "12px",
         right: "12px",
-        bottom: "12px",
+        bottom: "calc(12px + env(safe-area-inset-bottom))",
         zIndex: 100,
         background: "var(--glass-strong)",
         backdropFilter: "blur(24px) saturate(180%)",
@@ -105,10 +111,10 @@ export default function PwaController() {
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--text)" }}>
+        <div style={{ fontSize: "15px", fontWeight: 800, color: "var(--text)" }}>
           ホーム画面に追加できます
         </div>
-        <div style={{ fontSize: "12px", color: "var(--text-2)", marginTop: "2px" }}>
+        <div style={{ fontSize: "13px", color: "var(--text-2)", marginTop: "2px" }}>
           {showIosHint
             ? "共有ボタン → 「ホーム画面に追加」からアプリのように起動できます"
             : "アプリのようにアイコンから直接起動できます"}

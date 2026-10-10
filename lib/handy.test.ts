@@ -8,8 +8,23 @@ import {
   sortByPopularity,
   popularityFromOrders,
   tableRepeatItems,
+  shiftInList,
 } from "./handy";
 import type { MenuItem, Order } from "@/store/useAppStore";
+
+describe("shiftInList", () => {
+  it("1つ前・1つ後ろへ動かす", () => {
+    expect(shiftInList(["イ", "ロ", "ハ"], 1, -1)).toEqual(["ロ", "イ", "ハ"]);
+    expect(shiftInList(["イ", "ロ", "ハ"], 1, 1)).toEqual(["イ", "ハ", "ロ"]);
+  });
+
+  it("端からは動かせず、元の配列をそのまま返す", () => {
+    const list = ["イ", "ロ", "ハ"];
+    expect(shiftInList(list, 0, -1)).toBe(list);
+    expect(shiftInList(list, 2, 1)).toBe(list);
+    expect(shiftInList(list, -1, 1)).toBe(list);
+  });
+});
 
 const item = (id: string, name: string, cat: string): MenuItem => ({
   id,
@@ -91,6 +106,26 @@ describe("billLines", () => {
     expect(billLines(orders, "A")).toEqual([
       { name: "山崎", optionsText: "ロック", qty: 3 },
       { name: "山崎", optionsText: "", qty: 1 },
+    ]);
+  });
+});
+
+describe("billLines の並び", () => {
+  it("同じ品のオプション違いは、あとから注文されても隣り合わせにする", () => {
+    const c = [{ id: "c", name: "Cドリンク", priceDelta: 0 }];
+    const orders: Order[] = [
+      { id: "1", table: "A", createdAt: "2026-10-03T10:00:00Z", status: "served",
+        items: [
+          { menuItemId: "b", name: "小生ビール", price: 0, qty: 2 },
+          { menuItemId: "m", name: "魔王", price: 0, qty: 1 },
+        ] },
+      { id: "2", table: "A", createdAt: "2026-10-03T10:10:00Z", status: "cooking",
+        items: [{ menuItemId: "b", name: "小生ビール", price: 0, qty: 1, options: c }] },
+    ];
+    expect(billLines(orders, "A")).toEqual([
+      { name: "小生ビール", optionsText: "", qty: 2 },
+      { name: "小生ビール", optionsText: "Cドリンク", qty: 1 },
+      { name: "魔王", optionsText: "", qty: 1 },
     ]);
   });
 });

@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import type { MenuItem, MenuOption } from "@/store/useAppStore";
-import { unitPrice } from "@/lib/options";
+import { unitPrice, toggleOptionId, hasMissingChoice } from "@/lib/options";
 
 /**
  * 商品にオプションが設定されているときの選択シート（複数選択）。
+ * 「どれか1つを選ぶ」組（choiceGroup。例: 一合／グラス）は組の中で入れ替わり、選ぶまで追加できない。
  * 客の注文画面とスタッフの代理注文の両方で使う。
  * 選択結果は optionIds（IDのみ）で返す。追加料金の確定はサーバー側の責務。
  */
@@ -32,8 +33,9 @@ export default function OptionSheet({
   const chosen = options.filter((o) => selected.includes(o.id));
   const total = unitPrice(item.price, chosen);
 
-  const toggle = (id: string) =>
-    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const missing = hasMissingChoice(options, selected);
+
+  const toggle = (id: string) => setSelected((prev) => toggleOptionId(options, prev, id));
 
   return (
     <div
@@ -73,7 +75,9 @@ export default function OptionSheet({
         />
         <div style={{ fontSize: "19px", fontWeight: 800, color: "var(--text)" }}>{item.name}</div>
         <div style={{ fontSize: "13px", color: "var(--text-2)", margin: "2px 0 14px" }}>
-          オプションを選んでください（複数選択できます）
+          {options.some((o) => o.choiceGroup)
+            ? "選んでください"
+            : "オプションを選んでください（複数選択できます）"}
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -103,7 +107,7 @@ export default function OptionSheet({
                   style={{
                     width: "24px",
                     height: "24px",
-                    borderRadius: "8px",
+                    borderRadius: o.choiceGroup ? "50%" : "8px",
                     flexShrink: 0,
                     display: "flex",
                     alignItems: "center",
@@ -139,7 +143,9 @@ export default function OptionSheet({
 
         <button
           onClick={() => onAdd(selected)}
+          disabled={missing}
           style={{
+            opacity: missing ? 0.45 : 1,
             marginTop: "18px",
             width: "100%",
             padding: "15px",

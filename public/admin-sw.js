@@ -1,4 +1,4 @@
-// 管理画面(/admin配下)専用の最小構成Service Worker。
+// スタッフ用の画面（/admin・/handy・/kitchen）の最小構成Service Worker（登録は components/PwaController.tsx）。
 // 方針は「最小限」: オフライン用の案内ページ1枚だけをキャッシュし、
 // 厨房/会計/メニューのデータそのものは一切キャッシュしない
 // （注文はリアルタイム性が命なので、古いデータを誤って見せるくらいなら

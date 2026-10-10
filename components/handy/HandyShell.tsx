@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAppStore } from "@/store/useAppStore";
 import { isSupabaseConfigured, getSupabase } from "@/lib/supabase";
+import { loadDraft, saveDraft, clearDraft } from "@/lib/handyDraft";
 import SupabaseSync from "@/components/SupabaseSync";
 import AlertDialog from "@/components/ui/AlertDialog";
 import Toast from "@/components/ui/Toast";
@@ -11,25 +12,30 @@ import LoadingScreen from "@/components/ui/LoadingScreen";
 import TableGrid from "@/components/handy/TableGrid";
 import TableView from "@/components/handy/TableView";
 import OrderEntry from "@/components/handy/OrderEntry";
-
-const FONT =
-  "-apple-system, BlinkMacSystemFont, 'Hiragino Sans', var(--font-noto-sans-jp), 'Noto Sans JP', sans-serif";
+import TableEditSheet from "@/components/handy/TableEditSheet";
+import { PHONE_MAX_WIDTH, pillButton } from "@/components/handy/ui";
 
 type View = { name: "tables" } | { name: "table"; id: string } | { name: "order"; id: string };
 
-/** スタッフのスマホ用ハンディ（/handy）。卓一覧 → 卓 → 注文入力 の3画面。金額は一切出さない */
+/** スタッフのスマホ用ハンディ（/handy）。卓一覧 → 卓 → 注文入力 の3画面。金額は一切出さない。
+ *  スマホで使う前提（片手・縦持ち）。見た目は視認性を最優先にする */
 export default function HandyShell() {
   const storeName = useAppStore((s) => s.settings.storeName);
   const theme = useAppStore((s) => s.settings.theme);
   const loaded = useAppStore((s) => s.loaded);
   const tableName = useAppStore((s) => s.tableName);
   const selectStaffTable = useAppStore((s) => s.selectStaffTable);
+  const resetStaffCart = useAppStore((s) => s.resetStaffCart);
+  const restoreStaffCart = useAppStore((s) => s.restoreStaffCart);
+  const pushToast = useAppStore((s) => s.pushToast);
   const muteSound = useAppStore((s) => s.muteSound);
   const staffRole = useAppStore((s) => s.staffRole);
   const loading = isSupabaseConfigured() && !loaded;
   const [view, setView] = useState<View>({ name: "tables" });
+  const [editingTables, setEditingTables] = useState(false);
   // 入力中の注文（staffCart）がどの卓のものか。別の卓の注文入力に入ったら持ち越さない
   const cartOwner = useRef<string | null>(null);
+  const draftChecked = useRef(false);
 
   useEffect(() => {
     document.documentElement.style.setProperty("--accent", theme);
@@ -40,13 +46,51 @@ export default function HandyShell() {
     muteSound();
   }, [muteSound]);
 
+  // 入力中の注文は、変わるたびにこの端末へ控える（画面を下に引いて再読み込みになっても消えないように）
+  useEffect(
+    () =>
+      useAppStore.subscribe((st, prev) => {
+        if (st.staffCart === prev.staffCart && st.staffNotes === prev.staffNotes) return;
+        if (cartOwner.current) saveDraft(cartOwner.current, st.staffCart, st.staffNotes);
+      }),
+    []
+  );
+
+  // 開き直したとき、控えがあれば注文入力の続きに戻す（卓が消えた・閉じられたあとの控えは捨てる）
+  useEffect(() => {
+    if (loading) return;
+    // 読み込みが終わった直後に1回だけ。描画の途中で画面を切り替えないよう、ひと呼吸おいて行う
+    const timer = window.setTimeout(() => {
+      if (draftChecked.current) return;
+      draftChecked.current = true;
+      const draft = loadDraft();
+      if (!draft) return;
+      const table = useAppStore.getState().tables.find((t) => t.id === draft.tableId);
+      if (!table || (isSupabaseConfigured() && !table.openSince)) {
+        clearDraft();
+        return;
+      }
+      cartOwner.current = draft.tableId;
+      restoreStaffCart(draft.cart, draft.notes);
+      if (Object.keys(useAppStore.getState().staffCart).length === 0) {
+        cartOwner.current = null;
+        clearDraft();
+        return;
+      }
+      selectStaffTable(draft.tableId);
+      setView({ name: "order", id: draft.tableId });
+      pushToast(`${table.name} の入力中だった注文を戻しました`);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loading, restoreStaffCart, selectStaffTable, pushToast]);
+
   const openTableView = (id: string) => {
     selectStaffTable(id);
     setView({ name: "table", id });
   };
   const openOrder = (id: string) => {
     selectStaffTable(id);
-    if (cartOwner.current !== id) useAppStore.setState({ staffCart: {}, staffNotes: {} });
+    if (cartOwner.current !== id) resetStaffCart();
     cartOwner.current = id;
     setView({ name: "order", id });
   };
@@ -57,19 +101,24 @@ export default function HandyShell() {
 
   const title =
     view.name === "tables" ? storeName : view.name === "table" ? tableName(view.id) : `${tableName(view.id)} の注文`;
+  // 卓の編集はオーナーだけ（DB側の step22 と同じ条件。役割が分からない＝Supabase未設定のローカルでは出す）。
+  // スタッフにも開けたい店は、DBのポリシーと合わせてここを変える（店舗ごとのカスタマイズ）
+  const canEditTables = view.name === "tables" && !loading && (staffRole === "owner" || staffRole === null);
 
   return (
     <div
+      className="handy"
+      data-view={view.name}
       style={{
         minHeight: "100dvh",
+        maxWidth: PHONE_MAX_WIDTH,
+        margin: "0 auto",
         background: "var(--app-bg)",
-        fontFamily: FONT,
         color: "var(--text)",
         display: "flex",
         flexDirection: "column",
       }}
     >
-      <div aria-hidden className="ambient-wash" />
       <header
         style={{
           position: "sticky",
@@ -78,39 +127,50 @@ export default function HandyShell() {
           display: "flex",
           alignItems: "center",
           gap: "8px",
-          padding: "10px 12px",
-          background: "var(--glass)",
-          backdropFilter: "blur(26px) saturate(180%)",
-          WebkitBackdropFilter: "blur(26px) saturate(180%)",
-          borderBottom: "1px solid var(--glass-edge)",
+          height: "var(--handy-header-h)",
+          padding: "env(safe-area-inset-top) 12px 0",
+          background: "var(--surface)",
+          borderBottom: "1px solid var(--hairline)",
         }}
       >
         {view.name !== "tables" && (
-          <button onClick={back} aria-label="戻る" style={headerButton}>
-            ‹ 戻る
+          <button onClick={back} aria-label="戻る" style={{ ...pillButton, paddingLeft: "10px" }}>
+            <span aria-hidden style={{ fontSize: "20px", lineHeight: 1, marginRight: "2px" }}>
+              ‹
+            </span>
+            戻る
           </button>
         )}
-        <span
+        <h1
           style={{
             flex: 1,
             minWidth: 0,
+            margin: 0,
             fontWeight: 800,
-            fontSize: "18px",
+            fontSize: "20px",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
           }}
         >
           {title}
-        </span>
+        </h1>
+        {canEditTables && (
+          <button onClick={() => setEditingTables(true)} style={pillButton}>
+            卓の編集
+          </button>
+        )}
         {view.name === "tables" && isSupabaseConfigured() && (
-          <button onClick={() => getSupabase()?.auth.signOut()} style={{ ...headerButton, color: "var(--text-2)" }}>
+          <button
+            onClick={() => getSupabase()?.auth.signOut()}
+            style={{ ...pillButton, background: "transparent", color: "var(--text-2)", padding: "8px 4px" }}
+          >
             ログアウト
           </button>
         )}
       </header>
 
-      <main style={{ flex: 1, display: "flex", flexDirection: "column", position: "relative", zIndex: 1 }}>
+      <main style={{ flex: 1, display: "flex", flexDirection: "column" }}>
         {loading ? (
           <LoadingScreen />
         ) : staffRole === "kitchen" ? (
@@ -127,7 +187,11 @@ export default function HandyShell() {
             onOrder={() => openOrder(view.id)}
             onMoved={(to) => {
               // 移動先で注文入力を続けられるよう、入力中の注文も新しい卓のものとして引き継ぐ
-              if (cartOwner.current === view.id) cartOwner.current = to;
+              if (cartOwner.current === view.id) {
+                cartOwner.current = to;
+                const st = useAppStore.getState();
+                saveDraft(to, st.staffCart, st.staffNotes);
+              }
               openTableView(to);
             }}
             onClosedTable={() => setView({ name: "tables" })}
@@ -137,22 +201,11 @@ export default function HandyShell() {
         )}
       </main>
 
+      {editingTables && <TableEditSheet onClose={() => setEditingTables(false)} />}
+
       <SupabaseSync staff />
       <AlertDialog />
       <Toast />
     </div>
   );
 }
-
-const headerButton: React.CSSProperties = {
-  flexShrink: 0,
-  padding: "8px 12px",
-  borderRadius: "999px",
-  border: "none",
-  background: "var(--control-tint)",
-  color: "var(--text)",
-  fontFamily: "inherit",
-  fontSize: "14px",
-  fontWeight: 700,
-  cursor: "pointer",
-};

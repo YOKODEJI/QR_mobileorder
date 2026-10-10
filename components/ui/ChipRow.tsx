@@ -25,6 +25,7 @@ export default function ChipRow({
       // このチップ行自体が横スクロールするため、カテゴリ切替スワイプの対象から
       // 明示的に除外し、チップ行内でのドラッグは常にチップ行自身の横スクロールに使わせる。
       data-hscroll={wrap ? undefined : "true"}
+      className="no-scrollbar"
       style={{
         display: "flex",
         flexWrap: wrap ? "wrap" : "nowrap",

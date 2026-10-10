@@ -1,16 +1,29 @@
 "use client";
 
-/** ハンディ画面の下から出るシート（卓移動・レジ用の一覧で共通） */
+import { PHONE_MAX_WIDTH, pillButton } from "@/components/handy/ui";
+
+/** ハンディ・厨房の画面の下から出るシート。
+ *  title の下に header（検索やタブなど、スクロールしないもの）、真ん中に children（スクロールする）、下に footer。 */
 export default function Sheet({
   title,
+  subtitle,
   onClose,
   children,
+  header,
   footer,
+  maxWidth = PHONE_MAX_WIDTH,
+  tall = false,
 }: {
   title: string;
+  subtitle?: string;
   onClose: () => void;
   children: React.ReactNode;
+  header?: React.ReactNode;
   footer?: React.ReactNode;
+  /** 広い画面で横に伸びすぎないようにする（既定はスマホの幅） */
+  maxWidth?: string;
+  /** 中身の量で高さが変わらないようにする（絞り込みで一覧が増減するシート向け） */
+  tall?: boolean;
 }) {
   return (
     <div
@@ -19,48 +32,42 @@ export default function Sheet({
         position: "fixed",
         inset: 0,
         zIndex: 50,
-        background: "rgba(0,0,0,.32)",
+        background: "rgba(0,0,0,.45)",
         display: "flex",
         alignItems: "flex-end",
+        justifyContent: "center",
       }}
     >
       <div
+        role="dialog"
+        aria-label={title}
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
-          maxHeight: "86dvh",
+          maxWidth,
+          ...(tall ? { height: "86dvh" } : { maxHeight: "86dvh" }),
           display: "flex",
           flexDirection: "column",
-          background: "var(--glass-strong)",
-          backdropFilter: "blur(30px) saturate(180%)",
-          WebkitBackdropFilter: "blur(30px) saturate(180%)",
-          borderTop: "1px solid var(--glass-edge)",
+          gap: "12px",
+          background: "var(--app-bg)",
           borderRadius: "24px 24px 0 0",
-          padding: "16px 14px calc(16px + env(safe-area-inset-bottom))",
+          padding: "10px 14px calc(16px + env(safe-area-inset-bottom))",
           animation: "sheetup .3s ease-out",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
-          <span style={{ flex: 1, fontSize: "19px", fontWeight: 800 }}>{title}</span>
-          <button
-            onClick={onClose}
-            style={{
-              padding: "8px 14px",
-              borderRadius: "999px",
-              border: "none",
-              background: "var(--control-tint)",
-              color: "var(--text)",
-              fontFamily: "inherit",
-              fontSize: "14px",
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
+        <div aria-hidden style={{ width: "38px", height: "5px", borderRadius: "999px", background: "var(--soldout-bg)", margin: "0 auto" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: "20px", fontWeight: 800, lineHeight: 1.25 }}>{title}</div>
+            {subtitle && <div style={{ fontSize: "15px", fontWeight: 600, color: "var(--text-2)", marginTop: "2px" }}>{subtitle}</div>}
+          </div>
+          <button onClick={onClose} style={pillButton}>
             閉じる
           </button>
         </div>
-        <div style={{ flex: 1, overflowY: "auto" }}>{children}</div>
-        {footer && <div style={{ marginTop: "14px" }}>{footer}</div>}
+        {header}
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>{children}</div>
+        {footer}
       </div>
     </div>
   );

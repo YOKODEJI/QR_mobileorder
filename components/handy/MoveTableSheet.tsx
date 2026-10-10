@@ -6,6 +6,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { tableSummary } from "@/lib/handy";
 import Sheet from "@/components/handy/Sheet";
+import { disabledLook } from "@/components/handy/ui";
 
 /** 卓移動。相席は無い運用なので、空いている卓だけを候補に出す */
 export default function MoveTableSheet({
@@ -23,6 +24,7 @@ export default function MoveTableSheet({
       orders: st.orders,
       tableName: st.tableName,
       moveTable: st.moveTable,
+      openDialog: st.openDialog,
       closeDialog: st.closeDialog,
     }))
   );
@@ -33,45 +35,43 @@ export default function MoveTableSheet({
   );
 
   const choose = (toId: string) =>
-    useAppStore.setState({
-      dialog: {
-        title: "卓移動",
-        body: `${s.tableName(fromId)} のお客様を ${s.tableName(toId)} へ移します。\n注文と来店時刻もそのまま移ります。`,
-        confirmText: "移動する",
-        danger: false,
-        onConfirm: async () => {
-          s.closeDialog();
-          setBusy(true);
-          const ok = await s.moveTable(fromId, toId);
-          setBusy(false);
-          if (ok) onMoved(toId);
-        },
+    s.openDialog({
+      title: "卓移動",
+      body: `${s.tableName(fromId)} のお客様を ${s.tableName(toId)} へ移します。\n注文と来店時刻もそのまま移ります。`,
+      confirmText: "移動する",
+      danger: false,
+      onConfirm: async () => {
+        s.closeDialog();
+        setBusy(true);
+        const ok = await s.moveTable(fromId, toId);
+        setBusy(false);
+        if (ok) onMoved(toId);
       },
     });
 
   return (
-    <Sheet title={`${s.tableName(fromId)} から移動`} onClose={onClose}>
+    <Sheet title={`${s.tableName(fromId)} から移動`} subtitle="空いている卓を選んでください" onClose={onClose}>
       {empty.length === 0 ? (
-        <div style={{ textAlign: "center", color: "var(--text-2)", padding: "30px 0" }}>空いている卓がありません</div>
+        <div style={{ textAlign: "center", color: "var(--text-2)", fontSize: "16px", padding: "30px 0" }}>空いている卓がありません</div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: "10px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "10px" }}>
           {empty.map((t) => (
             <button
               key={t.id}
               disabled={busy}
               onClick={() => choose(t.id)}
               style={{
-                minHeight: "64px",
+                minHeight: "72px",
                 padding: "10px",
                 borderRadius: "14px",
-                border: "none",
+                border: "1px solid var(--hairline-strong)",
                 background: "var(--surface)",
-                boxShadow: "0 1px 5px rgba(0,0,0,.06)",
                 fontFamily: "inherit",
-                fontSize: "16px",
+                fontSize: "26px",
                 fontWeight: 800,
                 color: "var(--text)",
-                cursor: busy ? "default" : "pointer",
+                cursor: "pointer",
+                ...disabledLook(busy),
               }}
             >
               {t.name}

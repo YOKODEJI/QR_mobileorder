@@ -5,6 +5,7 @@ import { useShallow } from "zustand/react/shallow";
 import { useAppStore } from "@/store/useAppStore";
 import { billLines } from "@/lib/handy";
 import Sheet from "@/components/handy/Sheet";
+import { disabledLook, itemName, primaryButton, subText } from "@/components/handy/ui";
 
 /** レジ用の一覧。USENレジに打ち込むときに見る（金額は持たないので品名・杯数・飲み方だけ）。
  *  「レジで会計した」で卓を閉じる（close_table。未提供の分は厨房に残る） */
@@ -23,6 +24,7 @@ export default function BillSheet({
       tableName: st.tableName,
       selectStaffTable: st.selectStaffTable,
       checkout: st.checkout,
+      openDialog: st.openDialog,
       closeDialog: st.closeDialog,
     }))
   );
@@ -32,58 +34,43 @@ export default function BillSheet({
   const unserved = s.orders
     .filter((o) => o.table === tableId && !o.checkedOutAt && o.status === "cooking")
     .reduce((a, o) => a + o.items.reduce((x, it) => x + it.qty, 0), 0);
+  const off = busy || total === 0;
 
   const confirmClose = () =>
-    useAppStore.setState({
-      dialog: {
-        title: `${s.tableName(tableId)} を閉じる`,
-        body:
-          (unserved > 0
-            ? `⚠ まだ出していないドリンクが ${unserved} 杯あります。閉じても、出し終えるまで厨房には残ります。\n\n`
-            : "") + "USENレジでの会計が終わっていることを確かめてから閉じてください。",
-        confirmText: "会計済みにして閉じる",
-        danger: false,
-        onConfirm: async () => {
-          s.closeDialog();
-          setBusy(true);
-          s.selectStaffTable(tableId);
-          await s.checkout(null, 0, false);
-          setBusy(false);
-          // 失敗時は checkout がトーストを出して卓を開いたまま残す
-          if (!useAppStore.getState().tables.find((t) => t.id === tableId)?.openSince) onClosedTable();
-        },
+    s.openDialog({
+      title: `${s.tableName(tableId)} を閉じる`,
+      body:
+        (unserved > 0
+          ? `⚠ まだ出していないドリンクが ${unserved} 杯あります。閉じても、出し終えるまで厨房には残ります。\n\n`
+          : "") + "USENレジでの会計が終わっていることを確かめてから閉じてください。",
+      confirmText: "会計済みにして閉じる",
+      danger: false,
+      onConfirm: async () => {
+        s.closeDialog();
+        setBusy(true);
+        s.selectStaffTable(tableId);
+        await s.checkout(null, 0, false);
+        setBusy(false);
+        // 失敗時は checkout がトーストを出して卓を開いたまま残す
+        if (!useAppStore.getState().tables.find((t) => t.id === tableId)?.openSince) onClosedTable();
       },
     });
 
   return (
     <Sheet
       title={`${s.tableName(tableId)} のレジ用一覧`}
+      subtitle="レジに打ち終えたら、下のボタンで卓を閉じます"
       onClose={onClose}
       footer={
-        <button
-          onClick={confirmClose}
-          disabled={busy || total === 0}
-          style={{
-            width: "100%",
-            padding: "16px",
-            borderRadius: "16px",
-            border: "none",
-            background: total === 0 ? "var(--text-3)" : "var(--accent)",
-            color: "var(--accent-ink)",
-            fontFamily: "inherit",
-            fontSize: "17px",
-            fontWeight: 800,
-            cursor: busy || total === 0 ? "default" : "pointer",
-          }}
-        >
+        <button onClick={confirmClose} disabled={off} style={{ ...primaryButton, ...disabledLook(off) }}>
           {busy ? "閉じています…" : "レジで会計した（卓を閉じる）"}
         </button>
       }
     >
       {lines.length === 0 ? (
-        <div style={{ textAlign: "center", color: "var(--text-2)", padding: "30px 0" }}>注文はありません</div>
+        <div style={{ textAlign: "center", color: "var(--text-2)", fontSize: "16px", padding: "30px 0" }}>注文はありません</div>
       ) : (
-        <div style={{ background: "var(--surface)", borderRadius: "14px", padding: "4px 14px" }}>
+        <div style={{ background: "var(--surface)", border: "1px solid var(--hairline-strong)", borderRadius: "14px", padding: "4px 14px" }}>
           {lines.map((l, i) => (
             <div
               key={i}
@@ -95,15 +82,12 @@ export default function BillSheet({
                 borderTop: i === 0 ? "none" : "1px solid var(--hairline)",
               }}
             >
-              <span style={{ flex: 1, fontSize: "16px", fontWeight: 700 }}>
-                {l.name}
-                {l.optionsText && (
-                  <span style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "var(--text-2)" }}>
-                    {l.optionsText}
-                  </span>
-                )}
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={itemName}>{l.name}</span>
+                {/* レジで打ち分ける手がかりなので、飲み方・Cドリンクは品名と同じ濃さで出す */}
+                {l.optionsText && <span style={{ ...subText, fontSize: "16px", fontWeight: 800, color: "var(--text)" }}>{l.optionsText}</span>}
               </span>
-              <span style={{ fontSize: "18px", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{l.qty}</span>
+              <span style={{ fontSize: "22px", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{l.qty}</span>
             </div>
           ))}
           <div
@@ -111,7 +95,8 @@ export default function BillSheet({
               display: "flex",
               justifyContent: "space-between",
               padding: "10px 0",
-              borderTop: "2px solid var(--hairline)",
+              borderTop: "2px solid var(--hairline-strong)",
+              fontSize: "18px",
               fontWeight: 800,
             }}
           >

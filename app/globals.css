@@ -27,6 +27,8 @@
      控えめな極薄アルファに。数値としては同じ黒ベースで統一） */
   --hairline: rgba(60, 60, 67, 0.08);
   --hairline-2: rgba(60, 60, 67, 0.05);
+  /* 面の輪郭をはっきり見せたいところ用（ハンディの行・入力欄） */
+  --hairline-strong: rgba(60, 60, 67, 0.22);
 
   /* コントロール（systemFill / secondarySystemFill） */
   --control-tint: rgba(120, 120, 128, 0.16);
@@ -52,9 +54,21 @@
   --soldout-bg: #d1d1d6;
   --soldout-text: rgba(60, 60, 67, 0.6);
 
+  /* 注意（呼び出し・8分超の伝票・通知音ON）。赤より一段弱い「気にかけて」の色 */
+  --amber: #e0902a;
+  --amber-dark: #a8791a;
+  --amber-bg: #fff8e6;
+  --amber-edge: #ffe2a8;
+
+  /* 厨房の伝票のバー（提供前＝落ち着いた黒、提供済み＝グレー） */
+  --ticket: #2c2c2e;
+  --ticket-done: #8e8e93;
+
   /* テーマアクセント（設定で上書き。既定 red-orange） */
   --accent: #cf4b2c;
   --accent-ink: #ffffff;
+  /* アクセントの淡い面（選択中の行・おかわりの行など）。アクセントが変わっても追従するよう色混合で作る */
+  --accent-bg: color-mix(in srgb, var(--accent) 12%, var(--surface));
 
   /* モーション（バネのような押し込み感） */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -82,6 +96,7 @@
 
     --hairline: rgba(255, 255, 255, 0.08);
     --hairline-2: rgba(255, 255, 255, 0.05);
+    --hairline-strong: rgba(255, 255, 255, 0.24);
 
     --control-tint: rgba(120, 120, 128, 0.24);
     --chip-tint: rgba(120, 120, 128, 0.18);
@@ -134,6 +149,77 @@
 }
 
 /* ============================================================
+   ハンディ（/handy）。スマホで使う内部の道具なので、視認性を最優先にする。
+   ・補助の文字を標準より濃くする（暗い店内でも読めるように）
+   ・ガラスや背景の階調は使わず、白い面と細い枠で区切る
+   ・押した場所が青く光る・文字が選択される・長押しでメニューが出る、を止める
+   ============================================================ */
+.handy {
+  --text-2: rgba(60, 60, 67, 0.9);
+  --text-3: rgba(60, 60, 67, 0.6);
+  /* ヘッダーの高さ（ノッチぶんを含む）。注文入力の検索バーをこの下に貼り付けるのに使う */
+  --handy-header-h: calc(56px + env(safe-area-inset-top));
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.handy input {
+  -webkit-user-select: text;
+  user-select: text;
+}
+.handy input::placeholder {
+  color: var(--text-3);
+}
+/* 管理画面（/admin）もスタッフの道具。ハンディほどではないが、補助の文字を標準より濃くする */
+.staff-ui {
+  --text-2: rgba(60, 60, 67, 0.8);
+  --text-3: rgba(60, 60, 67, 0.5);
+  -webkit-tap-highlight-color: transparent;
+}
+/* 客の注文画面。小さな注意書きまで読めるよう、補助の文字を少し濃くする */
+.customer-ui {
+  --text-2: rgba(60, 60, 67, 0.72);
+  --text-3: rgba(60, 60, 67, 0.5);
+  -webkit-tap-highlight-color: transparent;
+}
+/* 画面を下に引っぱっても再読み込みにしない（入力中の注文が消えるのを防ぐ。
+   消えた場合の備えは lib/handyDraft.ts の控え） */
+html:has(.handy),
+html:has(.handy) body,
+html:has(.staff-ui),
+html:has(.staff-ui) body,
+html:has(.customer-ui),
+html:has(.customer-ui) body {
+  overscroll-behavior-y: none;
+}
+/* 管理画面のヘッダー: 狭い画面ではタブを1段ぶん使い、入りきらない分は横に流す
+   （以前は「会計履歴」などが画面の外に切れていた） */
+.admin-tabs {
+  max-width: 100%;
+  overflow-x: auto;
+}
+@media (max-width: 760px) {
+  .admin-tabs {
+    order: 3;
+    flex-basis: 100%;
+  }
+}
+/* 「ホーム画面に追加できます」の案内（PwaController）。ハンディでは下に主操作のボタンがあるので、
+   卓一覧とログイン画面でだけ出し、シートや確認ダイアログが開いている間も隠す */
+html:has(.handy:not([data-view="tables"])) .pwa-banner,
+html:has(.handy [role="dialog"]) .pwa-banner {
+  display: none !important;
+}
+/* 横に流す列（種類の切替）のスクロールバーは出さない */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ============================================================
    全ボタン共通のバネ的な押し込みフィードバック。
    個々のinline styleを触らずに全画面へ一括適用する。
    touch-action: manipulation はモバイルブラウザの標準300msタップ遅延
@@ -165,6 +251,11 @@ html,
 body {
   margin: 0;
   padding: 0;
+}
+body {
+  /* iPhone はシステムのヒラギノ、それ以外は Noto Sans JP（layout.tsx で読み込み）。各画面で指定し直さない */
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", var(--font-noto-sans-jp), "Noto Sans JP", sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 html {
   /* 管理画面はページ全体(document)がスクロールする。タブ切替でページ高さが

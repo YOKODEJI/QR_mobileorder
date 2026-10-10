@@ -7,7 +7,8 @@ import { elapsedMin, useNow } from "@/lib/time";
 import { tableSummary } from "@/lib/handy";
 import { BellIcon } from "@/components/ui/Icon";
 
-/** 卓一覧。空席をタップ → 来店受付 → そのまま注文入力へ。着席中をタップ → 卓画面へ */
+/** 卓一覧。空席をタップ → 来店受付 → そのまま注文入力へ。着席中をタップ → 卓画面へ。
+ *  2列の大きなタイル。着席中は白地に太い枠、空席は灰色の地で、色と言葉の両方で見分ける */
 export default function TableGrid({
   onOpenTable,
   onOrder,
@@ -21,6 +22,7 @@ export default function TableGrid({
       orders: st.orders,
       calls: st.calls,
       openTable: st.openTable,
+      openDialog: st.openDialog,
       closeDialog: st.closeDialog,
     }))
   );
@@ -29,25 +31,23 @@ export default function TableGrid({
   const gated = isSupabaseConfigured();
 
   const receive = (id: string, name: string) =>
-    useAppStore.setState({
-      dialog: {
-        title: `${name} の来店受付`,
-        body: "お客様を案内した卓を開いて、注文を入れられるようにします。",
-        confirmText: "受付して注文へ",
-        danger: false,
-        onConfirm: async () => {
-          s.closeDialog();
-          await s.openTable(id);
-          // 受付に失敗したら openTable が元に戻してトーストを出すので、開いたときだけ進む
-          if (useAppStore.getState().tables.find((t) => t.id === id)?.openSince) onOrder(id);
-        },
+    s.openDialog({
+      title: `${name} の来店受付`,
+      body: "お客様を案内した卓を開いて、注文を入れられるようにします。",
+      confirmText: "受付して注文へ",
+      danger: false,
+      onConfirm: async () => {
+        s.closeDialog();
+        await s.openTable(id);
+        // 受付に失敗したら openTable が元に戻してトーストを出すので、開いたときだけ進む
+        if (useAppStore.getState().tables.find((t) => t.id === id)?.openSince) onOrder(id);
       },
     });
 
   if (s.tables.length === 0) {
     return (
-      <div style={{ padding: "60px 20px", textAlign: "center", color: "var(--text-2)" }}>
-        卓が登録されていません。管理画面の「テーブル / 会計」から卓を追加してください。
+      <div style={{ padding: "60px 20px", textAlign: "center", color: "var(--text-2)", fontSize: "16px" }}>
+        卓が登録されていません。右上の「卓の編集」から追加してください。
       </div>
     );
   }
@@ -56,9 +56,9 @@ export default function TableGrid({
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))",
+        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
         gap: "10px",
-        padding: "14px 12px 40px",
+        padding: "12px 12px calc(24px + env(safe-area-inset-bottom))",
       }}
     >
       {s.tables.map((t) => {
@@ -73,12 +73,11 @@ export default function TableGrid({
             aria-label={`${t.name}（${open ? "着席中" : "空席"}）`}
             style={{
               position: "relative",
-              minHeight: "92px",
-              padding: "12px 10px",
-              borderRadius: "18px",
-              border: open ? "2px solid var(--accent)" : "1px solid var(--glass-edge)",
-              background: open ? "var(--surface)" : "var(--glass)",
-              boxShadow: open ? "0 2px 10px rgba(0,0,0,.08)" : "none",
+              minHeight: "104px",
+              padding: "12px 14px",
+              borderRadius: "16px",
+              border: open ? "2.5px solid var(--text)" : "1px solid var(--hairline-strong)",
+              background: open ? "var(--surface)" : "var(--inset)",
               fontFamily: "inherit",
               color: "var(--text)",
               cursor: "pointer",
@@ -86,41 +85,54 @@ export default function TableGrid({
               flexDirection: "column",
               alignItems: "flex-start",
               justifyContent: "space-between",
-              gap: "6px",
+              gap: "8px",
               textAlign: "left",
             }}
           >
-            <span style={{ fontSize: "17px", fontWeight: 800, lineHeight: 1.2 }}>{t.name}</span>
+            <span
+              style={{
+                fontSize: "30px",
+                fontWeight: 800,
+                lineHeight: 1.1,
+                color: open ? "var(--text)" : "var(--text-2)",
+                // 長い卓名（「カウンター A」など）は折り返す
+                overflowWrap: "anywhere",
+              }}
+            >
+              {t.name}
+            </span>
             {open ? (
-              <span style={{ display: "flex", flexDirection: "column", gap: "2px", fontSize: "12px", color: "var(--text-2)" }}>
-                {minutes != null && <span>{minutes}分</span>}
+              <span style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "6px", fontSize: "15px", fontWeight: 700 }}>
                 {sum.pendingQty > 0 ? (
-                  <span style={{ fontWeight: 800, color: "#c2410c" }}>作成中 {sum.pendingQty}</span>
+                  <span style={{ padding: "3px 9px", borderRadius: "8px", background: "var(--accent)", color: "var(--accent-ink)", fontWeight: 800 }}>
+                    提供前 {sum.pendingQty}
+                  </span>
                 ) : (
-                  <span>{sum.orderCount > 0 ? "提供済み" : "注文なし"}</span>
+                  <span style={{ color: "var(--text-2)" }}>{sum.orderCount > 0 ? "提供済み" : "注文なし"}</span>
                 )}
+                {minutes != null && <span style={{ color: "var(--text-2)", fontVariantNumeric: "tabular-nums" }}>{minutes}分</span>}
               </span>
             ) : (
-              <span style={{ fontSize: "12px", color: "var(--text-3)" }}>空席</span>
+              <span style={{ fontSize: "15px", fontWeight: 700, color: "var(--text-2)" }}>空席</span>
             )}
             {calling && (
               <span
                 aria-label="呼び出し中"
                 style={{
                   position: "absolute",
-                  top: "8px",
-                  right: "8px",
-                  width: "26px",
-                  height: "26px",
+                  top: "10px",
+                  right: "10px",
+                  width: "30px",
+                  height: "30px",
                   borderRadius: "50%",
-                  background: "#a8791a",
+                  background: "var(--amber-dark)",
                   color: "#fff",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                 }}
               >
-                <BellIcon size={14} />
+                <BellIcon size={16} />
               </span>
             )}
           </button>

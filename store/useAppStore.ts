@@ -6,15 +6,19 @@ import { isSupabaseConfigured, ORDER_VIA_FUNCTION } from "@/lib/supabase";
 import { computeCheckoutBreakdown } from "@/lib/pricing";
 import { deletePhoto } from "@/lib/storage";
 import { getStoredSoundOn, setStoredSoundOn } from "@/lib/soundPref";
+import { playOrderChime } from "@/lib/notifySound";
 import {
   cartKey,
   parseCartKey,
   lineTotal,
   optionsLabel,
+  toggleOptionId,
+  moveCartLine,
   type MenuOption,
   type SelectedOption,
 } from "@/lib/options";
 import { detectSquarePosPlatform, buildSquarePosUrl } from "@/lib/squarePos";
+import { shiftInList } from "@/lib/handy";
 
 export type { MenuOption, SelectedOption };
 
@@ -257,6 +261,11 @@ export interface AppState {
   addStaff: (id: string, optionIds?: string[]) => void;
   removeStaff: (id: string, optionIds?: string[]) => void;
   setStaffNote: (key: string, note: string) => void;
+  // 入力中の行に、個別のオプション（Cドリンクなど）を付け外しする。行ごと（数量・備考ごと）移る
+  toggleStaffLineOption: (id: string, optionIds: string[], optionId: string) => void;
+  resetStaffCart: () => void; // 別の卓の注文入力に入るときに、入力中の注文を捨てる
+  restoreStaffCart: (cart: Record<string, number>, notes: Record<string, string>) => void; // 端末の控えから戻す（lib/handyDraft.ts）
+  restoreCart: (cart: Record<string, number>) => void; // お客様のカートを端末の控えから戻す（売切・在庫切れの分は戻さない）
 
   // ---- 注文 ----
   confirmOrder: () => void;
@@ -305,6 +314,11 @@ export interface AppState {
   dragStartTable: (id: string) => void;
   dragEndTable: () => void;
   dropOnTable: (targetId: string) => void;
+  // ハンディの「卓の編集」用（owner・staff）。確認ダイアログは画面側で出す
+  addTableNamed: (name: string) => Promise<boolean>;
+  renameTable: (id: string, name: string) => Promise<boolean>;
+  shiftTable: (id: string, dir: -1 | 1) => Promise<void>; // 並び順を1つ前(-1)/後ろ(1)へ
+  removeTable: (id: string) => Promise<boolean>;
 
   // ---- メニュー管理 ----
   setPrice: (id: string, val: string) => void;
@@ -348,34 +362,14 @@ export interface AppState {
   closeSettings: () => void;
   toggleHistory: (v: boolean) => void;
   closeDialog: () => void;
+  openDialog: (d: DialogSpec) => void; // 画面側から確認ダイアログを出す（setState を直接触らない）
   pushToast: (message: string) => void;
   dismissToast: (id: string) => void;
 }
 
-let audioCtx: AudioContext | null = null;
+/** 通知音（音の作りは lib/notifySound.ts） */
 function playBeep(soundOn: boolean) {
-  if (!soundOn) return;
-  try {
-    const AC =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext: typeof AudioContext })
-        .webkitAudioContext;
-    const ctx = audioCtx || (audioCtx = new AC());
-    if (ctx.state === "suspended") ctx.resume();
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = "sine";
-    o.frequency.value = 880;
-    o.connect(g);
-    g.connect(ctx.destination);
-    g.gain.setValueAtTime(0.001, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-    o.start();
-    o.stop(ctx.currentTime + 0.42);
-  } catch {
-    /* noop */
-  }
+  if (soundOn) playOrderChime();
 }
 
 /** カート（id→qty）から注文明細を生成。menuItemIdと当時の名前/価格スナップショットを持たせる */
@@ -516,9 +510,13 @@ function orderErrorDialog(
     },
   } as const;
   const m = map[res.code] ?? map.error;
+  // DBは「out of stock: 品名」の形で返す。品名が分かるときは、どれを外せばよいかを伝える
+  const soldOutName = res.code === "out_of_stock" ? res.message.match(/out of stock:\s*(.+)$/)?.[1]?.trim() : undefined;
   return {
     title: m.title,
-    body: m.body,
+    body: soldOutName
+      ? `申し訳ありません。「${soldOutName}」が売り切れになりました。その品を外して、もう一度ご注文ください。`
+      : m.body,
     confirmText: "もう一度",
     danger: false,
     onConfirm: onRetry,
@@ -899,6 +897,39 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { staffCart, staffNotes };
     }),
   setStaffNote: (key, note) => set((s) => ({ staffNotes: { ...s.staffNotes, [key]: note } })),
+  resetStaffCart: () => set({ staffCart: {}, staffNotes: {} }),
+  restoreCart: (cart) =>
+    set((s) => {
+      // 1つずつ入れ直す。控えたあとに売切・在庫切れ・メニューから消えた品は、入る分だけ戻る
+      let next: Record<string, number> = {};
+      for (const key of Object.keys(cart)) {
+        const { menuItemId, optionIds } = parseCartKey(key);
+        for (let i = 0; i < cart[key]; i++) {
+          const added = addToCart(next, s.menu, menuItemId, optionIds, s.settings.trackStock);
+          if (!added) break;
+          next = added;
+        }
+      }
+      return { cart: next };
+    }),
+  restoreStaffCart: (cart, notes) =>
+    set((s) => {
+      // 控えたあとにメニューから消えた品の行は戻さない
+      const staffCart: Record<string, number> = {};
+      const staffNotes: Record<string, string> = {};
+      for (const key of Object.keys(cart)) {
+        if (!s.menu.some((m) => m.id === parseCartKey(key).menuItemId)) continue;
+        staffCart[key] = cart[key];
+        if (notes[key]) staffNotes[key] = notes[key];
+      }
+      return { staffCart, staffNotes };
+    }),
+  toggleStaffLineOption: (id, optionIds, optionId) =>
+    set((s) => {
+      const nextIds = toggleOptionId(s.itemOptions[id] ?? [], optionIds, optionId);
+      const moved = moveCartLine(s.staffCart, s.staffNotes, cartKey(id, optionIds), cartKey(id, nextIds));
+      return { staffCart: moved.cart, staffNotes: moved.notes };
+    }),
 
   // ---- 注文 ----
   confirmOrder: () => {
@@ -1103,7 +1134,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       return;
     }
-    const to = o.status === "cooking" ? "提供済み" : "調理中";
+    const to = o.status === "cooking" ? "提供済み" : "提供前";
     set({
       dialog: {
         title: get().tableName(o.table) + " の伝票",
@@ -1660,6 +1691,74 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().pushToast("テーブルの並び替えの保存に失敗しました。もう一度お試しください。");
     }
   },
+  addTableNamed: async (rawName) => {
+    const name = rawName.trim();
+    if (!name) return false;
+    if (get().tables.some((t) => t.name === name)) {
+      get().pushToast("同じ名前の卓がすでにあります。");
+      return false;
+    }
+    const insertedId = await db.dbInsertTable(name, get().tables.length);
+    if (insertedId == null && isSupabaseConfigured()) {
+      get().pushToast("卓の追加に失敗しました。もう一度お試しください。");
+      return false;
+    }
+    const id = insertedId ?? newId();
+    // Realtimeの取り直しが先に届いていたら二重に足さない
+    set((st) => (st.tables.some((t) => t.id === id) ? st : { tables: [...st.tables, { id, name }] }));
+    return true;
+  },
+  renameTable: async (id, rawName) => {
+    const name = rawName.trim();
+    const prevTables = get().tables;
+    const cur = prevTables.find((t) => t.id === id);
+    if (!cur || !name || cur.name === name) return false;
+    if (prevTables.some((t) => t.id !== id && t.name === name)) {
+      get().pushToast("同じ名前の卓がすでにあります。");
+      return false;
+    }
+    set((s) => ({ tables: s.tables.map((t) => (t.id === id ? { ...t, name } : t)) }));
+    const success = await db.dbUpdateTableName(id, name);
+    if (!success) {
+      set({ tables: prevTables });
+      get().pushToast("卓の名前の保存に失敗しました。もう一度お試しください。");
+    }
+    return success;
+  },
+  shiftTable: async (id, dir) => {
+    const prevTables = get().tables;
+    const arr = shiftInList(
+      prevTables,
+      prevTables.findIndex((t) => t.id === id),
+      dir
+    );
+    if (arr === prevTables) return;
+    set({ tables: arr });
+    const success = await db.dbReorderTables(arr.map((t) => t.id));
+    if (!success) {
+      set({ tables: prevTables });
+      get().pushToast("卓の並び替えの保存に失敗しました。もう一度お試しください。");
+    }
+  },
+  removeTable: async (id) => {
+    const success = await db.dbDeleteTable(id);
+    // DB側で止められた削除（権限が無い・店によっては着席中の卓を消させない）は、
+    // エラーにならず0件削除で返るので、取り直して本当に消えたか確かめる
+    const fresh = success && isSupabaseConfigured() ? await db.fetchTables() : null;
+    if (!success || fresh?.some((t) => t.id === id)) {
+      get().pushToast("卓を削除できませんでした。着席中の卓は、卓を閉じてから削除してください。");
+      return false;
+    }
+    set((st) => ({
+      tables: st.tables.filter((x) => x.id !== id),
+      orders: st.orders.filter((o) => o.table !== id),
+      calls: st.calls.filter((c) => c.table !== id),
+      selectedStaffTable: st.selectedStaffTable === id ? null : st.selectedStaffTable,
+    }));
+    // 並び順の番号を詰め直す（次に追加する卓が、既存の卓と同じ番号にならないように）
+    void db.dbReorderTables(get().tables.map((t) => t.id));
+    return true;
+  },
   confirmDeleteTable: (id) => {
     const s = get();
     const t = s.tables.find((x) => x.id === id);
@@ -2164,6 +2263,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   closeSettings: () => set({ showSettings: false }),
   toggleHistory: (v) => set({ showHistory: v }),
   closeDialog: () => set({ dialog: null }),
+  openDialog: (d) => set({ dialog: d }),
   pushToast: (message) => {
     const id = newId();
     set((s) => ({ toasts: [...s.toasts, { id, message }] }));

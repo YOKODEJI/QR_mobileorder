@@ -67,6 +67,7 @@ export default function AdminShell() {
 
   return (
     <div
+      className="staff-ui"
       style={{
         minHeight: "100vh",
         background: "var(--app-bg)",
@@ -109,22 +110,24 @@ export default function AdminShell() {
             alignItems: "center",
             justifyContent: "space-between",
             gap: "10px",
-            padding: "10px 16px",
+            padding: "10px 14px",
           }}
         >
-          <div style={{ display: "flex", alignItems: "baseline", gap: "8px", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "8px", minWidth: 0 }}>
             <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-.02em", whiteSpace: "nowrap" }}>
               {storeName}
             </span>
-            <span style={{ fontSize: "11px", color: "var(--text-2)", whiteSpace: "nowrap" }}>管理ツール</span>
+            <span style={{ fontSize: "13px", color: "var(--text-2)", whiteSpace: "nowrap" }}>管理ツール</span>
           </div>
 
           {tabs.length > 1 && (
-            <SegmentedControl
-              segments={MGMT_SEGMENTS.filter((seg) => tabs.includes(seg.value))}
-              value={tabs.includes(mgmtTab) ? mgmtTab : tabs[0]}
-              onChange={setMgmt}
-            />
+            <div className="admin-tabs no-scrollbar">
+              <SegmentedControl
+                segments={MGMT_SEGMENTS.filter((seg) => tabs.includes(seg.value))}
+                value={tabs.includes(mgmtTab) ? mgmtTab : tabs[0]}
+                onChange={setMgmt}
+              />
+            </div>
           )}
 
           <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
@@ -132,13 +135,14 @@ export default function AdminShell() {
               <button
                 onClick={() => getSupabase()?.auth.signOut()}
                 style={{
+                  minHeight: "40px",
                   padding: "7px 14px",
                   borderRadius: "999px",
                   border: "none",
                   background: "var(--control-tint)",
                   color: "var(--text-2)",
                   fontFamily: "inherit",
-                  fontSize: "13px",
+                  fontSize: "14px",
                   fontWeight: 600,
                   cursor: "pointer",
                   whiteSpace: "nowrap",
@@ -154,13 +158,14 @@ export default function AdminShell() {
                 display: "flex",
                 alignItems: "center",
                 gap: "6px",
+                minHeight: "40px",
                 padding: "7px 14px",
                 borderRadius: "999px",
                 border: "none",
                 background: "var(--control-tint)",
                 color: "var(--text)",
                 fontFamily: "inherit",
-                fontSize: "13px",
+                fontSize: "14px",
                 fontWeight: 600,
                 cursor: "pointer",
                 whiteSpace: "nowrap",

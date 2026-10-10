@@ -3,13 +3,32 @@
 import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useAppStore, type MenuItem } from "@/store/useAppStore";
-import { parseCartKey, optionsLabel } from "@/lib/options";
+import { parseCartKey, choiceGroups, countSteps } from "@/lib/options";
 import { filterMenu, sortByPopularity, tableRepeatItems, type RepeatItem } from "@/lib/handy";
 import { useMenuPopularity } from "@/lib/useMenuPopularity";
 import OptionSheet from "@/components/ui/OptionSheet";
+import SearchField from "@/components/ui/SearchField";
+import CategoryChips from "@/components/ui/CategoryChips";
+import Sheet from "@/components/handy/Sheet";
+import ReviewSheet from "@/components/handy/ReviewSheet";
+import CountChoiceSheet from "@/components/handy/CountChoiceSheet";
+import {
+  bottomBar,
+  choiceButton,
+  countBadge,
+  itemName,
+  primaryButton,
+  rowCard,
+  sectionTitle,
+  statusTag,
+  subText,
+  tapFeedback,
+} from "@/components/handy/ui";
 
-/** 注文入力。種類の切替＋検索で品目を選び、確認画面（数量・備考）から送信する。金額は出さない。
- *  同じ商品・同じオプションは1行にまとまり（cartKeyが同じ）、備考もその行単位で持つ */
+/** 注文入力。種類の切替＋検索で品目を選び、確認画面（ReviewSheet）から送信する。金額は出さない。
+ *  同じ商品・同じオプションは1行にまとまり（cartKeyが同じ）、備考もその行単位で持つ。
+ *  「どれか1つを選ぶ」オプション（日本酒の一合／グラス、焼酎の飲み方、瓶のグラスの数）は品目を押したときに聞き、
+ *  個別のチェック（Cドリンク）は確認画面で行ごとに付ける（普通の品は1回押すだけで入るように） */
 export default function OrderEntry({ tableId, onSent }: { tableId: string; onSent: () => void }) {
   const s = useAppStore(
     useShallow((st) => ({
@@ -20,10 +39,8 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
       staffCart: st.staffCart,
       staffNotes: st.staffNotes,
       addStaff: st.addStaff,
-      removeStaff: st.removeStaff,
       setStaffNote: st.setStaffNote,
       submitProxy: st.submitProxy,
-      tableName: st.tableName,
       yen: st.yen,
       theme: st.settings.theme,
     }))
@@ -41,21 +58,34 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
   const repeats = tableRepeatItems(s.orders, tableId);
   const soldOutIds = new Set(s.menu.filter((m) => m.soldOut).map((m) => m.id));
 
-  // おかわり: 同じ品・同じ飲み方を1杯足す。前回の備考は、この行にまだ備考が無ければ引き継ぐ
-  const repeat = (r: RepeatItem) => {
-    if (soldOutIds.has(r.menuItemId)) return;
-    s.addStaff(r.menuItemId, r.optionIds);
-    if (r.note && !s.staffNotes[r.key]) s.setStaffNote(r.key, r.note);
-  };
   const cartKeys = Object.keys(s.staffCart);
   const totalQty = cartKeys.reduce((a, k) => a + s.staffCart[k], 0);
   const qtyOf = (id: string) =>
     cartKeys.reduce((a, k) => (parseCartKey(k).menuItemId === id ? a + s.staffCart[k] : a), 0);
 
+  const add = (menuItemId: string, optionIds: string[] = []) => {
+    s.addStaff(menuItemId, optionIds);
+    tapFeedback();
+  };
+
+  // おかわり: 同じ品・同じ飲み方を1杯足す。前回の備考は、この行にまだ備考が無ければ引き継ぐ
+  const repeat = (r: RepeatItem) => {
+    if (soldOutIds.has(r.menuItemId)) return;
+    add(r.menuItemId, r.optionIds);
+    if (r.note && !s.staffNotes[r.key]) s.setStaffNote(r.key, r.note);
+  };
+
   const tapItem = (m: MenuItem) => {
     if (m.soldOut) return;
-    if ((s.itemOptions[m.id] ?? []).length > 0) setOptionItem(m);
-    else s.addStaff(m.id);
+    if (choiceGroups(s.itemOptions[m.id] ?? []).length > 0) setOptionItem(m);
+    else add(m.id);
+  };
+  const optionItemGroups = optionItem ? choiceGroups(s.itemOptions[optionItem.id] ?? []) : [];
+  const optionCount = optionItemGroups.length === 1 ? countSteps(optionItemGroups[0].options) : null;
+
+  const changeCat = (c: string) => {
+    setCat(c);
+    window.scrollTo({ top: 0 });
   };
 
   const send = async () => {
@@ -71,57 +101,32 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-      <div style={{ padding: "10px 12px 8px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="品名で探す（ひらがな可）"
-          aria-label="品名で探す"
-          style={{
-            width: "100%",
-            padding: "12px 14px",
-            borderRadius: "12px",
-            border: "none",
-            background: "var(--hairline)",
-            fontSize: "16px",
-            fontFamily: "inherit",
-            color: "var(--text)",
-          }}
-        />
-        {!query && (
-          <div style={{ display: "flex", gap: "6px", overflowX: "auto", paddingBottom: "2px" }}>
-            {["すべて", ...usedCats].map((c) => (
-              <button
-                key={c}
-                onClick={() => setCat(c)}
-                style={{
-                  flexShrink: 0,
-                  padding: "8px 14px",
-                  borderRadius: "999px",
-                  border: "none",
-                  background: cat === c ? "var(--accent)" : "var(--control-tint)",
-                  color: cat === c ? "var(--accent-ink)" : "var(--text)",
-                  fontFamily: "inherit",
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-        )}
+      {/* 検索と種類の切替は、一覧をスクロールしても上に残す */}
+      <div
+        style={{
+          position: "sticky",
+          top: "var(--handy-header-h)",
+          zIndex: 10,
+          padding: "10px 12px 8px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px",
+          background: "var(--app-bg)",
+          borderBottom: "1px solid var(--hairline)",
+        }}
+      >
+        <SearchField value={query} onChange={setQuery} placeholder="品名で探す（ひらがな可）" />
+        {!query && <CategoryChips categories={usedCats} value={cat} onChange={changeCat} />}
       </div>
 
-      <div style={{ padding: "4px 12px 110px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        {!query && repeats.length > 0 && (
-          <div style={{ marginBottom: "6px" }}>
-            <div style={{ fontSize: "13px", fontWeight: 800, color: "var(--text-2)", margin: "2px 2px 6px" }}>
-              この卓の注文（タップでおかわり）
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      <div style={{ padding: "10px 12px 120px", display: "flex", flexDirection: "column", gap: "10px" }}>
+        {!query && cat === "すべて" && repeats.length > 0 && (
+          <section
+            aria-label="おかわり"
+            style={{ marginBottom: "6px", padding: "10px", borderRadius: "16px", background: "var(--accent-bg)", border: "1px solid var(--accent)" }}
+          >
+            <h2 style={{ ...sectionTitle, margin: "0 2px 8px", color: "var(--text)" }}>おかわり（この卓が前に頼んだもの）</h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {repeats.map((r) => {
                 const soldOut = soldOutIds.has(r.menuItemId);
                 const inCart = s.staffCart[r.key] ?? 0;
@@ -132,58 +137,44 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
                     disabled={soldOut}
                     aria-label={soldOut ? `${r.name}（売切）` : `${r.name}${r.optionsText ? "・" + r.optionsText : ""}をおかわり`}
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                      minHeight: "52px",
-                      padding: "8px 14px",
-                      borderRadius: "14px",
-                      border: inCart > 0 ? "2px solid var(--accent)" : "1px dashed var(--accent)",
-                      background: soldOut ? "var(--hairline)" : "var(--chip-tint)",
-                      fontFamily: "inherit",
-                      textAlign: "left",
+                      ...rowCard,
+                      minHeight: "58px",
+                      border: inCart > 0 ? "2.5px solid var(--accent)" : rowCard.border,
+                      background: soldOut ? "var(--inset)" : "var(--surface)",
                       cursor: soldOut ? "default" : "pointer",
-                      width: "100%",
                     }}
                   >
                     <span style={{ flex: 1, minWidth: 0 }}>
-                      <span
-                        style={{
-                          display: "block",
-                          fontSize: "16px",
-                          fontWeight: 700,
-                          color: soldOut ? "var(--text-3)" : "var(--text)",
-                        }}
-                      >
+                      <span style={{ ...itemName, color: soldOut ? "var(--text-2)" : "var(--text)", textDecoration: soldOut ? "line-through" : "none" }}>
                         {r.name}
                       </span>
                       {(r.optionsText || r.note) && (
-                        <span style={{ fontSize: "12px", color: "var(--text-2)" }}>
-                          {[r.optionsText, r.note && `※ ${r.note}`].filter(Boolean).join("　")}
-                        </span>
+                        <span style={subText}>{[r.optionsText, r.note && `※ ${r.note}`].filter(Boolean).join("　")}</span>
                       )}
                     </span>
                     {soldOut ? (
-                      <span style={{ fontSize: "13px", fontWeight: 800, color: "var(--red-dark)" }}>売切</span>
+                      <span style={{ ...statusTag, background: "var(--red)", color: "#fff" }}>売切</span>
                     ) : (
-                      <span style={{ fontSize: "12px", color: "var(--text-2)", whiteSpace: "nowrap" }}>
-                        これまで{r.qty}
-                        {inCart > 0 && (
-                          <strong style={{ marginLeft: "6px", fontSize: "15px", color: "var(--accent)" }}>＋{inCart}</strong>
+                      <>
+                        <span style={{ fontSize: "15px", fontWeight: 600, color: "var(--text-2)", whiteSpace: "nowrap" }}>前回まで {r.qty}</span>
+                        {inCart > 0 ? (
+                          <span style={countBadge}>＋{inCart}</span>
+                        ) : (
+                          <span aria-hidden style={{ ...countBadge, background: "var(--surface)", color: "var(--accent)", border: "2px solid var(--accent)" }}>
+                            ＋
+                          </span>
                         )}
-                      </span>
+                      </>
                     )}
                   </button>
                 );
               })}
             </div>
-            <div style={{ fontSize: "13px", fontWeight: 800, color: "var(--text-2)", margin: "14px 2px 0" }}>
-              メニュー（人気順）
-            </div>
-          </div>
+          </section>
         )}
+        {!query && cat === "すべて" && repeats.length > 0 && <h2 style={{ ...sectionTitle, margin: "6px 2px 0" }}>メニュー（人気順）</h2>}
         {items.length === 0 && (
-          <div style={{ textAlign: "center", color: "var(--text-2)", padding: "40px 0" }}>該当する品目がありません</div>
+          <div style={{ textAlign: "center", color: "var(--text-2)", fontSize: "16px", padding: "40px 0" }}>該当する品目がありません</div>
         )}
         {items.map((m) => {
           const q = qtyOf(m.id);
@@ -194,56 +185,22 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
               disabled={m.soldOut}
               aria-label={m.soldOut ? `${m.name}（売切）` : `${m.name}を追加`}
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                minHeight: "56px",
-                padding: "10px 14px",
-                borderRadius: "14px",
-                border: q > 0 ? "2px solid var(--accent)" : "none",
-                background: m.soldOut ? "var(--hairline)" : "var(--surface)",
-                boxShadow: m.soldOut ? "none" : "0 1px 5px rgba(0,0,0,.05)",
-                fontFamily: "inherit",
-                textAlign: "left",
+                ...rowCard,
+                border: q > 0 ? "2.5px solid var(--accent)" : rowCard.border,
+                background: m.soldOut ? "var(--inset)" : q > 0 ? "var(--accent-bg)" : "var(--surface)",
                 cursor: m.soldOut ? "default" : "pointer",
-                width: "100%",
               }}
             >
               <span style={{ flex: 1, minWidth: 0 }}>
-                <span
-                  style={{
-                    display: "block",
-                    fontSize: "16px",
-                    fontWeight: 700,
-                    color: m.soldOut ? "var(--text-3)" : "var(--text)",
-                  }}
-                >
+                <span style={{ ...itemName, color: m.soldOut ? "var(--text-2)" : "var(--text)", textDecoration: m.soldOut ? "line-through" : "none" }}>
                   {m.name}
                 </span>
-                {query && <span style={{ fontSize: "12px", color: "var(--text-2)" }}>{m.cat}</span>}
+                {(query || cat === "すべて") && <span style={subText}>{m.cat}</span>}
               </span>
               {m.soldOut ? (
-                <span style={{ fontSize: "13px", fontWeight: 800, color: "var(--red-dark)" }}>売切</span>
+                <span style={{ ...statusTag, background: "var(--red)", color: "#fff" }}>売切</span>
               ) : (
-                q > 0 && (
-                  <span
-                    style={{
-                      minWidth: "30px",
-                      height: "30px",
-                      borderRadius: "999px",
-                      background: "var(--accent)",
-                      color: "var(--accent-ink)",
-                      fontSize: "15px",
-                      fontWeight: 800,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: "0 8px",
-                    }}
-                  >
-                    {q}
-                  </span>
-                )
+                q > 0 && <span style={countBadge}>{q}</span>
               )}
             </button>
           );
@@ -252,13 +209,54 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
 
       {totalQty > 0 && (
         <div style={bottomBar}>
-          <button onClick={() => setReviewing(true)} style={primaryButton}>
-            確認して送信（{totalQty}点）
+          <button
+            onClick={() => setReviewing(true)}
+            style={{ ...primaryButton, display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}
+          >
+            注文内容を確認する
+            <span style={{ ...countBadge, background: "var(--accent-ink)", color: "var(--accent)", minWidth: "auto", height: "30px", fontSize: "16px" }}>
+              {totalQty}点
+            </span>
           </button>
         </div>
       )}
 
-      {optionItem && (
+      {/* 数を合わせる組（瓶のグラスの数）は、＋−で合わせてから入れる */}
+      {optionItem && optionCount && (
+        <CountChoiceSheet
+          itemName={optionItem.name}
+          title={optionItemGroups[0].group}
+          count={optionCount}
+          onClose={() => setOptionItem(null)}
+          onAdd={(optionId) => {
+            add(optionItem.id, [optionId]);
+            setOptionItem(null);
+          }}
+        />
+      )}
+
+      {/* 選ぶ組が1つだけ（一合／グラス、飲み方）なら、押した時点でそのまま入れる */}
+      {optionItem && optionItemGroups.length === 1 && !optionCount && (
+        <Sheet title={optionItem.name} subtitle={`${optionItemGroups[0].group}を選んでください`} onClose={() => setOptionItem(null)}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px", paddingBottom: "6px" }}>
+            {optionItemGroups[0].options.map((o) => (
+              <button
+                key={o.id}
+                onClick={() => {
+                  add(optionItem.id, [o.id]);
+                  setOptionItem(null);
+                }}
+                style={choiceButton}
+              >
+                {o.name}
+              </button>
+            ))}
+          </div>
+        </Sheet>
+      )}
+
+      {/* 選ぶ組が複数ある品は、共通のオプション選択シートで */}
+      {optionItem && optionItemGroups.length !== 1 && (
         <div style={{ position: "fixed", inset: 0, zIndex: 50 }}>
           <OptionSheet
             item={optionItem}
@@ -268,149 +266,14 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
             hidePrice
             onClose={() => setOptionItem(null)}
             onAdd={(optionIds) => {
-              s.addStaff(optionItem.id, optionIds);
+              add(optionItem.id, optionIds);
               setOptionItem(null);
             }}
           />
         </div>
       )}
 
-      {reviewing && (
-        <div
-          onClick={() => !sending && setReviewing(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 50,
-            background: "rgba(0,0,0,.32)",
-            display: "flex",
-            alignItems: "flex-end",
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "100%",
-              maxHeight: "86dvh",
-              overflowY: "auto",
-              background: "var(--glass-strong)",
-              backdropFilter: "blur(30px) saturate(180%)",
-              WebkitBackdropFilter: "blur(30px) saturate(180%)",
-              borderTop: "1px solid var(--glass-edge)",
-              borderRadius: "24px 24px 0 0",
-              padding: "16px 14px calc(16px + env(safe-area-inset-bottom))",
-              animation: "sheetup .3s ease-out",
-            }}
-          >
-            <div style={{ fontSize: "19px", fontWeight: 800, marginBottom: "10px" }}>
-              {s.tableName(tableId)} に送信
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {cartKeys.map((k) => {
-                const { menuItemId, optionIds } = parseCartKey(k);
-                const m = s.menu.find((x) => x.id === menuItemId);
-                if (!m) return null;
-                const opts = (s.itemOptions[menuItemId] ?? []).filter((o) => optionIds.includes(o.id));
-                const label = optionsLabel(opts.map((o) => ({ id: o.id, name: o.name, priceDelta: o.priceDelta })));
-                return (
-                  <div
-                    key={k}
-                    style={{ background: "var(--surface)", borderRadius: "14px", padding: "10px 12px" }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <span style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ display: "block", fontSize: "16px", fontWeight: 700 }}>{m.name}</span>
-                        {label && <span style={{ fontSize: "13px", color: "var(--text-2)" }}>{label}</span>}
-                      </span>
-                      <button
-                        onClick={() => s.removeStaff(menuItemId, optionIds)}
-                        aria-label={`${m.name}を1つ減らす`}
-                        style={stepButton}
-                      >
-                        −
-                      </button>
-                      <span style={{ minWidth: "24px", textAlign: "center", fontSize: "18px", fontWeight: 800 }}>
-                        {s.staffCart[k]}
-                      </span>
-                      <button
-                        onClick={() => s.addStaff(menuItemId, optionIds)}
-                        aria-label={`${m.name}を1つ増やす`}
-                        style={stepButton}
-                      >
-                        ＋
-                      </button>
-                    </div>
-                    <input
-                      value={s.staffNotes[k] ?? ""}
-                      onChange={(e) => s.setStaffNote(k, e.target.value)}
-                      maxLength={200}
-                      placeholder="備考（例: お湯割り、氷なし）"
-                      aria-label={`${m.name}の備考`}
-                      style={{
-                        marginTop: "8px",
-                        width: "100%",
-                        padding: "10px 12px",
-                        borderRadius: "10px",
-                        border: "none",
-                        background: "var(--hairline)",
-                        fontSize: "16px",
-                        fontFamily: "inherit",
-                        color: "var(--text)",
-                      }}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-            <button
-              onClick={send}
-              disabled={sending || totalQty === 0}
-              style={{ ...primaryButton, marginTop: "14px", opacity: sending ? 0.6 : 1 }}
-            >
-              {sending ? "送信中…" : `厨房へ送信（${totalQty}点）`}
-            </button>
-          </div>
-        </div>
-      )}
+      {reviewing && <ReviewSheet tableId={tableId} sending={sending} onSend={send} onClose={() => setReviewing(false)} />}
     </div>
   );
 }
-
-const bottomBar: React.CSSProperties = {
-  position: "fixed",
-  left: 0,
-  right: 0,
-  bottom: 0,
-  zIndex: 20,
-  padding: "12px 12px calc(12px + env(safe-area-inset-bottom))",
-  background: "var(--glass)",
-  backdropFilter: "blur(26px) saturate(180%)",
-  WebkitBackdropFilter: "blur(26px) saturate(180%)",
-  borderTop: "1px solid var(--glass-edge)",
-};
-
-const primaryButton: React.CSSProperties = {
-  width: "100%",
-  padding: "16px",
-  borderRadius: "16px",
-  border: "none",
-  background: "var(--accent)",
-  color: "var(--accent-ink)",
-  fontFamily: "inherit",
-  fontSize: "17px",
-  fontWeight: 800,
-  cursor: "pointer",
-};
-
-const stepButton: React.CSSProperties = {
-  width: "40px",
-  height: "40px",
-  borderRadius: "12px",
-  border: "none",
-  background: "var(--control-tint)",
-  color: "var(--text)",
-  fontFamily: "inherit",
-  fontSize: "20px",
-  fontWeight: 800,
-  cursor: "pointer",
-};

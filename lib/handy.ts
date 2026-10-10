@@ -2,6 +2,15 @@
 import type { MenuItem, Order } from "@/store/useAppStore";
 import { optionsLabel, cartKey } from "@/lib/options";
 
+/** 並びの index 番目を1つ前(-1)/後ろ(1)へ動かした新しい配列。動かせないときは元の配列をそのまま返す */
+export function shiftInList<T>(list: T[], index: number, dir: -1 | 1): T[] {
+  const to = index + dir;
+  if (index < 0 || index >= list.length || to < 0 || to >= list.length) return list;
+  const out = [...list];
+  [out[index], out[to]] = [out[to], out[index]];
+  return out;
+}
+
 /** 店全体の人気順（杯数の多い順）。同じ杯数・注文なしの品は元の並び（メニュー管理の順）のまま */
 export function sortByPopularity<T extends { id: string }>(items: T[], popularity: Record<string, number>): T[] {
   return items
@@ -122,7 +131,8 @@ export interface BillLine {
   qty: number;
 }
 
-/** レジ用の一覧: この卓の未会計のドリンクを「品名＋オプション」ごとにまとめる（初めて出た順） */
+/** レジ用の一覧: この卓の未会計のドリンクを「品名＋オプション」ごとにまとめる。
+ *  並びは品名が初めて出た順で、同じ品のオプション違い（Cドリンクの分など）は隣り合わせにする */
 export function billLines(orders: Order[], tableId: string): BillLine[] {
   const map = new Map<string, BillLine>();
   const sorted = orders
@@ -137,7 +147,15 @@ export function billLines(orders: Order[], tableId: string): BillLine[] {
       else map.set(key, { name: it.name, optionsText, qty: it.qty });
     }
   }
-  return [...map.values()];
+  const lines = [...map.values()];
+  const firstSeen = new Map<string, number>();
+  lines.forEach((l, i) => {
+    if (!firstSeen.has(l.name)) firstSeen.set(l.name, i);
+  });
+  return lines
+    .map((line, i) => ({ line, i }))
+    .sort((a, b) => firstSeen.get(a.line.name)! - firstSeen.get(b.line.name)! || a.i - b.i)
+    .map((x) => x.line);
 }
 
 /** 卓一覧のタイル用の集計。会計済みの繰越伝票(checkedOutAt)は前のお客様の分なので数えない */

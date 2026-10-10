@@ -10,8 +10,10 @@ export async function manifestResponse(opts: { label: string; path: string; desc
     name: `${storeName} ${opts.label}`,
     short_name: opts.label === "管理画面" ? storeName : opts.label,
     description: opts.description,
+    id: opts.path,
     start_url: opts.path,
-    scope: `${opts.path}/`,
+    // 末尾に / を付けると start_url（/handy）が範囲の外になり、ブラウザに scope を無視される。画面のパスそのものにする
+    scope: opts.path,
     display: "standalone",
     background_color: "#f2f2f7",
     theme_color: store?.theme ?? "#cf4b2c",
