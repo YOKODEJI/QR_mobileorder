@@ -9,6 +9,8 @@ import {
   popularityFromOrders,
   tableRepeatItems,
   shiftInList,
+  fitTableGrid,
+  settleTargets,
 } from "./handy";
 import type { MenuItem, Order } from "@/store/useAppStore";
 
@@ -189,5 +191,63 @@ describe("tableSummary", () => {
       order("B", "cooking", 3),
     ];
     expect(tableSummary(orders, "A")).toEqual({ pendingQty: 2, servedQty: 1, orderCount: 2 });
+  });
+});
+
+describe("fitTableGrid（卓一覧の並べ方）", () => {
+  it("スマホで8卓なら2列で、スクロール無しに収まる", () => {
+    const fit = fitTableGrid(8, 351, 700);
+    expect(fit.cols).toBe(2);
+    expect(fit.scrolls).toBe(false);
+    expect(fit.tileHeight * 4 + 10 * 3).toBeLessThanOrEqual(700);
+  });
+  it("卓が少なければ大きく（間延びしない上限つき）", () => {
+    const fit = fitTableGrid(3, 351, 700);
+    expect(fit.cols).toBe(1);
+    expect(fit.tileHeight).toBe(200);
+  });
+  it("卓が多ければ列を増やして収める", () => {
+    const fit = fitTableGrid(20, 351, 700);
+    expect(fit.cols).toBe(3);
+    expect(fit.scrolls).toBe(false);
+    expect(fit.tileHeight).toBeGreaterThanOrEqual(84);
+  });
+  it("どうしても入り切らなければ、縦に流す", () => {
+    const fit = fitTableGrid(40, 351, 700);
+    expect(fit.scrolls).toBe(true);
+    expect(fit.cols).toBe(3);
+  });
+  it("測れていないとき・卓が無いときは既定の並び", () => {
+    expect(fitTableGrid(8, 0, 0).cols).toBe(2);
+    expect(fitTableGrid(0, 351, 700).cols).toBe(2);
+  });
+  it("卓名の文字はタイルに合わせて 22〜40px", () => {
+    expect(fitTableGrid(20, 351, 700).nameSize).toBeGreaterThanOrEqual(22);
+    expect(fitTableGrid(2, 351, 700).nameSize).toBeLessThanOrEqual(40);
+  });
+});
+
+describe("settleTargets（一括清算の対象）", () => {
+  const tables = [
+    { id: "a", name: "A", openSince: "2026-10-10T10:00:00Z" },
+    { id: "b", name: "B", openSince: "2026-10-10T10:00:00Z" },
+    { id: "c", name: "C", openSince: null },
+    { id: "d", name: "D", openSince: null },
+  ];
+  const order = (table: string, checkedOutAt?: string): Order =>
+    ({ id: table + (checkedOutAt ?? ""), table, createdAt: "2026-10-10T10:05:00Z", status: "cooking", items: [], checkedOutAt }) as Order;
+
+  it("注文のある卓と、受付だけの卓を分ける。空席は対象外", () => {
+    const t = settleTargets(tables, [order("a")]);
+    expect(t.withOrders.map((x) => x.id)).toEqual(["a"]);
+    expect(t.openOnly.map((x) => x.id)).toEqual(["b"]);
+  });
+  it("会計済みの繰越伝票だけの卓は、注文なしとして扱う", () => {
+    const t = settleTargets(tables, [order("b", "2026-10-10T11:00:00Z"), order("d", "2026-10-10T11:00:00Z")]);
+    expect(t.withOrders).toEqual([]);
+    expect(t.openOnly.map((x) => x.id)).toEqual(["a", "b"]);
+  });
+  it("受付の記録が無くても、注文があれば対象（ローカル開発）", () => {
+    expect(settleTargets([{ id: "x" }], [order("x")]).withOrders.map((x) => x.id)).toEqual(["x"]);
   });
 });

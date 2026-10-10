@@ -8,7 +8,7 @@ import { optionsLabel } from "@/lib/options";
 import { BellIcon } from "@/components/ui/Icon";
 import MoveTableSheet from "@/components/handy/MoveTableSheet";
 import BillSheet from "@/components/handy/BillSheet";
-import { bottomBar, itemName, primaryButton, secondaryButton, statusTag, subText } from "@/components/handy/ui";
+import { bottomBar, card, itemName, primaryButton, secondaryButton, statusTag, subText } from "@/components/handy/ui";
 
 /** 卓画面。この卓のドリンクと提供状況を新しい順に出し、下のボタンから追加注文・卓移動・レジ用の一覧へ */
 export default function TableView({
@@ -48,7 +48,7 @@ export default function TableView({
               gap: "10px",
               background: "var(--amber-bg)",
               border: "1px solid var(--amber-edge)",
-              borderRadius: "8px",
+              borderRadius: "14px",
               padding: "10px 12px",
             }}
           >
@@ -59,7 +59,7 @@ export default function TableView({
               style={{
                 minHeight: "40px",
                 padding: "8px 14px",
-                borderRadius: "8px",
+                borderRadius: "12px",
                 border: "none",
                 background: "var(--amber-dark)",
                 color: "#fff",
@@ -83,10 +83,9 @@ export default function TableView({
               <div
                 key={o.id}
                 style={{
-                  background: "var(--surface)",
-                  borderRadius: "8px",
+                  ...card,
                   // 提供前の伝票は、強調色の太い枠と右上の印で分かるようにする（左の色線は使わない）
-                  border: cooking ? "2.5px solid var(--accent)" : "1.5px solid var(--rule)",
+                  border: cooking ? "2px solid var(--accent)" : card.border,
                   padding: "10px 14px",
                 }}
               >
@@ -100,7 +99,7 @@ export default function TableView({
                       // 提供前は色つき、提供済みは白地に黒文字とチェック。色の濃淡だけに頼らない
                       background: cooking ? "var(--accent)" : "var(--surface)",
                       color: cooking ? "var(--accent-ink)" : "var(--text)",
-                      border: cooking ? "1.5px solid var(--accent)" : "1.5px solid var(--rule)",
+                      border: cooking ? "1.5px solid var(--accent)" : "1.5px solid var(--hairline-strong)",
                     }}
                   >
                     {cooking ? "提供前" : "✓ 提供済み"}

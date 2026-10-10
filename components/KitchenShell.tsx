@@ -56,6 +56,7 @@ export default function KitchenShell() {
 
   return (
     <div
+      className="kitchen-ui"
       style={{
         minHeight: "100dvh",
         background: "var(--app-bg)",
@@ -83,7 +84,7 @@ export default function KitchenShell() {
         {isSupabaseConfigured() && (
           <button
             onClick={() => getSupabase()?.auth.signOut()}
-            style={{ ...smallButton, background: "transparent", color: "var(--text-2)", fontSize: "13px" }}
+            style={{ ...smallButton, border: "none", background: "transparent", boxShadow: "none", color: "var(--text-2)", fontSize: "13px" }}
           >
             ログアウト
           </button>

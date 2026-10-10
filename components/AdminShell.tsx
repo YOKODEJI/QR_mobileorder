@@ -46,6 +46,11 @@ export default function AdminShell() {
   const staffRole = useAppStore((s) => s.staffRole);
   const loading = isSupabaseConfigured() && !loaded;
   const tabs = tabsFor(staffRole);
+  // ハンディの店は金額を持たない（会計はレジ）ので、タブの名前から「会計」を外す
+  const handy = useAppStore((s) => s.settings.orderMode === "handy");
+  const segments = MGMT_SEGMENTS.filter((seg) => tabs.includes(seg.value)).map((seg) =>
+    handy && seg.value === "staff" ? { ...seg, label: "テーブル" } : handy && seg.value === "history" ? { ...seg, label: "卓の履歴" } : seg
+  );
   const isOwner = staffRole === null || staffRole === "owner";
 
   const tabPager = useSwipePager({
@@ -122,7 +127,7 @@ export default function AdminShell() {
           {tabs.length > 1 && (
             <div className="admin-tabs no-scrollbar">
               <SegmentedControl
-                segments={MGMT_SEGMENTS.filter((seg) => tabs.includes(seg.value))}
+                segments={segments}
                 value={tabs.includes(mgmtTab) ? mgmtTab : tabs[0]}
                 onChange={setMgmt}
               />

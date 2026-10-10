@@ -13,7 +13,7 @@ import TableGrid from "@/components/handy/TableGrid";
 import TableView from "@/components/handy/TableView";
 import OrderEntry from "@/components/handy/OrderEntry";
 import TableEditSheet from "@/components/handy/TableEditSheet";
-import { PHONE_MAX_WIDTH, smallButton } from "@/components/handy/ui";
+import { PHONE_MAX_WIDTH, glassBar, smallButton } from "@/components/handy/ui";
 import { STAFF_CAN_EDIT_TABLES } from "@/lib/storeRules";
 
 type View = { name: "tables" } | { name: "table"; id: string } | { name: "order"; id: string };
@@ -123,8 +123,11 @@ export default function HandyShell() {
         flexDirection: "column",
       }}
     >
+      {/* すりガラスの背後に敷く、店の色の光 */}
+      <div aria-hidden className="ambient-wash" />
       <header
         style={{
+          ...glassBar,
           position: "sticky",
           top: 0,
           zIndex: 30,
@@ -133,8 +136,8 @@ export default function HandyShell() {
           gap: "8px",
           height: "var(--handy-header-h)",
           padding: "env(safe-area-inset-top) 12px 0",
-          background: "var(--surface)",
-          borderBottom: "1.5px solid var(--text)",
+          borderBottom: "1px solid var(--glass-edge)",
+          boxShadow: "inset 0 1px 0 var(--glass-spec)",
         }}
       >
         {view.name !== "tables" && (
@@ -168,14 +171,14 @@ export default function HandyShell() {
         {view.name === "tables" && isSupabaseConfigured() && (
           <button
             onClick={() => getSupabase()?.auth.signOut()}
-            style={{ ...smallButton, border: "none", background: "transparent", color: "var(--text-2)", padding: "8px 4px" }}
+            style={{ ...smallButton, border: "none", background: "transparent", boxShadow: "none", color: "var(--text-2)", padding: "8px 4px" }}
           >
             ログアウト
           </button>
         )}
       </header>
 
-      <main style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+      <main style={{ flex: 1, display: "flex", flexDirection: "column", position: "relative" }}>
         {loading ? (
           <LoadingScreen />
         ) : staffRole === "kitchen" ? (

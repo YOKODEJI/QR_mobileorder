@@ -53,7 +53,7 @@ export default function SoldOutSheet({ onClose }: { onClose: () => void }) {
             style={{
               ...rowCard,
               padding: "14px 16px",
-              background: m.soldOut ? "var(--red-bg-2)" : "var(--surface)",
+              ...(m.soldOut ? { background: "var(--red-bg-2)" } : {}),
             }}
           >
             <span style={{ flex: 1, minWidth: 0 }}>

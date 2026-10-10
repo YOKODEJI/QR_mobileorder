@@ -7,6 +7,7 @@ import { hm, elapsedMin, useNow } from "@/lib/time";
 import { BellIcon, BellSlashIcon, WarningIcon } from "@/components/ui/Icon";
 import { optionsLabel } from "@/lib/options";
 import SoldOutSheet from "@/components/kitchen/SoldOutSheet";
+import { card } from "@/components/handy/ui";
 
 /** 提供前伝票の経過時間による色エスカレーション */
 function ticketHeaderColor(status: "cooking" | "served", elapsed: number | null): string {
@@ -23,7 +24,7 @@ const pill: React.CSSProperties = {
   gap: "6px",
   minHeight: "36px",
   padding: "8px 12px",
-  borderRadius: "8px",
+  borderRadius: "12px",
   fontSize: "14px",
   fontWeight: 700,
   border: "none",
@@ -34,7 +35,7 @@ const notice: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: "10px",
-  borderRadius: "8px",
+  borderRadius: "16px",
   padding: "12px 16px",
   marginBottom: "16px",
 };
@@ -187,10 +188,9 @@ export default function KitchenDisplay() {
                 key={o.id}
                 aria-label={`${s.tableName(o.table)} の伝票`}
                 style={{
-                  background: "var(--surface)",
-                  borderRadius: "10px",
-                  // 影は使わず、罫線の枠で区切る
-                  border: highlight ? "2.5px solid var(--red)" : "1.5px solid var(--rule)",
+                  ...card,
+                  borderRadius: "18px",
+                  border: highlight ? "2.5px solid var(--red)" : card.border,
                   overflow: "hidden",
                   animation: highlight ? "kpulse 1s ease-out 2" : undefined,
                 }}
@@ -250,7 +250,7 @@ export default function KitchenDisplay() {
                       marginTop: "10px",
                       minHeight: "46px",
                       padding: "11px",
-                      borderRadius: "8px",
+                      borderRadius: "12px",
                       border: "none",
                       fontFamily: "inherit",
                       fontSize: "15px",

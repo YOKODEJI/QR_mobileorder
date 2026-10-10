@@ -6,7 +6,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { tableSummary } from "@/lib/handy";
 import Sheet from "@/components/handy/Sheet";
-import { disabledLook } from "@/components/handy/ui";
+import { disabledLook, glassPanel } from "@/components/handy/ui";
 
 /** 卓移動。相席は無い運用なので、空いている卓だけを候補に出す */
 export default function MoveTableSheet({
@@ -63,9 +63,8 @@ export default function MoveTableSheet({
               style={{
                 minHeight: "72px",
                 padding: "10px",
-                borderRadius: "10px",
-                border: "1.5px solid var(--rule)",
-                background: "var(--surface)",
+                ...glassPanel,
+                borderRadius: "16px",
                 fontFamily: "inherit",
                 fontSize: "26px",
                 fontWeight: 800,

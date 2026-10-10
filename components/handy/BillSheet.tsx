@@ -5,7 +5,7 @@ import { useShallow } from "zustand/react/shallow";
 import { useAppStore } from "@/store/useAppStore";
 import { billLines } from "@/lib/handy";
 import Sheet from "@/components/handy/Sheet";
-import { disabledLook, itemName, primaryButton, subText } from "@/components/handy/ui";
+import { card, disabledLook, itemName, primaryButton, subText } from "@/components/handy/ui";
 
 /** レジ用の一覧。USENレジに打ち込むときに見る（金額は持たないので品名・杯数・飲み方だけ）。
  *  「レジで会計した」で卓を閉じる（close_table。未提供の分は厨房に残る） */
@@ -70,7 +70,7 @@ export default function BillSheet({
       {lines.length === 0 ? (
         <div style={{ textAlign: "center", color: "var(--text-2)", fontSize: "16px", padding: "30px 0" }}>注文はありません</div>
       ) : (
-        <div style={{ background: "var(--surface)", border: "1.5px solid var(--rule)", borderRadius: "8px", padding: "4px 14px" }}>
+        <div style={{ ...card, padding: "4px 14px" }}>
           {lines.map((l, i) => (
             <div
               key={i}
@@ -95,7 +95,7 @@ export default function BillSheet({
               display: "flex",
               justifyContent: "space-between",
               padding: "10px 0",
-              borderTop: "1.5px solid var(--text)",
+              borderTop: "1.5px solid var(--hairline-strong)",
               fontSize: "18px",
               fontWeight: 800,
             }}

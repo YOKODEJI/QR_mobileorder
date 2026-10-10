@@ -12,6 +12,7 @@ import { computeCheckoutBreakdown, type DiscountType } from "@/lib/pricing";
 import { cartKey, parseCartKey, lineTotal, unitPrice, optionsLabel } from "@/lib/options";
 import { useSwipePager } from "@/lib/useSwipePager";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { settleTargets } from "@/lib/handy";
 
 export default function StaffCheckout() {
   const s = useAppStore(
@@ -23,6 +24,7 @@ export default function StaffCheckout() {
       avail: st.avail,
       cancelUnit: st.cancelUnit,
       confirmCheckout: st.confirmCheckout,
+      confirmCheckoutAll: st.confirmCheckoutAll,
       confirmCloseTableGate: st.confirmCloseTableGate,
       confirmDeleteTable: st.confirmDeleteTable,
       confirmOpenTable: st.confirmOpenTable,
@@ -59,6 +61,10 @@ export default function StaffCheckout() {
   );
   const accent = s.settings.theme;
   const supabaseOn = isSupabaseConfigured();
+  // ハンディの店は金額を持たない（会計はレジ）。金額・割引・税の表示は出さない
+  const handy = s.settings.orderMode === "handy";
+  const settle = settleTargets(s.tables, s.orders);
+  const settleCount = settle.withOrders.length + settle.openOnly.length;
   const photoById: Record<string, string> = {};
   s.menu.forEach((m) => {
     if (m.photo) photoById[m.id] = m.photo;
@@ -173,8 +179,8 @@ export default function StaffCheckout() {
       <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
         {/* テーブル一覧（幅に合わせて2〜6列。スマホでは2列） */}
         <div style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", padding: "16px 18px", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", gap: "6px" }}>
-            <span style={{ fontSize: "16px", fontWeight: 800 }}>テーブル一覧</span>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", gap: "6px", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "16px", fontWeight: 800, whiteSpace: "nowrap" }}>テーブル一覧</span>
             {s.tableEditMode ? (
               <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
                 <button
@@ -211,23 +217,47 @@ export default function StaffCheckout() {
                 </button>
               </div>
             ) : (
-              <button
-                onClick={() => s.setTableEditMode(true)}
-                style={{
-                  border: "none",
-                  background: "var(--control-tint)",
-                  borderRadius: "8px",
-                  padding: "6px 14px",
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  fontFamily: "inherit",
-                  cursor: "pointer",
-                  color: "var(--text)",
-                  flexShrink: 0,
-                }}
-              >
-                テーブル編集
-              </button>
+              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: "6px" }}>
+                {/* 閉店時などに、着席中の卓をまとめて清算して閉じる */}
+                <button
+                  onClick={s.confirmCheckoutAll}
+                  disabled={settleCount === 0}
+                  style={{
+                    border: "1px solid var(--red-bg)",
+                    background: "var(--surface)",
+                    borderRadius: "8px",
+                    padding: "6px 14px",
+                    minHeight: "36px",
+                    fontSize: "14px",
+                    fontWeight: 700,
+                    fontFamily: "inherit",
+                    cursor: settleCount === 0 ? "default" : "pointer",
+                    color: "var(--red-dark)",
+                    opacity: settleCount === 0 ? 0.45 : 1,
+                    flexShrink: 0,
+                  }}
+                >
+                  全卓を一括清算{settleCount > 0 ? `（${settleCount}）` : ""}
+                </button>
+                <button
+                  onClick={() => s.setTableEditMode(true)}
+                  style={{
+                    border: "none",
+                    background: "var(--control-tint)",
+                    borderRadius: "8px",
+                    padding: "6px 14px",
+                    minHeight: "36px",
+                    fontSize: "14px",
+                    fontWeight: 700,
+                    fontFamily: "inherit",
+                    cursor: "pointer",
+                    color: "var(--text)",
+                    flexShrink: 0,
+                  }}
+                >
+                  テーブル編集
+                </button>
+              </div>
             )}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(132px, 1fr))", gap: "10px" }}>
@@ -411,7 +441,7 @@ export default function StaffCheckout() {
                             ✕
                           </button>
                         </div>
-                      ) : (
+                      ) : handy ? null : (
                         <div
                           style={{
                             marginTop: "8px",
@@ -443,20 +473,26 @@ export default function StaffCheckout() {
             <>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}>
                 <div style={{ fontSize: "23px", fontWeight: 800 }}>{s.tableName(sel)}</div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: "13px", color: "var(--text-2)" }}>
-                    合計{s.settings.taxMode === "exclusive" ? "（税込）" : "（内税）"}
+                {!handy && (
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: "13px", color: "var(--text-2)" }}>
+                      合計{s.settings.taxMode === "exclusive" ? "（税込）" : "（内税）"}
+                    </div>
+                    <div style={{ fontSize: "25px", fontWeight: 800, color: accent }}>
+                      {s.yen(breakdown.total)}
+                    </div>
                   </div>
-                  <div style={{ fontSize: "25px", fontWeight: 800, color: accent }}>
-                    {s.yen(breakdown.total)}
-                  </div>
+                )}
+              </div>
+              {handy ? (
+                <div style={{ marginBottom: "12px" }} />
+              ) : (
+                <div style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "18px", textAlign: "right" }}>
+                  {s.settings.taxMode === "exclusive"
+                    ? `表示価格は税抜です（消費税率 ${s.settings.taxRate}%）`
+                    : "表示価格は税込です"}
                 </div>
-              </div>
-              <div style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "18px", textAlign: "right" }}>
-                {s.settings.taxMode === "exclusive"
-                  ? `表示価格は税抜です（消費税率 ${s.settings.taxRate}%）`
-                  : "表示価格は税込です"}
-              </div>
+              )}
 
               {/* 注文明細 */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px", gap: "8px" }}>
@@ -562,14 +598,18 @@ export default function StaffCheckout() {
                             {optionsLabel(it.options)}
                           </div>
                         )}
-                        <div style={{ fontSize: "13px", color: "var(--text-2)" }}>
-                          {s.yen(unitPrice(it.price, it.options))} × {it.qty}
-                          {it.proxy ? " · 代理あり" : ""}
-                        </div>
+                        {!handy && (
+                          <div style={{ fontSize: "13px", color: "var(--text-2)" }}>
+                            {s.yen(unitPrice(it.price, it.options))} × {it.qty}
+                            {it.proxy ? " · 代理あり" : ""}
+                          </div>
+                        )}
                       </div>
-                      <span style={{ fontSize: "15px", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
-                        {s.yen(lineTotal(it))}
-                      </span>
+                      {!handy && (
+                        <span style={{ fontSize: "15px", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+                          {s.yen(lineTotal(it))}
+                        </span>
+                      )}
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         {s.orderEditMode && (
                           <button
@@ -621,7 +661,7 @@ export default function StaffCheckout() {
               )}
 
               {/* 割引 / チャージ料 / 内訳 */}
-              {aggList.length > 0 && (
+              {aggList.length > 0 && !handy && (
                 <div style={{ marginTop: "18px", paddingTop: "16px", borderTop: "1px solid var(--hairline)" }}>
                   <div style={{ fontSize: "14px", fontWeight: 800, marginBottom: "10px" }}>割引</div>
                   <div style={{ display: "flex", gap: "8px", marginBottom: "10px" }}>
@@ -724,11 +764,15 @@ export default function StaffCheckout() {
                   boxShadow: s.orderEditMode ? "none" : "inset 0 1px 0 rgba(255,255,255,.3)",
                 }}
               >
-                {s.settings.squarePosMode === "mobile_web" ? "Squareで決済する" : "お会計する（卓を閉じる）"}
+                {handy ? "卓を閉じる" : s.settings.squarePosMode === "mobile_web" ? "Squareで決済する" : "お会計する（卓を閉じる）"}
               </button>
               <div style={{ fontSize: "13px", color: s.orderEditMode ? "var(--red)" : "var(--text-2)", marginTop: "8px", textAlign: "center", fontWeight: s.orderEditMode ? 700 : 400 }}>
                 {s.orderEditMode
-                  ? "注文編集を「完了」してからお会計できます。"
+                  ? handy
+                    ? "注文編集を「完了」してから卓を閉じられます。"
+                    : "注文編集を「完了」してからお会計できます。"
+                  : handy
+                  ? "会計はレジで行います。ここでは卓を閉じるだけです。"
                   : s.settings.squarePosMode === "mobile_web"
                   ? "Square POSアプリが開きます。決済が完了するとセッションが締まります。"
                   : "決済は既存のレジで行います。ここでは卓を閉じるだけです。"}
@@ -736,9 +780,9 @@ export default function StaffCheckout() {
 
               {/* 代理注文 */}
               <div style={{ borderTop: "1px solid var(--hairline)", marginTop: "22px", paddingTop: "18px" }}>
-                <div style={{ fontSize: "16px", fontWeight: 800 }}>代理注文</div>
+                <div style={{ fontSize: "16px", fontWeight: 800 }}>{handy ? "注文を追加" : "代理注文"}</div>
                 <div style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "6px" }}>
-                  同じメニューから店員が入力できます
+                  {handy ? "この卓の注文を、ここからも入れられます" : "同じメニューから店員が入力できます"}
                 </div>
                 <div style={{ margin: "0 -6px" }}>
                   <ChipRow value={s.proxyCat} onChange={s.setProxyCat} accent={accent} />
@@ -775,7 +819,7 @@ export default function StaffCheckout() {
                         )}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: "14px", fontWeight: 700 }}>{m.name}</div>
-                          <div style={{ fontSize: "13px", color: "var(--text-2)" }}>{s.yen(m.price)}</div>
+                          {!handy && <div style={{ fontSize: "13px", color: "var(--text-2)" }}>{s.yen(m.price)}</div>}
                         </div>
                         {!orderable ? (
                           <span style={{ fontSize: "13px", color: "var(--text-2)", fontWeight: 700 }}>売切</span>
@@ -835,9 +879,11 @@ export default function StaffCheckout() {
                           >
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}>{label}</div>
-                              <div style={{ fontSize: "13px", color: "var(--text-2)", fontVariantNumeric: "tabular-nums" }}>
-                                {s.yen(unitPrice(m.price, r.opts))}
-                              </div>
+                              {!handy && (
+                                <div style={{ fontSize: "13px", color: "var(--text-2)", fontVariantNumeric: "tabular-nums" }}>
+                                  {s.yen(unitPrice(m.price, r.opts))}
+                                </div>
+                              )}
                             </div>
                             <button
                               onClick={() => s.removeStaff(m.id, r.optionIds)}
@@ -882,7 +928,7 @@ export default function StaffCheckout() {
                     cursor: proxyCount === 0 ? "default" : "pointer",
                   }}
                 >
-                  代理注文を送信（{proxyCount}点）
+                  {handy ? "注文を送信" : "代理注文を送信"}（{proxyCount}点）
                 </button>
               </div>
             </>
@@ -898,6 +944,7 @@ export default function StaffCheckout() {
             options={optionsFor(proxyOptionItem.id)}
             accent={accent}
             yen={s.yen}
+            hidePrice={handy}
             onClose={() => setProxyOptionItem(null)}
             onAdd={(ids) => {
               s.addStaff(proxyOptionItem.id, ids);

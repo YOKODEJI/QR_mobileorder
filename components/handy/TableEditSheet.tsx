@@ -6,7 +6,7 @@ import { useAppStore, type TableRec } from "@/store/useAppStore";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { tableSummary } from "@/lib/handy";
 import Sheet from "@/components/handy/Sheet";
-import { disabledLook, stepButton, textInput } from "@/components/handy/ui";
+import { card, disabledLook, stepButton, textInput } from "@/components/handy/ui";
 
 /** 卓の編集（追加・名前変更・並び替え・削除）。オーナーとスタッフが使う。着席中の卓は削除できない */
 export default function TableEditSheet({ onClose }: { onClose: () => void }) {
@@ -118,9 +118,7 @@ export default function TableEditSheet({ onClose }: { onClose: () => void }) {
                   alignItems: "center",
                   gap: "6px",
                   padding: "8px",
-                  borderRadius: "8px",
-                  background: "var(--surface)",
-                  border: "1.5px solid var(--rule)",
+                  ...card,
                 }}
               >
                 <button

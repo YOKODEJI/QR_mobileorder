@@ -18,7 +18,7 @@ import {
   type SelectedOption,
 } from "@/lib/options";
 import { detectSquarePosPlatform, buildSquarePosUrl } from "@/lib/squarePos";
-import { shiftInList } from "@/lib/handy";
+import { settleTargets, shiftInList } from "@/lib/handy";
 
 export type { MenuOption, SelectedOption };
 
@@ -289,6 +289,17 @@ export interface AppState {
   selectStaffTable: (id: string) => void;
   confirmCheckout: (discountType: DiscountType, discountValue: number, chargeEnabled: boolean) => void;
   checkout: (discountType: DiscountType, discountValue: number, chargeEnabled: boolean) => void;
+  /** 卓を1つ会計して閉じる（未会計の注文が無ければ何もしない）。成功なら true */
+  checkoutTable: (
+    tableId: string,
+    discountType: DiscountType,
+    discountValue: number,
+    chargeEnabled: boolean,
+    quiet?: boolean
+  ) => Promise<boolean>;
+  /** 着席中の卓をすべて清算して閉じる（管理画面）。確認ダイアログ → 実行 */
+  confirmCheckoutAll: () => void;
+  checkoutAll: () => Promise<void>;
   // 決済そのものをSquareで実行する店舗向け(step19)。Square POSアプリを開くところまでを行い、
   // 当店側の会計確定は決済成功のコールバックが返ってから(/admin/square-callback)行う。
   checkoutViaSquare: (discountType: DiscountType, discountValue: number, chargeEnabled: boolean) => Promise<void>;
@@ -1215,6 +1226,24 @@ export const useAppStore = create<AppState>((set, get) => ({
       s.settings.taxMode,
       s.settings.taxRate
     );
+    if (s.settings.orderMode === "handy") {
+      set({
+        dialog: {
+          title: s.tableName(t) + " を閉じますか？",
+          body:
+            (unservedCount > 0
+              ? `⚠ 提供前の品が ${unservedCount} 点あります。閉じたあとも、提供が終わるまで厨房に表示され続けます。\n\n`
+              : "") + "会計はレジで行います。ここでは卓を閉じるだけです。",
+          confirmText: "卓を閉じる",
+          danger: false,
+          onConfirm: () => {
+            get().closeDialog();
+            get().checkout(null, 0, false);
+          },
+        },
+      });
+      return;
+    }
     const lines = [`小計 ${s.yen(b.subtotal)}`];
     if (b.discountAmount > 0) lines.push(`割引 −${s.yen(b.discountAmount)}`);
     if (b.chargeAmount > 0) lines.push(`チャージ料 +${s.yen(b.chargeAmount)}`);
@@ -1360,14 +1389,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     window.location.href = url;
   },
   checkout: async (discountType, discountValue, chargeEnabled) => {
-    const s = get();
-    const t = s.selectedStaffTable;
+    const t = get().selectedStaffTable;
     if (t == null) return;
+    const ok = await get().checkoutTable(t, discountType, discountValue, chargeEnabled);
+    if (ok) set({ selectedStaffTable: null, orderEditMode: false });
+  },
+  checkoutTable: async (t, discountType, discountValue, chargeEnabled, quiet = false) => {
+    const s = get();
     const tableOrders = s.orders.filter((o) => o.table === t && !o.checkedOutAt);
-    if (tableOrders.length === 0) {
-      set({ selectedStaffTable: null, orderEditMode: false });
-      return;
-    }
+    if (tableOrders.length === 0) return true;
     // 品目を menuItemId+価格で集約してスナップショット化
     const agg: Record<string, OrderItem> = {};
     let subtotal = 0;
@@ -1432,8 +1462,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       record = dbOk ? fallbackRecord : null;
     }
     if (!record) {
-      get().pushToast("お会計の確定に失敗しました。通信環境を確認し、もう一度お試しください。");
-      return;
+      if (!quiet) get().pushToast("お会計の確定に失敗しました。通信環境を確認し、もう一度お試しください。");
+      return false;
     }
     set((st) => ({
       checkouts: [record, ...st.checkouts],
@@ -1447,13 +1477,95 @@ export const useAppStore = create<AppState>((set, get) => ({
       calls: st.calls.filter((c) => c.table !== t),
       // 会計で卓は自動的に閉じる
       tables: st.tables.map((x) => (x.id === t ? { ...x, openSince: null } : x)),
-      selectedStaffTable: null,
-      orderEditMode: false,
     }));
     // Square会計連携の土台(ベストエフォート)。店舗ごとの連携有無はEdge Function側の
     // stores.square_enabledで判定するため、ここでは常に一律で呼ぶだけでよい。
     // awaitせず結果を待たない＝失敗しても会計フロー自体には一切影響しない。
     db.dbSyncSquare(record.id);
+    return true;
+  },
+  // 全卓の一括清算（閉店時など）。注文のある卓は「割引なし・チャージ料は設定どおり」で会計して閉じ、
+  // 受付だけして注文の無い卓は受付を取り消して閉じる。
+  confirmCheckoutAll: () => {
+    const s = get();
+    if (s.orderEditMode) {
+      get().pushToast("注文編集を「完了」してから清算してください。");
+      return;
+    }
+    const handy = s.settings.orderMode === "handy";
+    const target = settleTargets(s.tables, s.orders);
+    const count = target.withOrders.length + target.openOnly.length;
+    if (count === 0) {
+      get().pushToast("清算する卓がありません。");
+      return;
+    }
+    let total = 0;
+    let unserved = 0;
+    for (const t of target.withOrders) {
+      const tableOrders = s.orders.filter((o) => o.table === t.id && !o.checkedOutAt);
+      const subtotal = tableOrders.reduce((sum, o) => sum + o.items.reduce((x, it) => x + lineTotal(it), 0), 0);
+      total += computeCheckoutBreakdown(subtotal, null, 0, s.settings.chargeRate, s.settings.taxMode, s.settings.taxRate).total;
+      unserved += tableOrders
+        .filter((o) => o.status === "cooking")
+        .reduce((c, o) => c + o.items.reduce((x, it) => x + it.qty, 0), 0);
+    }
+    const names = [
+      ...target.withOrders.map((t) => t.name),
+      ...target.openOnly.map((t) => `${t.name}（注文なし）`),
+    ].join("・");
+    const lines = [`着席中の ${count} 卓をまとめて清算し、すべて閉じます。`, names];
+    if (unserved > 0) {
+      lines.push(`⚠ 提供前の品が ${unserved} 点あります。閉じたあとも、提供が終わるまで厨房に表示され続けます。`);
+    }
+    if (handy) {
+      lines.push("会計はレジで行います。ここでは卓を閉じるだけです。");
+    } else {
+      lines.push(
+        `合計 ${s.yen(total)}（割引なし${s.settings.chargeRate > 0 ? `・チャージ料 ${s.settings.chargeRate}% あり` : ""}）`,
+        "割引を付ける卓や、チャージ料を外す卓があるときは、先にその卓だけ個別に会計してください。",
+        s.settings.squarePosMode === "mobile_web"
+          ? "Squareでの決済は行いません。決済が済んでいる卓を閉じるためのものです。"
+          : "決済は既存のレジで行います。"
+      );
+    }
+    lines.push("この操作は取り消せません。");
+    set({
+      dialog: {
+        title: "すべての卓を清算しますか？",
+        body: lines.join("\n\n"),
+        confirmText: `${count} 卓を清算する`,
+        danger: true,
+        onConfirm: () => {
+          get().closeDialog();
+          get().checkoutAll();
+        },
+      },
+    });
+  },
+  checkoutAll: async () => {
+    const s = get();
+    const target = settleTargets(s.tables, s.orders);
+    const failed: string[] = [];
+    let done = 0;
+    // 金額が絡むので、1卓ずつ順に確定する（まとめて投げて一部だけ失敗、を追えるように）
+    for (const t of target.withOrders) {
+      const ok = await get().checkoutTable(t.id, null, 0, true, true);
+      if (ok) done++;
+      else failed.push(t.name);
+    }
+    for (const t of target.openOnly) {
+      const ok = await db.dbCloseTableGate(t.id);
+      if (ok) {
+        done++;
+        set((st) => ({ tables: st.tables.map((x) => (x.id === t.id ? { ...x, openSince: null } : x)) }));
+      } else failed.push(t.name);
+    }
+    set({ selectedStaffTable: null, orderEditMode: false });
+    get().pushToast(
+      failed.length === 0
+        ? `${done} 卓を清算しました。`
+        : `${done} 卓を清算しました。${failed.join("・")} は清算できませんでした。通信環境を確認し、もう一度お試しください。`
+    );
   },
   cancelUnit: async (menuItemId, options = []) => {
     const t = get().selectedStaffTable;
@@ -1550,7 +1662,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       dialog: {
         title: `${name} の来店受付`,
-        body: "この卓を開いて、QRからのご注文を受け付けます。お客様を案内したらタップしてください。",
+        body:
+          get().settings.orderMode === "handy"
+            ? "お客様を案内した卓を開いて、注文を入れられるようにします。"
+            : "この卓を開いて、QRからのご注文を受け付けます。お客様を案内したらタップしてください。",
         confirmText: "来店受付する",
         danger: false,
         onConfirm: () => {
@@ -1581,13 +1696,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     // 注文が入っている卓は閉じさせない（会計で自動的に閉じるのが正規の経路）
     const hasOrders = s.orders.some((o) => o.table === id && !o.checkedOutAt);
     if (hasOrders) {
-      get().pushToast("注文が入っているため受付を取り消せません。お会計で締めてください。");
+      get().pushToast(
+        s.settings.orderMode === "handy"
+          ? "注文が入っているため受付を取り消せません。「卓を閉じる」で閉じてください。"
+          : "注文が入っているため受付を取り消せません。お会計で締めてください。"
+      );
       return;
     }
     set({
       dialog: {
         title: `${s.tableName(id)} の受付を取り消しますか？`,
-        body: "誤って受付した場合の取消です。この卓のQRからの注文を再び停止します。",
+        body:
+          s.settings.orderMode === "handy"
+            ? "誤って受付した場合の取消です。この卓を空席に戻します。"
+            : "誤って受付した場合の取消です。この卓のQRからの注文を再び停止します。",
         confirmText: "受付を取り消す",
         danger: true,
         onConfirm: () => {
@@ -2074,6 +2196,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((st) => ({
       categories: [...st.categories, name],
       newCategoryName: "",
+      newCat: name, // 続けてこのカテゴリの品を足せるように
     }));
   },
   startEditCategory: (name) => set({ editingCategoryName: name, editCategoryNameValue: name }),

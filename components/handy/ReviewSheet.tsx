@@ -5,7 +5,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { parseCartKey, optionsLabel, freeOptions, choiceGroups, countSteps } from "@/lib/options";
 import Sheet from "@/components/handy/Sheet";
 import CountStepper from "@/components/handy/CountStepper";
-import { disabledLook, itemName, primaryButton, stepButton, subText, textInput } from "@/components/handy/ui";
+import { card, disabledLook, itemName, primaryButton, stepButton, subText, textInput } from "@/components/handy/ui";
 
 /** 送信前の確認。行ごとに数量・チェック（Cドリンクなど）・備考を直してから厨房へ送る */
 export default function ReviewSheet({
@@ -65,7 +65,7 @@ export default function ReviewSheet({
           return (
             <div
               key={k}
-              style={{ background: "var(--surface)", border: "1.5px solid var(--rule)", borderRadius: "8px", padding: "10px 12px" }}
+              style={{ ...card, padding: "10px 12px" }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 <span style={{ flex: 1, minWidth: 0 }}>
@@ -109,8 +109,8 @@ export default function ReviewSheet({
                           gap: "8px",
                           minHeight: "44px",
                           padding: "6px 14px 6px 10px",
-                          borderRadius: "8px",
-                          border: on ? "2px solid var(--accent)" : "2px solid var(--rule)",
+                          borderRadius: "12px",
+                          border: on ? "2px solid var(--accent)" : "2px solid var(--hairline-strong)",
                           background: on ? "var(--accent)" : "var(--surface)",
                           color: on ? "var(--accent-ink)" : "var(--text)",
                           fontFamily: "inherit",

@@ -35,6 +35,8 @@ export default function CheckoutHistory() {
     }))
   );
   const accent = s.settings.theme;
+  // ハンディの店は金額を持たない（会計はレジ）。いつ・どの卓で・何が出たかだけを見せる
+  const handy = s.settings.orderMode === "handy";
 
   // 新しい順（checkouts は先頭が最新）→ 日付でグループ化
   const groups: { date: string; records: CheckoutRecord[]; total: number }[] = [];
@@ -88,20 +90,22 @@ export default function CheckoutHistory() {
       {/* サマリー */}
       <div style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", padding: "20px 22px", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
         <div>
-          <div style={{ fontSize: "19px", fontWeight: 800 }}>会計履歴</div>
+          <div style={{ fontSize: "19px", fontWeight: 800 }}>{handy ? "卓の履歴" : "会計履歴"}</div>
           <div style={{ fontSize: "13px", color: "var(--text-2)", marginTop: "2px" }}>
-            会計済みのセッションを時刻つきで記録しています。日付・テーブルをタップで開閉できます。
+            {handy ? "閉じた卓の注文" : "会計済みの卓"}を、時刻つきで記録しています。日付・テーブルをタップで開閉できます。
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ fontSize: "13px", color: "var(--text-2)" }}>本日 {todayCount}件</div>
-          <div style={{ fontSize: "23px", fontWeight: 800, color: accent, fontVariantNumeric: "tabular-nums" }}>{s.yen(todayTotal)}</div>
+          {!handy && (
+            <div style={{ fontSize: "23px", fontWeight: 800, color: accent, fontVariantNumeric: "tabular-nums" }}>{s.yen(todayTotal)}</div>
+          )}
         </div>
       </div>
 
       {s.checkouts.length === 0 ? (
         <div style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", padding: "40px 22px", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)", textAlign: "center", color: "var(--text-2)", fontSize: "15px" }}>
-          まだ会計履歴はありません。
+          {handy ? "まだ履歴はありません。" : "まだ会計履歴はありません。"}
         </div>
       ) : (
         groups.map((g) => {
@@ -129,7 +133,7 @@ export default function CheckoutHistory() {
                   <span style={{ fontSize: "15px", fontWeight: 800 }}>{g.date}</span>
                 </span>
                 <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-2)" }}>
-                  {g.records.length}件 · <span style={{ color: accent }}>{s.yen(g.total)}</span>
+                  {g.records.length}件{!handy && <> · <span style={{ color: accent }}>{s.yen(g.total)}</span></>}
                 </span>
               </button>
 
@@ -163,9 +167,11 @@ export default function CheckoutHistory() {
                               </span>
                             </span>
                           </span>
-                          <span style={{ fontSize: "17px", fontWeight: 800, color: accent, flexShrink: 0, marginLeft: "10px" }}>
-                            {s.yen(r.total)}
-                          </span>
+                          {!handy && (
+                            <span style={{ fontSize: "17px", fontWeight: 800, color: accent, flexShrink: 0, marginLeft: "10px" }}>
+                              {s.yen(r.total)}
+                            </span>
+                          )}
                         </button>
                         {recOpen && (
                           <div style={{ padding: "0 8px 12px 30px", display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -187,12 +193,14 @@ export default function CheckoutHistory() {
                                   )}{" "}
                                   <span style={{ color: "var(--text-2)" }}>×{it.qty}</span>
                                 </span>
-                                <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>
-                                  {s.yen(lineTotal(it))}
-                                </span>
+                                {!handy && (
+                                  <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>
+                                    {s.yen(lineTotal(it))}
+                                  </span>
+                                )}
                               </div>
                             ))}
-                            {(r.discountAmount > 0 || r.chargeAmount > 0 || r.taxAmount > 0) && (
+                            {!handy && (r.discountAmount > 0 || r.chargeAmount > 0 || r.taxAmount > 0) && (
                               <div style={{ marginTop: "6px", paddingTop: "6px", borderTop: "1px dashed var(--hairline)", display: "flex", flexDirection: "column", gap: "4px" }}>
                                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px", fontWeight: 600, color: "var(--text-2)" }}>
                                   <span>小計</span>

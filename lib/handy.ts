@@ -172,3 +172,60 @@ export function tableSummary(orders: Order[], tableId: string): TableSummary {
   }
   return { pendingQty, servedQty, orderCount };
 }
+
+export interface TableGridFit {
+  cols: number;
+  /** タイル1つの高さ(px) */
+  tileHeight: number;
+  /** 卓名の文字の大きさ(px) */
+  nameSize: number;
+  /** 画面に入り切らず、縦に流す並びかどうか */
+  scrolls: boolean;
+}
+
+const TILE_MIN_H = 84; // これより低いと卓名と状態が読みにくい
+const TILE_MAX_H = 200; // 卓が少ない日に、間延びしすぎないように
+const TILE_MIN_W = 96;
+
+/**
+ * ハンディの卓一覧の並べ方を、卓の数と画面の大きさ（一覧に使える幅・高さ）から決める。
+ * できるだけスクロール無しで全卓が見え、かつタイルが大きくなる列数を選ぶ。
+ * どの列数でも入り切らないときは、列を増やしてタイルを低めにし、縦に流す。
+ */
+export function fitTableGrid(count: number, width: number, height: number, gap = 10): TableGridFit {
+  const tileW = (cols: number) => (width - gap * (cols - 1)) / cols;
+  const nameSize = (w: number, h: number) => Math.max(22, Math.min(40, Math.round(Math.min(h * 0.3, w * 0.24))));
+  if (count <= 0 || width <= 0 || height <= 0) return { cols: 2, tileHeight: 104, nameSize: 30, scrolls: false };
+
+  let best: (TableGridFit & { score: number }) | null = null;
+  for (let cols = 1; cols <= 6; cols++) {
+    const w = tileW(cols);
+    if (cols > 1 && w < TILE_MIN_W) break;
+    const rows = Math.ceil(count / cols);
+    const h = Math.floor((height - gap * (rows - 1)) / rows);
+    if (h < TILE_MIN_H) continue;
+    const tileHeight = Math.min(h, TILE_MAX_H);
+    // 横に長すぎるタイルは、広さのわりに読みやすくならないので割り引く
+    const score = tileHeight * Math.min(w, tileHeight * 2);
+    if (!best || score > best.score) best = { cols, tileHeight, nameSize: nameSize(w, tileHeight), scrolls: false, score };
+  }
+  if (best) return { cols: best.cols, tileHeight: best.tileHeight, nameSize: best.nameSize, scrolls: false };
+
+  // 入り切らない: 幅が許すだけ列を増やして（各タイル 104px 以上）、縦に流す
+  let cols = 2;
+  while (cols < 6 && tileW(cols + 1) >= 104) cols++;
+  return { cols, tileHeight: 92, nameSize: nameSize(tileW(cols), 92), scrolls: true };
+}
+
+/** 全卓の一括清算の対象。注文のある卓（会計して閉じる）と、受付だけして注文の無い卓（受付を取り消して閉じる）。
+ *  会計済みの繰越伝票(checkedOutAt)だけが残っている卓は、注文なしとして扱う */
+export function settleTargets<T extends { id: string; openSince?: string | null }>(
+  tables: T[],
+  orders: Order[]
+): { withOrders: T[]; openOnly: T[] } {
+  const hasOrders = new Set(orders.filter((o) => !o.checkedOutAt).map((o) => o.table));
+  return {
+    withOrders: tables.filter((t) => hasOrders.has(t.id)),
+    openOnly: tables.filter((t) => !hasOrders.has(t.id) && !!t.openSince),
+  };
+}

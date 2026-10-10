@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { parseBulkMenu } from "@/lib/handy";
 
-/** メニューのまとめて登録（ハンディモードの店向け。金額・在庫は持たないので品名とカテゴリだけ） */
+/** 品をまとめて追加する（ハンディモードの店向け。金額・在庫は持たないので品名だけ）。
+ *  「商品を追加」の枠の中に、ふだんは閉じた1行として置く。開くと、1行に1品ずつ書く欄が出る */
 export default function BulkAddMenu({ defaultCat }: { defaultCat: string }) {
   const bulkAddMenu = useAppStore((s) => s.bulkAddMenu);
   const pushToast = useAppStore((s) => s.pushToast);
+  const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const items = parseBulkMenu(text, defaultCat);
@@ -21,48 +23,75 @@ export default function BulkAddMenu({ defaultCat }: { defaultCat: string }) {
     const skipped = items.length - added;
     pushToast(`${added}品を追加しました${skipped > 0 ? `（すでにある${skipped}品は飛ばしました）` : ""}`);
     setText("");
+    setOpen(false);
   };
 
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        style={{
+          marginTop: "12px",
+          padding: "6px 0",
+          border: "none",
+          background: "transparent",
+          color: "var(--accent)",
+          fontFamily: "inherit",
+          fontSize: "14px",
+          fontWeight: 700,
+          cursor: "pointer",
+        }}
+      >
+        ＋ 何品かまとめて追加する
+      </button>
+    );
+  }
+
   return (
-    <div
-      style={{
-        background: "var(--glass)",
-        backdropFilter: "blur(22px) saturate(180%)",
-        WebkitBackdropFilter: "blur(22px) saturate(180%)",
-        border: "1px solid var(--glass-edge)",
-        borderRadius: "22px",
-        padding: "20px 22px",
-        boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)",
-      }}
-    >
-      <div style={{ fontSize: "17px", fontWeight: 800 }}>まとめて登録</div>
-      <div style={{ fontSize: "12px", color: "var(--text-2)", margin: "4px 0 12px", lineHeight: 1.6 }}>
-        1行に1品。「焼酎 / 富乃宝山」のようにカテゴリを付けるか、「【焼酎】」の行の下に品名を並べます。
-        無いカテゴリは自動で作り、同じカテゴリに同じ名前がある品は飛ばします。
+    <div style={{ marginTop: "14px", paddingTop: "14px", borderTop: "1px solid var(--hairline)" }}>
+      <div style={{ fontSize: "14px", fontWeight: 800 }}>まとめて追加</div>
+      <div style={{ fontSize: "13px", color: "var(--text-2)", margin: "4px 0 10px", lineHeight: 1.6 }}>
+        1行に1品ずつ書くと、上で選んだカテゴリ「{defaultCat}」にまとめて入ります。同じ名前の品は飛ばします。
       </div>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        rows={8}
-        placeholder={"【焼酎】\n富乃宝山\n佐藤 黒\nワイン / CAVA"}
-        aria-label="まとめて登録する品目"
+        rows={5}
+        placeholder={"富乃宝山\n佐藤 黒\n赤霧島"}
+        aria-label="まとめて追加する品名（1行に1品）"
         style={{
           width: "100%",
           padding: "12px 14px",
           borderRadius: "12px",
           border: "none",
           background: "var(--hairline)",
-          fontSize: "15px",
+          fontSize: "16px",
           fontFamily: "inherit",
           color: "var(--text)",
           resize: "vertical",
           lineHeight: 1.6,
         }}
       />
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginTop: "10px" }}>
-        <span style={{ fontSize: "13px", color: "var(--text-2)" }}>
-          {items.length > 0 ? `${items.length}品を読み取りました` : ""}
-        </span>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "8px", marginTop: "10px" }}>
+        <button
+          onClick={() => {
+            setOpen(false);
+            setText("");
+          }}
+          style={{
+            padding: "11px 16px",
+            borderRadius: "8px",
+            border: "none",
+            background: "var(--control-tint)",
+            color: "var(--text-2)",
+            fontFamily: "inherit",
+            fontSize: "14px",
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          やめる
+        </button>
         <button
           onClick={submit}
           disabled={busy || items.length === 0}
@@ -78,7 +107,7 @@ export default function BulkAddMenu({ defaultCat }: { defaultCat: string }) {
             cursor: busy || items.length === 0 ? "default" : "pointer",
           }}
         >
-          {busy ? "登録中…" : "まとめて登録"}
+          {busy ? "追加中…" : items.length > 0 ? `${items.length}品を追加` : "追加"}
         </button>
       </div>
     </div>

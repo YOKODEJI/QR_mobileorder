@@ -178,6 +178,9 @@ export default function SettingsSheet() {
           />
         </div>
 
+        {/* お客様の注文ページの写真と、税・チャージ料。ハンディの店はお客様のQR注文も金額も使わないので出さない */}
+        {settings.orderMode !== "handy" && (
+          <>
         {/* 写真表示（管理画面から設定。客用は表示のみ） */}
         <div style={labelStyle}>客用ページの写真</div>
         <div style={{ background: "var(--surface)", borderRadius: "14px", overflow: "hidden" }}>
@@ -321,6 +324,9 @@ export default function SettingsSheet() {
         <div style={{ fontSize: "12px", color: "var(--text-2)", margin: "10px 8px 0", lineHeight: 1.5 }}>
           会計時に自動で反映されます。チャージ料は0%で無しになります。
         </div>
+
+          </>
+        )}
 
         {/* アプリアイコン（この管理画面をホーム画面に追加した際のアイコン） */}
         <div style={{ ...labelStyle, marginTop: "20px" }}>アプリアイコン</div>

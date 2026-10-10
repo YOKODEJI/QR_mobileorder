@@ -32,7 +32,7 @@ function DragDots() {
 /* 商品ごとのオプション編集ボタン + モーダル。
    オプションは商品ごとの個別設定なので、この中で追加・編集・削除まで完結させる。
    行が横に長くなりすぎないよう、編集UIはモーダルに逃がしている。 */
-function ItemOptionsButton({ item, accent }: { item: MenuItem; accent: string }) {
+function ItemOptionsButton({ item, accent, showPrice }: { item: MenuItem; accent: string; showPrice: boolean }) {
   const options = useAppStore((s) => s.itemOptions[item.id]);
   const addOption = useAppStore((s) => s.addOption);
   const updateOption = useAppStore((s) => s.updateOption);
@@ -116,7 +116,7 @@ function ItemOptionsButton({ item, accent }: { item: MenuItem; accent: string })
               {item.name} のオプション
             </div>
             <div style={{ fontSize: "12px", color: "var(--text-2)", margin: "4px 0 14px" }}>
-              この商品の注文時に選べる選択肢です。追加料金は0円やマイナス（値引き）も設定できます。
+              この商品の注文時に選べる選択肢です。{showPrice ? "追加料金は0円やマイナス（値引き）も設定できます。" : ""}
             </div>
 
             <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "14px" }}>
@@ -129,6 +129,7 @@ function ItemOptionsButton({ item, accent }: { item: MenuItem; accent: string })
                 }}
                 style={{ ...insetInput, flex: "2 1 120px", minWidth: 0 }}
               />
+              {showPrice && (
               <input
                 type="number"
                 placeholder="料金"
@@ -139,6 +140,7 @@ function ItemOptionsButton({ item, accent }: { item: MenuItem; accent: string })
                 }}
                 style={{ ...insetInput, width: "84px", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
               />
+              )}
               <button
                 onClick={submit}
                 style={{
@@ -193,7 +195,7 @@ function ItemOptionsButton({ item, accent }: { item: MenuItem; accent: string })
                         color: "var(--text)",
                       }}
                     />
-                    <div style={{ display: "flex", alignItems: "center", gap: "2px", flexShrink: 0 }}>
+                    <div style={{ display: showPrice ? "flex" : "none", alignItems: "center", gap: "2px", flexShrink: 0 }}>
                       <span style={{ fontSize: "14px", color: "var(--text-2)" }}>¥</span>
                       <input
                         type="number"
@@ -508,9 +510,132 @@ export default function MenuManagement() {
             追加
           </button>
         </div>
+        {!showPrice && <BulkAddMenu defaultCat={s.newCat} />}
       </div>
 
-      {!showPrice && <BulkAddMenu defaultCat={s.newCat} />}
+      {/* カテゴリ（追加・名前の変更・削除）。メニューの一覧より上に置く */}
+      <div style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", padding: "20px 22px", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)" }}>
+        <div style={{ fontSize: "17px", fontWeight: 800, marginBottom: "4px" }}>カテゴリ</div>
+        <div style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "14px" }}>
+          名前を入れて「追加」。名前を変えるときは下のカテゴリ名を、消すときは ✕ を押します（消したカテゴリの品は「その他」へ移ります）。
+        </div>
+        <div style={{ display: "flex", gap: "10px", marginBottom: "14px" }}>
+          <input
+            placeholder="新しいカテゴリ名（例: 日本酒）"
+            value={s.newCategoryName}
+            onChange={(e) => s.setNewCategoryName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") s.addCategory();
+            }}
+            style={{ ...insetInput, flex: 1 }}
+          />
+          <button
+            onClick={s.addCategory}
+            disabled={!s.newCategoryName.trim()}
+            style={{
+              ...pill,
+              border: "none",
+              background: s.newCategoryName.trim() ? accent : "var(--hairline)",
+              color: s.newCategoryName.trim() ? "#fff" : "var(--text-3)",
+              padding: "11px 22px",
+              fontSize: "14px",
+            }}
+          >
+            追加
+          </button>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+          {s.categories.map((c) => {
+            if (s.editingCategoryName === c) {
+              return (
+                <span
+                  key={c}
+                  style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+                >
+                  <input
+                    autoFocus
+                    value={s.editCategoryNameValue}
+                    onChange={(e) => s.setEditCategoryNameValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") s.saveEditCategory();
+                    }}
+                    onBlur={s.saveEditCategory}
+                    style={{
+                      border: "none",
+                      background: "var(--surface)",
+                      boxShadow: `0 0 0 2px ${accent}`,
+                      color: "var(--text)",
+                      borderRadius: "8px",
+                      padding: "6px 14px",
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      fontFamily: "inherit",
+                      width: "120px",
+                    }}
+                  />
+                </span>
+              );
+            }
+            return (
+              <span
+                key={c}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  background: "var(--hairline)",
+                  color: "var(--text)",
+                  borderRadius: "8px",
+                  padding: "6px 8px 6px 14px",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                }}
+              >
+                {c !== "その他" ? (
+                  <button
+                    onClick={() => s.startEditCategory(c)}
+                    aria-label={c + "の名前を変更"}
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      color: "var(--text)",
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      fontFamily: "inherit",
+                      cursor: "pointer",
+                      padding: 0,
+                    }}
+                  >
+                    {c}
+                  </button>
+                ) : (
+                  <span>{c}</span>
+                )}
+                {c !== "その他" && (
+                  <button
+                    onClick={() => s.confirmDeleteCategory(c)}
+                    aria-label={c + "を削除"}
+                    style={{
+                      width: "28px",
+                      height: "28px",
+                      borderRadius: "50%",
+                      border: "none",
+                      background: accent,
+                      color: "#fff",
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      lineHeight: 1,
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </span>
+            );
+          })}
+        </div>
+      </div>
 
       {/* メニュー管理 */}
       <div
@@ -589,7 +714,7 @@ export default function MenuManagement() {
                   alignItems: "center",
                   gap: "14px",
                   padding: "12px 20px",
-                  minWidth: "780px",
+                  minWidth: showPrice || showStock ? "780px" : "0",
                   borderBottom: "1px solid var(--hairline-2)",
                   background: dragging
                     ? "rgba(238,243,255,.5)"
@@ -722,7 +847,7 @@ export default function MenuManagement() {
                 )}
 
                 {/* この商品に出すオプション */}
-                <ItemOptionsButton item={m} accent={accent} />
+                <ItemOptionsButton item={m} accent={accent} showPrice={showPrice} />
 
                 {/* 停止 / 再販 */}
                 <button
@@ -742,130 +867,6 @@ export default function MenuManagement() {
           })}
         </div>
         ))}
-      </div>
-
-      {/* カテゴリ管理 */}
-      <div style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", padding: "20px 22px", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)" }}>
-        <div style={{ fontSize: "17px", fontWeight: 800, marginBottom: "4px" }}>カテゴリ管理</div>
-        <div style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "14px" }}>
-          カテゴリを追加・削除・名前変更できます。削除すると、そのカテゴリのメニューは「その他」に移動します。
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "16px" }}>
-          {s.categories.map((c) => {
-            if (s.editingCategoryName === c) {
-              return (
-                <span
-                  key={c}
-                  style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
-                >
-                  <input
-                    autoFocus
-                    value={s.editCategoryNameValue}
-                    onChange={(e) => s.setEditCategoryNameValue(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") s.saveEditCategory();
-                    }}
-                    onBlur={s.saveEditCategory}
-                    style={{
-                      border: "none",
-                      background: "var(--surface)",
-                      boxShadow: `0 0 0 2px ${accent}`,
-                      color: "var(--text)",
-                      borderRadius: "8px",
-                      padding: "6px 14px",
-                      fontSize: "13px",
-                      fontWeight: 700,
-                      fontFamily: "inherit",
-                      width: "120px",
-                    }}
-                  />
-                </span>
-              );
-            }
-            return (
-              <span
-                key={c}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  background: "var(--hairline)",
-                  color: "var(--text)",
-                  borderRadius: "8px",
-                  padding: "6px 8px 6px 14px",
-                  fontSize: "13px",
-                  fontWeight: 700,
-                }}
-              >
-                {c !== "その他" ? (
-                  <button
-                    onClick={() => s.startEditCategory(c)}
-                    aria-label={c + "の名前を変更"}
-                    style={{
-                      border: "none",
-                      background: "transparent",
-                      color: "var(--text)",
-                      fontSize: "13px",
-                      fontWeight: 700,
-                      fontFamily: "inherit",
-                      cursor: "pointer",
-                      padding: 0,
-                    }}
-                  >
-                    {c}
-                  </button>
-                ) : (
-                  <span>{c}</span>
-                )}
-                {c !== "その他" && (
-                  <button
-                    onClick={() => s.confirmDeleteCategory(c)}
-                    aria-label={c + "を削除"}
-                    style={{
-                      width: "28px",
-                      height: "28px",
-                      borderRadius: "50%",
-                      border: "none",
-                      background: accent,
-                      color: "#fff",
-                      fontSize: "11px",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      lineHeight: 1,
-                    }}
-                  >
-                    ✕
-                  </button>
-                )}
-              </span>
-            );
-          })}
-        </div>
-        <div style={{ display: "flex", gap: "10px" }}>
-          <input
-            placeholder="新しいカテゴリ名"
-            value={s.newCategoryName}
-            onChange={(e) => s.setNewCategoryName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") s.addCategory();
-            }}
-            style={{ ...insetInput, flex: 1 }}
-          />
-          <button
-            onClick={s.addCategory}
-            disabled={!s.newCategoryName.trim()}
-            style={{
-              ...pill,
-              border: "none",
-              background: s.newCategoryName.trim() ? accent : "var(--hairline)",
-              color: s.newCategoryName.trim() ? "#fff" : "var(--text-3)",
-              padding: "11px 22px",
-              fontSize: "14px",
-            }}
-          >
-            追加
-          </button>
-        </div>
       </div>
     </div>
   );

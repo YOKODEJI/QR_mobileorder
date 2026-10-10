@@ -47,9 +47,8 @@ export default function CountStepper({
         alignItems: "center",
         gap: "12px",
         padding: large ? "14px 16px 18px" : "8px 10px",
-        borderRadius: "8px",
-        background: "var(--inset)",
-        border: "1.5px solid var(--rule)",
+        borderRadius: "14px",
+        background: "var(--chip-tint)",
       }}
     >
       <span style={{ flex: large ? "none" : 1, minWidth: 0, fontSize: large ? "18px" : "16px", fontWeight: 800 }}>{title}</span>
