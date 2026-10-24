@@ -11,6 +11,7 @@ import LoadingScreen from "@/components/ui/LoadingScreen";
 import { smallButton } from "@/components/handy/ui";
 import { useBackGuard } from "@/lib/backGuard";
 import { prepareChime, unlockAudio, playOrderChime } from "@/lib/notifySound";
+import UpdateNotice, { buildLabel } from "@/components/UpdateNotice";
 
 type WakeLockSentinelLike = { release: () => Promise<void> };
 
@@ -112,6 +113,8 @@ export default function KitchenShell() {
         <h1 style={{ margin: 0, fontWeight: 800, fontSize: "17px" }}>
           {storeName}
           <span style={{ fontSize: "13px", color: "var(--text-2)", marginLeft: "8px", fontWeight: 600 }}>厨房</span>
+          {/* どの版が動いているか（古い版のまま動いていないかを確かめる手がかり） */}
+          <span style={{ fontSize: "12px", color: "var(--text-3)", marginLeft: "8px", fontWeight: 500 }}>版 {buildLabel()}</span>
         </h1>
         {isSupabaseConfigured() && (
           <button
@@ -184,6 +187,7 @@ export default function KitchenShell() {
       )}
 
       <SupabaseSync staff />
+      <UpdateNotice />
       <AlertDialog />
       <Toast />
     </div>

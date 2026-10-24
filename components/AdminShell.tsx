@@ -18,6 +18,7 @@ import { useSwipePager } from "@/lib/useSwipePager";
 import type { AppState, StaffRole } from "@/store/useAppStore";
 import { useBackGuard } from "@/lib/backGuard";
 import { prepareChime, unlockAudio } from "@/lib/notifySound";
+import UpdateNotice from "@/components/UpdateNotice";
 
 const FONT = "var(--font-ui)";
 
@@ -230,6 +231,7 @@ export default function AdminShell() {
       </main>
 
       <SupabaseSync staff />
+      <UpdateNotice />
       <SettingsSheet />
       <AlertDialog />
       <Toast />

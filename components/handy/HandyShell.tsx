@@ -17,6 +17,7 @@ import SentView, { type SentLine } from "@/components/handy/SentView";
 import { PHONE_MAX_WIDTH, glassBar, smallButton } from "@/components/handy/ui";
 import { STAFF_CAN_EDIT_TABLES } from "@/lib/storeRules";
 import { useBackGuard, useBackHandler } from "@/lib/backGuard";
+import UpdateNotice from "@/components/UpdateNotice";
 
 type View =
   | { name: "tables" }
@@ -238,6 +239,7 @@ export default function HandyShell() {
       {editingTables && <TableEditSheet onClose={() => setEditingTables(false)} />}
 
       <SupabaseSync staff />
+      <UpdateNotice />
       <AlertDialog />
       <Toast />
     </div>

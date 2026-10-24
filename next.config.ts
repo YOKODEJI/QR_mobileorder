@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
+// 公開した版の印（ビルドした時刻）。端末が古い版のまま動いていないかを確かめるのに使う（components/UpdateNotice.tsx）
+const BUILD_ID = new Date().toISOString();
+
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_BUILD_ID: BUILD_ID },
   async headers() {
     return [
       {
