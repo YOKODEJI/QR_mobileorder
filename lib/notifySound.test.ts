@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PARTIALS, STRIKES, ATTACK_SEC } from "./notifySound";
+import { PARTIALS, STRIKES, ATTACK_SEC, encodeWav } from "./notifySound";
 
 /** scheduleChime と同じ包絡（直線で立ち上がり、指数で消える）で波形を計算する */
 function render(sampleRate = 22050, seconds = 3.6): Float64Array {
@@ -38,5 +38,22 @@ describe("通知音（厨房）", () => {
     const from = Math.round(0.5 * 22050);
     const tail = wave.slice(from, from + 2205).reduce((m, x) => Math.max(m, Math.abs(x)), 0);
     expect(tail).toBeGreaterThan(0.2);
+  });
+});
+
+describe("encodeWav（<audio> で鳴らすための書き出し）", () => {
+  it("16bit・モノラルの WAV になり、範囲外の値は丸める", () => {
+    const buf = encodeWav(new Float32Array([0, 0.5, -1, 2]), 44100);
+    const v = new DataView(buf);
+    const text = (at: number, n: number) => String.fromCharCode(...Array.from({ length: n }, (_, i) => v.getUint8(at + i)));
+    expect(text(0, 4)).toBe("RIFF");
+    expect(text(8, 4)).toBe("WAVE");
+    expect(v.getUint16(22, true)).toBe(1); // モノラル
+    expect(v.getUint32(24, true)).toBe(44100);
+    expect(v.getUint32(40, true)).toBe(8); // 4標本×2バイト
+    expect(buf.byteLength).toBe(44 + 8);
+    expect(v.getInt16(46, true)).toBe(16383); // 0.5 × 32767 の小数は切り捨て
+    expect(v.getInt16(48, true)).toBe(-32768);
+    expect(v.getInt16(50, true)).toBe(32767);
   });
 });

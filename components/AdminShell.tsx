@@ -17,6 +17,7 @@ import LoadingScreen from "@/components/ui/LoadingScreen";
 import { useSwipePager } from "@/lib/useSwipePager";
 import type { AppState, StaffRole } from "@/store/useAppStore";
 import { useBackGuard } from "@/lib/backGuard";
+import { prepareChime, unlockAudio } from "@/lib/notifySound";
 
 const FONT = "var(--font-ui)";
 
@@ -71,6 +72,21 @@ export default function AdminShell() {
   useEffect(() => {
     syncSoundPref();
   }, [syncSoundPref]);
+
+  // 管理画面の「厨房」でも通知音を鳴らすので、画面に触れるたびに音声を開放しておく
+  // （iPadは、触れた操作の中で開放しておかないと、通信で届いた注文の音が鳴らない）
+  useEffect(() => {
+    void prepareChime();
+    const unlock = () => {
+      if (document.visibilityState === "visible") unlockAudio();
+    };
+    document.addEventListener("pointerdown", unlock);
+    document.addEventListener("visibilitychange", unlock);
+    return () => {
+      document.removeEventListener("pointerdown", unlock);
+      document.removeEventListener("visibilitychange", unlock);
+    };
+  }, []);
 
   return (
     <div

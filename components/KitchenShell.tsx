@@ -10,6 +10,7 @@ import Toast from "@/components/ui/Toast";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 import { smallButton } from "@/components/handy/ui";
 import { useBackGuard } from "@/lib/backGuard";
+import { prepareChime, unlockAudio, playOrderChime } from "@/lib/notifySound";
 
 type WakeLockSentinelLike = { release: () => Promise<void> };
 
@@ -22,8 +23,30 @@ export default function KitchenShell() {
   const loading = isSupabaseConfigured() && !loaded;
   // ブラウザは一度画面に触れるまで音を鳴らせない。最初のタップで音と画面点灯の維持を有効にする
   const [started, setStarted] = useState(false);
+  // 画面が自動で消えるのを止められなかった（その端末では、画面が消えると注文も音も届かない）
+  const [wakeLockFailed, setWakeLockFailed] = useState(false);
+  const [wakeHintClosed, setWakeHintClosed] = useState(false);
   // 端末の「戻る」で厨房の画面が閉じないようにする
   useBackGuard();
+
+  // 通知音を先に作っておく（最初のタップの確認音から、消音モードでも消えない鳴らし方にできるように）
+  useEffect(() => {
+    void prepareChime();
+  }, []);
+
+  // iPadは画面を隠す・ロックすると音声が止まる。戻ってきたとき、また画面に触れたときに開放し直す
+  useEffect(() => {
+    if (!started) return;
+    const resume = () => {
+      if (document.visibilityState === "visible") unlockAudio();
+    };
+    document.addEventListener("visibilitychange", resume);
+    document.addEventListener("pointerdown", resume);
+    return () => {
+      document.removeEventListener("visibilitychange", resume);
+      document.removeEventListener("pointerdown", resume);
+    };
+  }, [started]);
 
   useEffect(() => {
     document.documentElement.style.setProperty("--accent", theme);
@@ -38,12 +61,18 @@ export default function KitchenShell() {
     const wl = (navigator as Navigator & {
       wakeLock?: { request: (type: "screen") => Promise<WakeLockSentinelLike> };
     }).wakeLock;
-    if (!wl) return;
+    if (!wl) {
+      void Promise.resolve().then(() => setWakeLockFailed(true));
+      return;
+    }
     let sentinel: WakeLockSentinelLike | null = null;
     const acquire = () =>
       wl.request("screen").then(
-        (s) => (sentinel = s),
-        () => {} // 省電力モード等で拒否されても厨房表示は続ける
+        (s) => {
+          sentinel = s;
+          setWakeLockFailed(false);
+        },
+        () => setWakeLockFailed(true) // 省電力モード等で拒否されても厨房表示は続ける（案内だけ出す）
       );
     // 画面を隠すと自動で解除されるので、戻ってきたら取り直す
     const onVisible = () => {
@@ -94,13 +123,45 @@ export default function KitchenShell() {
         )}
       </header>
 
+      {started && wakeLockFailed && !wakeHintClosed && (
+        <div
+          role="note"
+          style={{
+            position: "relative",
+            zIndex: 1,
+            margin: "12px 18px 0",
+            padding: "12px 14px",
+            borderRadius: "16px",
+            background: "var(--amber-bg)",
+            border: "1px solid var(--amber-edge)",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "12px",
+            fontSize: "15px",
+            lineHeight: 1.6,
+          }}
+        >
+          <span style={{ flex: 1 }}>
+            この端末では、画面が自動で消えるのを止められませんでした。画面が消えると、注文が届かず通知音も鳴りません。
+            iPadなら「設定 → 画面表示と明るさ → 自動ロック」を「なし」にしてください。
+          </span>
+          <button onClick={() => setWakeHintClosed(true)} style={{ ...smallButton, flexShrink: 0 }}>
+            閉じる
+          </button>
+        </div>
+      )}
+
       <main style={{ flex: 1, position: "relative", zIndex: 1 }}>
         {loading ? <LoadingScreen /> : <KitchenDisplay />}
       </main>
 
       {!started && (
         <button
-          onClick={() => setStarted(true)}
+          onClick={() => {
+            unlockAudio(); // iPadはタップの中で音声を開放しておかないと、あとの通知音が鳴らない
+            playOrderChime(); // 音が出るか、その場で確かめられる
+            setStarted(true);
+          }}
           style={{
             position: "fixed",
             inset: 0,
@@ -118,7 +179,7 @@ export default function KitchenShell() {
           }}
         >
           <span style={{ fontSize: "30px", fontWeight: 800 }}>タップして開始</span>
-          <span style={{ fontSize: "15px", opacity: 0.85 }}>通知音と、画面が消えない設定を有効にします</span>
+          <span style={{ fontSize: "15px", opacity: 0.85 }}>通知音と、画面が消えない設定を有効にします（確認の音が1回鳴ります）</span>
         </button>
       )}
 
