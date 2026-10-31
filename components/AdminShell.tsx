@@ -17,6 +17,7 @@ import LoadingScreen from "@/components/ui/LoadingScreen";
 import { useSwipePager } from "@/lib/useSwipePager";
 import type { AppState, StaffRole } from "@/store/useAppStore";
 import { useBackGuard } from "@/lib/backGuard";
+import { useWideMode } from "@/lib/wideMode";
 import { prepareChime, unlockAudio } from "@/lib/notifySound";
 import UpdateNotice from "@/components/UpdateNotice";
 
@@ -55,6 +56,9 @@ export default function AdminShell() {
     handy && seg.value === "staff" ? { ...seg, label: "テーブル" } : handy && seg.value === "history" ? { ...seg, label: "卓の履歴" } : seg
   );
   const isOwner = staffRole === null || staffRole === "owner";
+  // 厨房のタブを全画面にしているときは、上の見出しとタブを隠す
+  const wide = useWideMode();
+  const hideHeader = wide && (tabs.includes(mgmtTab) ? mgmtTab : tabs[0]) === "kitchen";
   // 端末の「戻る」で管理画面が閉じないようにする（開いている設定や確認は閉じる）
   useBackGuard();
 
@@ -110,61 +114,85 @@ export default function AdminShell() {
           固定で敷き、スクロールしてもどの位置でも屈折が視認できるようにする
           （隅に光を数点置くだけだとスクロールで通り過ぎた瞬間ガラスが死んで見える）。 */}
       <div aria-hidden className="no-print ambient-wash" />
-      <header
-        className="no-print"
-        style={{
-          margin: "10px 10px 0",
-          borderRadius: "22px",
-          background: "var(--glass)",
-          backdropFilter: "blur(26px) saturate(180%)",
-          WebkitBackdropFilter: "blur(26px) saturate(180%)",
-          border: "1px solid var(--glass-edge)",
-          boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)",
-          position: "sticky",
-          top: "10px",
-          zIndex: 30,
-        }}
-      >
-        {/* 店名/タブ/ログアウト・設定を1つの折り返し可能な横並びにして縦を圧縮する。
-            幅が十分あれば1行(3列相当)に収まり、狭い画面では自然に2列・1列へ折り返す。 */}
-        <div
+      {!hideHeader && (
+        <header
+          className="no-print"
           style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "10px",
-            padding: "10px 14px",
+            margin: "10px 10px 0",
+            borderRadius: "22px",
+            background: "var(--glass)",
+            backdropFilter: "blur(26px) saturate(180%)",
+            WebkitBackdropFilter: "blur(26px) saturate(180%)",
+            border: "1px solid var(--glass-edge)",
+            boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)",
+            position: "sticky",
+            top: "10px",
+            zIndex: 30,
           }}
         >
-          <div style={{ display: "flex", alignItems: "baseline", gap: "8px", minWidth: 0 }}>
-            <span className="brand-name" style={{ whiteSpace: "nowrap" }}>
-              {storeName}
-            </span>
-            <span style={{ fontSize: "13px", color: "var(--text-2)", whiteSpace: "nowrap" }}>管理ツール</span>
-          </div>
-
-          {tabs.length > 1 && (
-            <div className="admin-tabs no-scrollbar">
-              <SegmentedControl
-                segments={segments}
-                value={tabs.includes(mgmtTab) ? mgmtTab : tabs[0]}
-                onChange={setMgmt}
-              />
+          {/* 店名/タブ/ログアウト・設定を1つの折り返し可能な横並びにして縦を圧縮する。
+              幅が十分あれば1行(3列相当)に収まり、狭い画面では自然に2列・1列へ折り返す。 */}
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "10px",
+              padding: "10px 14px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "baseline", gap: "8px", minWidth: 0 }}>
+              <span className="brand-name" style={{ whiteSpace: "nowrap" }}>
+                {storeName}
+              </span>
+              <span style={{ fontSize: "13px", color: "var(--text-2)", whiteSpace: "nowrap" }}>管理ツール</span>
             </div>
-          )}
 
-          <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
-            {isSupabaseConfigured() && (
+            {tabs.length > 1 && (
+              <div className="admin-tabs no-scrollbar">
+                <SegmentedControl
+                  segments={segments}
+                  value={tabs.includes(mgmtTab) ? mgmtTab : tabs[0]}
+                  onChange={setMgmt}
+                />
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+              {isSupabaseConfigured() && (
+                <button
+                  onClick={() => getSupabase()?.auth.signOut()}
+                  style={{
+                    minHeight: "40px",
+                    padding: "7px 14px",
+                    borderRadius: "8px",
+                    border: "none",
+                    background: "var(--control-tint)",
+                    color: "var(--text-2)",
+                    fontFamily: "inherit",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  ログアウト
+                </button>
+              )}
+              {isOwner && (
               <button
-                onClick={() => getSupabase()?.auth.signOut()}
+                onClick={openSettings}
                 style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
                   minHeight: "40px",
                   padding: "7px 14px",
                   borderRadius: "8px",
                   border: "none",
                   background: "var(--control-tint)",
-                  color: "var(--text-2)",
+                  color: "var(--text)",
                   fontFamily: "inherit",
                   fontSize: "14px",
                   fontWeight: 600,
@@ -172,35 +200,13 @@ export default function AdminShell() {
                   whiteSpace: "nowrap",
                 }}
               >
-                ログアウト
+                <GearIcon size={15} />設定
               </button>
-            )}
-            {isOwner && (
-            <button
-              onClick={openSettings}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                minHeight: "40px",
-                padding: "7px 14px",
-                borderRadius: "8px",
-                border: "none",
-                background: "var(--control-tint)",
-                color: "var(--text)",
-                fontFamily: "inherit",
-                fontSize: "14px",
-                fontWeight: 600,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-              }}
-            >
-              <GearIcon size={15} />設定
-            </button>
-            )}
+              )}
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       <main
         {...tabPager.handlers}

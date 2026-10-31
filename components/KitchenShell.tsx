@@ -10,6 +10,7 @@ import Toast from "@/components/ui/Toast";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 import { smallButton } from "@/components/handy/ui";
 import { useBackGuard } from "@/lib/backGuard";
+import { useWideMode } from "@/lib/wideMode";
 import { prepareChime, unlockAudio, playOrderChime } from "@/lib/notifySound";
 import UpdateNotice, { buildLabel } from "@/components/UpdateNotice";
 
@@ -29,6 +30,8 @@ export default function KitchenShell() {
   const [wakeHintClosed, setWakeHintClosed] = useState(false);
   // 端末の「戻る」で厨房の画面が閉じないようにする
   useBackGuard();
+  // 全画面のときは、店名やログアウトの見出しを隠す（伝票だけを広く出す）
+  const wide = useWideMode();
 
   // 通知音を先に作っておく（最初のタップの確認音から、消音モードでも消えない鳴らし方にできるように）
   useEffect(() => {
@@ -99,32 +102,34 @@ export default function KitchenShell() {
       }}
     >
       <div aria-hidden className="ambient-wash" />
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "10px",
-          padding: "12px 18px 0",
-          position: "relative",
-          zIndex: 1,
-        }}
-      >
-        <h1 style={{ margin: 0, fontWeight: 800, fontSize: "17px" }}>
-          {storeName}
-          <span style={{ fontSize: "13px", color: "var(--text-2)", marginLeft: "8px", fontWeight: 600 }}>厨房</span>
-          {/* どの版が動いているか（古い版のまま動いていないかを確かめる手がかり） */}
-          <span style={{ fontSize: "12px", color: "var(--text-3)", marginLeft: "8px", fontWeight: 500 }}>版 {buildLabel()}</span>
-        </h1>
-        {isSupabaseConfigured() && (
-          <button
-            onClick={() => getSupabase()?.auth.signOut()}
-            style={{ ...smallButton, border: "none", background: "transparent", boxShadow: "none", color: "var(--text-2)", fontSize: "13px" }}
-          >
-            ログアウト
-          </button>
-        )}
-      </header>
+      {!wide && (
+        <header
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "10px",
+            padding: "12px 18px 0",
+            position: "relative",
+            zIndex: 1,
+          }}
+        >
+          <h1 style={{ margin: 0, fontWeight: 800, fontSize: "17px" }}>
+            {storeName}
+            <span style={{ fontSize: "13px", color: "var(--text-2)", marginLeft: "8px", fontWeight: 600 }}>厨房</span>
+            {/* どの版が動いているか（古い版のまま動いていないかを確かめる手がかり） */}
+            <span style={{ fontSize: "12px", color: "var(--text-3)", marginLeft: "8px", fontWeight: 500 }}>版 {buildLabel()}</span>
+          </h1>
+          {isSupabaseConfigured() && (
+            <button
+              onClick={() => getSupabase()?.auth.signOut()}
+              style={{ ...smallButton, border: "none", background: "transparent", boxShadow: "none", color: "var(--text-2)", fontSize: "13px" }}
+            >
+              ログアウト
+            </button>
+          )}
+        </header>
+      )}
 
       {started && wakeLockFailed && !wakeHintClosed && (
         <div
