@@ -252,16 +252,6 @@ export default function SettingsSheet() {
             </div>
           )}
         </div>
-        <div
-          style={{
-            fontSize: "12px",
-            color: "var(--text-2)",
-            margin: "10px 8px 0",
-            lineHeight: 1.5,
-          }}
-        >
-          写真は管理画面から設定します。客用ページには表示だけされます。
-        </div>
 
         {/* 税・チャージ料 */}
         <div style={{ ...labelStyle, marginTop: "20px" }}>税・チャージ料</div>
@@ -323,9 +313,6 @@ export default function SettingsSheet() {
             </span>
           </label>
         </div>
-        <div style={{ fontSize: "12px", color: "var(--text-2)", margin: "10px 8px 0", lineHeight: 1.5 }}>
-          会計時に自動で反映されます。チャージ料は0%で無しになります。
-        </div>
 
           </>
         )}
@@ -346,9 +333,6 @@ export default function SettingsSheet() {
               画像を削除
             </button>
           )}
-        </div>
-        <div style={{ fontSize: "12px", color: "var(--text-2)", margin: "10px 8px 0", lineHeight: 1.5 }}>
-          スタッフがこの管理画面をホーム画面に追加した際のアイコンです。正方形の画像を推奨します。未設定の間は仮アイコンが使われます。
         </div>
 
         {/* QRコード管理（ハンディモードの店は客のQR注文を使わないので出さない） */}

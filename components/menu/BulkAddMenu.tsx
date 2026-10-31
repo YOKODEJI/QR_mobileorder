@@ -49,10 +49,7 @@ export default function BulkAddMenu({ defaultCat }: { defaultCat: string }) {
 
   return (
     <div style={{ marginTop: "14px", paddingTop: "14px", borderTop: "1px solid var(--hairline)" }}>
-      <div style={{ fontSize: "14px", fontWeight: 800 }}>まとめて追加</div>
-      <div style={{ fontSize: "13px", color: "var(--text-2)", margin: "4px 0 10px", lineHeight: 1.6 }}>
-        1行に1品ずつ書くと、上で選んだカテゴリ「{defaultCat}」にまとめて入ります。同じ名前の品は飛ばします。
-      </div>
+      <div style={{ fontSize: "14px", fontWeight: 800, marginBottom: "10px" }}>まとめて追加（{defaultCat}）</div>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}

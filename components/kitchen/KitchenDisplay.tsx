@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useAppStore, type Order } from "@/store/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import { hm, elapsedMin, useNow } from "@/lib/time";
-import { BellIcon, BellSlashIcon, WarningIcon } from "@/components/ui/Icon";
+import { BellIcon, BellSlashIcon, CompressIcon, ExpandIcon, WarningIcon } from "@/components/ui/Icon";
 import { optionsLabel, splitCountOptions } from "@/lib/options";
 import SoldOutSheet from "@/components/kitchen/SoldOutSheet";
 import { card } from "@/components/handy/ui";
@@ -246,7 +246,8 @@ export default function KitchenDisplay() {
               color: wide ? "#fff" : "var(--text)",
             }}
           >
-            {wide ? "全画面を終わる" : "全画面"}
+            {wide ? <CompressIcon size={15} /> : <ExpandIcon size={15} />}
+            {wide ? "全画面表示モードを閉じる" : "全画面表示モード"}
           </button>
         </div>
       </div>
@@ -279,7 +280,6 @@ export default function KitchenDisplay() {
             <div style={{ fontWeight: 700, color: "var(--red-dark)", fontSize: "14px" }}>
               {conflictTables.map((t) => s.tableName(t)).join("・")}：会計済みの未提供伝票が残ったまま、新しい注文が入っています
             </div>
-            <div style={{ fontSize: "13px", color: "var(--text-2)" }}>前のお客様の未提供分（グレーの伝票）を先に提供し、伝票を閉じてください。</div>
           </div>
         </div>
       )}
@@ -289,7 +289,6 @@ export default function KitchenDisplay() {
           <WarningIcon size={18} style={{ color: "var(--red-dark)", flexShrink: 0 }} />
           <div>
             <div style={{ fontWeight: 700, color: "var(--red-dark)", fontSize: "14px" }}>接続が切断されています</div>
-            <div style={{ fontSize: "13px", color: "var(--text-2)" }}>新しい注文を受信できません。ネットワークを確認してください。</div>
           </div>
         </div>
       )}
@@ -327,7 +326,6 @@ export default function KitchenDisplay() {
               {servedOpen ? "▲" : "▼"}
             </span>
           </button>
-          <span style={{ fontSize: "13px", color: "var(--text-2)" }}>お会計（卓を閉じる）で、ここからも消えます</span>
         </div>
         {servedOpen &&
           (served.length === 0 ? (

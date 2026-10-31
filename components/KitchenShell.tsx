@@ -150,8 +150,7 @@ export default function KitchenShell() {
           }}
         >
           <span style={{ flex: 1 }}>
-            この端末では、画面が自動で消えるのを止められませんでした。画面が消えると、注文が届かず通知音も鳴りません。
-            iPadなら「設定 → 画面表示と明るさ → 自動ロック」を「なし」にしてください。
+            画面が自動で消えると、注文も通知音も届きません。設定 → 画面表示と明るさ → 自動ロック → なし
           </span>
           <button onClick={() => setWakeHintClosed(true)} style={{ ...smallButton, flexShrink: 0 }}>
             閉じる
@@ -187,7 +186,6 @@ export default function KitchenShell() {
           }}
         >
           <span style={{ fontSize: "30px", fontWeight: 800 }}>タップして開始</span>
-          <span style={{ fontSize: "15px", opacity: 0.85 }}>通知音と、画面が消えない設定を有効にします（確認の音が1回鳴ります）</span>
         </button>
       )}
 

@@ -92,6 +92,7 @@ export default function HandyShell() {
     return () => window.clearTimeout(timer);
   }, [loading, restoreStaffCart, selectStaffTable, pushToast]);
 
+  // 卓を押すと、直接注文入力へ。同じ卓のまま「注文」「注文一覧」を行き来しても、入力中の注文は残る
   const openTableView = (id: string) => {
     selectStaffTable(id);
     setView({ name: "table", id });
@@ -102,29 +103,28 @@ export default function HandyShell() {
     cartOwner.current = id;
     setView({ name: "order", id });
   };
-  const back = () => {
-    if (view.name === "order") setView({ name: "table", id: view.id });
-    else setView({ name: "tables" });
+  const back = () => setView({ name: "tables" });
+  /** 卓移動のあと、入力中の注文も新しい卓のものとして引き継ぐ */
+  const movedTable = (from: string, to: string) => {
+    if (cartOwner.current === from) {
+      cartOwner.current = to;
+      const st = useAppStore.getState();
+      saveDraft(to, st.staffCart, st.staffNotes);
+    }
+    setEditingTables(false);
   };
 
-  // 端末の「戻る」でアプリが閉じないようにし、奥の画面から1つずつ戻る（注文入力 → 卓 → 卓一覧）
+  // 端末の「戻る」でアプリが閉じないようにし、1つ前（注文・注文一覧 → 卓一覧）へ戻る
   useBackGuard();
   useBackHandler(view.name !== "tables", back);
 
-  const title =
-    view.name === "tables"
-      ? storeName
-      : view.name === "table"
-        ? tableName(view.id)
-        : view.name === "sent"
-          ? "送信完了"
-          : `${tableName(view.id)} の注文`;
-  // 卓の編集ができる役割は店の決まり（lib/storeRules.ts。DBのポリシーと合わせること）。
-  // 役割が分からない＝Supabase未設定のローカルでは出す
-  const canEditTables =
-    view.name === "tables" &&
-    !loading &&
-    (staffRole === "owner" || staffRole === null || (STAFF_CAN_EDIT_TABLES && staffRole === "staff"));
+  const title = view.name === "tables" ? storeName : view.name === "sent" ? "送信完了" : tableName(view.id);
+  // 卓の追加・名前・並び・削除ができる役割は店の決まり（lib/storeRules.ts。DBのポリシーと合わせること）。
+  // 役割が分からない＝Supabase未設定のローカルでは出す。卓移動は誰でもできる
+  const canEditTables = staffRole === "owner" || staffRole === null || (STAFF_CAN_EDIT_TABLES && staffRole === "staff");
+  const showEditButton = view.name === "tables" && !loading && staffRole !== "kitchen";
+  // 注文・注文一覧のときは、上に「注文」「注文一覧」のタブを出す（見出しが2段になる）
+  const showTabs = view.name === "order" || view.name === "table";
 
   return (
     <div
@@ -140,6 +140,7 @@ export default function HandyShell() {
         flexDirection: "column",
         // 種類の切替で横にずらした一覧がはみ出しても、横スクロールにしない（clip は sticky を壊さない）
         overflowX: "clip",
+        ...(showTabs ? ({ "--handy-header-h": "calc(108px + env(safe-area-inset-top))" } as React.CSSProperties) : {}),
       }}
     >
       {/* すりガラスの背後に敷く、店の色の光 */}
@@ -151,49 +152,85 @@ export default function HandyShell() {
           top: 0,
           zIndex: 30,
           display: "flex",
-          alignItems: "center",
-          gap: "8px",
+          flexDirection: "column",
           height: "var(--handy-header-h)",
-          padding: "env(safe-area-inset-top) 12px 0",
+          paddingTop: "env(safe-area-inset-top)",
           borderBottom: "1px solid var(--glass-edge)",
           boxShadow: "inset 0 1px 0 var(--glass-spec)",
         }}
       >
-        {view.name !== "tables" && (
-          <button onClick={back} aria-label="戻る" style={{ ...smallButton, paddingLeft: "10px" }}>
-            <span aria-hidden style={{ fontSize: "20px", lineHeight: 1, marginRight: "2px" }}>
-              ‹
-            </span>
-            戻る
-          </button>
-        )}
-        {/* 卓一覧では屋号を店の書体で出す。ほかの画面は卓名を大きく */}
-        <h1
-          className={view.name === "tables" ? "brand-name" : undefined}
-          style={{
-            flex: 1,
-            minWidth: 0,
-            margin: 0,
-            ...(view.name === "tables" ? {} : { fontWeight: 800, fontSize: "21px" }),
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {title}
-        </h1>
-        {canEditTables && (
-          <button onClick={() => setEditingTables(true)} style={smallButton}>
-            卓の編集
-          </button>
-        )}
-        {view.name === "tables" && isSupabaseConfigured() && (
-          <button
-            onClick={() => getSupabase()?.auth.signOut()}
-            style={{ ...smallButton, border: "none", background: "transparent", boxShadow: "none", color: "var(--text-2)", padding: "8px 4px" }}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", height: "56px", padding: "0 12px", flexShrink: 0 }}>
+          {view.name !== "tables" && (
+            <button onClick={back} aria-label="戻る" style={{ ...smallButton, paddingLeft: "10px" }}>
+              <span aria-hidden style={{ fontSize: "20px", lineHeight: 1, marginRight: "2px" }}>
+                ‹
+              </span>
+              戻る
+            </button>
+          )}
+          {/* 卓一覧では屋号を店の書体で出す。ほかの画面は卓名を大きく */}
+          <h1
+            className={view.name === "tables" ? "brand-name" : undefined}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              margin: 0,
+              ...(view.name === "tables" ? {} : { fontWeight: 800, fontSize: "21px" }),
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
           >
-            ログアウト
-          </button>
+            {title}
+          </h1>
+          {showEditButton && (
+            <button onClick={() => setEditingTables(true)} style={smallButton}>
+              卓の編集
+            </button>
+          )}
+          {view.name === "tables" && isSupabaseConfigured() && (
+            <button
+              onClick={() => getSupabase()?.auth.signOut()}
+              style={{ ...smallButton, border: "none", background: "transparent", boxShadow: "none", color: "var(--text-2)", padding: "8px 4px" }}
+            >
+              ログアウト
+            </button>
+          )}
+        </div>
+        {showTabs && (view.name === "order" || view.name === "table") && (
+          <div role="tablist" style={{ display: "flex", gap: "8px", padding: "0 12px 8px", flexShrink: 0 }}>
+            {(
+              [
+                { key: "order", label: "注文" },
+                { key: "table", label: "注文一覧" },
+              ] as const
+            ).map((t) => {
+              const on = view.name === t.key;
+              return (
+                <button
+                  key={t.key}
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => (t.key === "order" ? openOrder(view.id) : openTableView(view.id))}
+                  style={{
+                    flex: 1,
+                    minHeight: "44px",
+                    borderRadius: "12px",
+                    border: on ? "1px solid var(--text)" : "1px solid var(--glass-edge)",
+                    background: on ? "var(--text)" : "var(--glass-strong)",
+                    boxShadow: on ? "none" : "inset 0 1px 0 var(--glass-spec)",
+                    color: on ? "#fff" : "var(--text)",
+                    fontFamily: "inherit",
+                    fontSize: "17px",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
         )}
       </header>
 
@@ -207,22 +244,9 @@ export default function HandyShell() {
             厨房の画面は <Link href="/kitchen" style={{ color: "var(--accent)", fontWeight: 700 }}>/kitchen</Link> です。
           </div>
         ) : view.name === "tables" ? (
-          <TableGrid onOpenTable={openTableView} onOrder={openOrder} />
+          <TableGrid onOpenTable={openOrder} onOrder={openOrder} />
         ) : view.name === "table" ? (
-          <TableView
-            tableId={view.id}
-            onOrder={() => openOrder(view.id)}
-            onMoved={(to) => {
-              // 移動先で注文入力を続けられるよう、入力中の注文も新しい卓のものとして引き継ぐ
-              if (cartOwner.current === view.id) {
-                cartOwner.current = to;
-                const st = useAppStore.getState();
-                saveDraft(to, st.staffCart, st.staffNotes);
-              }
-              openTableView(to);
-            }}
-            onClosedTable={() => setView({ name: "tables" })}
-          />
+          <TableView tableId={view.id} onClosedTable={() => setView({ name: "tables" })} />
         ) : view.name === "sent" ? (
           <SentView
             tableName={tableName(view.id)}
@@ -236,7 +260,7 @@ export default function HandyShell() {
         )}
       </main>
 
-      {editingTables && <TableEditSheet onClose={() => setEditingTables(false)} />}
+      {editingTables && <TableEditSheet canEdit={canEditTables} onClose={() => setEditingTables(false)} onMoved={movedTable} />}
 
       <SupabaseSync staff />
       <UpdateNotice />

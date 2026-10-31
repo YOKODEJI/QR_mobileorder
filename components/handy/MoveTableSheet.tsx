@@ -37,7 +37,7 @@ export default function MoveTableSheet({
   const choose = (toId: string) =>
     s.openDialog({
       title: "卓移動",
-      body: `${s.tableName(fromId)} のお客様を ${s.tableName(toId)} へ移します。\n注文と来店時刻もそのまま移ります。`,
+      body: `${s.tableName(fromId)} → ${s.tableName(toId)}`,
       confirmText: "移動する",
       danger: false,
       onConfirm: async () => {
@@ -50,7 +50,7 @@ export default function MoveTableSheet({
     });
 
   return (
-    <Sheet title={`${s.tableName(fromId)} から移動`} subtitle="空いている卓を選んでください" onClose={onClose}>
+    <Sheet title={`${s.tableName(fromId)} の移動先`} onClose={onClose}>
       {empty.length === 0 ? (
         <div style={{ textAlign: "center", color: "var(--text-2)", fontSize: "16px", padding: "30px 0" }}>空いている卓がありません</div>
       ) : (

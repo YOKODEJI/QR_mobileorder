@@ -226,7 +226,7 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
             style={{ ...card, marginBottom: "6px", border: "1.5px solid var(--accent)", overflow: "hidden" }}
           >
             <h2 style={{ ...sectionTitle, margin: 0, padding: "8px 14px", color: "var(--text)", background: "var(--accent-bg)" }}>
-              おかわり（この卓が前に頼んだもの）
+              おかわり
             </h2>
             <div style={{ display: "flex", flexDirection: "column" }}>
               {repeats.map((r) => {
@@ -388,7 +388,7 @@ export default function OrderEntry({ tableId, onSent }: { tableId: string; onSen
 
       {/* 選ぶ組が1つだけ（一合／グラス、飲み方）なら、押した時点でそのまま入れる */}
       {optionItem && optionItemGroups.length === 1 && !optionCount && (
-        <Sheet title={optionItem.name} subtitle={`${optionItemGroups[0].group}を選んでください`} onClose={() => setOptionItem(null)}>
+        <Sheet title={optionItem.name} onClose={() => setOptionItem(null)}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px", paddingBottom: "4px" }}>
             {optionItemGroups[0].options.map((o) => (
               <button

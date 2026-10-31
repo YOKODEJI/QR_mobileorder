@@ -42,8 +42,8 @@ export default function BillSheet({
       title: `${s.tableName(tableId)} を閉じる`,
       body:
         (unserved > 0
-          ? `⚠ まだ出していないドリンクが ${unserved} 杯あります。閉じても、出し終えるまで厨房には残ります。\n\n`
-          : "") + "USENレジでの会計が終わっていることを確かめてから閉じてください。",
+          ? `⚠ まだ出していないドリンクが ${unserved} 杯あります`
+          : ""),
       confirmText: "会計済みにして閉じる",
       danger: false,
       onConfirm: async () => {
@@ -60,7 +60,6 @@ export default function BillSheet({
   return (
     <Sheet
       title={`${s.tableName(tableId)} のレジ用一覧`}
-      subtitle="レジに打ち終えたら、下のボタンで卓を閉じます"
       onClose={onClose}
       footer={
         <button onClick={confirmClose} disabled={off} style={{ ...primaryButton, ...disabledLook(off) }}>

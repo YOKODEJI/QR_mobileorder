@@ -537,11 +537,7 @@ export default function StaffCheckout() {
                   )
                 )}
               </div>
-              <div style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "10px" }}>
-                {s.orderEditMode
-                  ? "「−」で品目を1個ずつ取消できます。完了を押すと編集を終了します。"
-                  : "誤操作防止のため、取消するには「注文編集」を押してください。"}
-              </div>
+              <div style={{ height: "10px" }} />
               {aggList.length === 0 ? (
                 <div style={{ padding: "16px 0" }}>
                   <div style={{ color: "var(--text-2)", fontSize: "14px" }}>
@@ -766,24 +762,16 @@ export default function StaffCheckout() {
               >
                 {handy ? "卓を閉じる" : s.settings.squarePosMode === "mobile_web" ? "Squareで決済する" : "お会計する（卓を閉じる）"}
               </button>
-              <div style={{ fontSize: "13px", color: s.orderEditMode ? "var(--red)" : "var(--text-2)", marginTop: "8px", textAlign: "center", fontWeight: s.orderEditMode ? 700 : 400 }}>
-                {s.orderEditMode
-                  ? handy
-                    ? "注文編集を「完了」してから卓を閉じられます。"
-                    : "注文編集を「完了」してからお会計できます。"
-                  : handy
-                  ? "会計はレジで行います。ここでは卓を閉じるだけです。"
-                  : s.settings.squarePosMode === "mobile_web"
-                  ? "Square POSアプリが開きます。決済が完了するとセッションが締まります。"
-                  : "決済は既存のレジで行います。ここでは卓を閉じるだけです。"}
-              </div>
+              {s.orderEditMode && (
+                <div style={{ fontSize: "13px", color: "var(--red)", marginTop: "8px", textAlign: "center", fontWeight: 700 }}>
+                  注文編集の「完了」を押してください
+                </div>
+              )}
 
               {/* 代理注文 */}
               <div style={{ borderTop: "1px solid var(--hairline)", marginTop: "22px", paddingTop: "18px" }}>
                 <div style={{ fontSize: "16px", fontWeight: 800 }}>{handy ? "注文を追加" : "代理注文"}</div>
-                <div style={{ fontSize: "13px", color: "var(--text-2)", marginBottom: "6px" }}>
-                  {handy ? "この卓の注文を、ここからも入れられます" : "同じメニューから店員が入力できます"}
-                </div>
+                <div style={{ height: "6px" }} />
                 <div style={{ margin: "0 -6px" }}>
                   <ChipRow value={s.proxyCat} onChange={s.setProxyCat} accent={accent} />
                 </div>

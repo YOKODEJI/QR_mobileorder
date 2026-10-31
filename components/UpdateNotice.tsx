@@ -72,7 +72,7 @@ export default function UpdateNotice() {
         cursor: "pointer",
       }}
     >
-      新しい版があります。ここを押して読み込み直してください
+      新しい版があります（タップで更新）
     </button>
   );
 }

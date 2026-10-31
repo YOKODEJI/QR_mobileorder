@@ -117,9 +117,7 @@ function ItemOptionsButton({ item, accent, showPrice }: { item: MenuItem; accent
             <div style={{ fontSize: "17px", fontWeight: 800, color: "var(--text)" }}>
               {item.name} のオプション
             </div>
-            <div style={{ fontSize: "12px", color: "var(--text-2)", margin: "4px 0 14px" }}>
-              この商品の注文時に選べる選択肢です。{showPrice ? "追加料金は0円やマイナス（値引き）も設定できます。" : ""}
-            </div>
+            <div style={{ height: "14px" }} />
 
             <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "14px" }}>
               <input
@@ -164,7 +162,7 @@ function ItemOptionsButton({ item, accent, showPrice }: { item: MenuItem; accent
 
             {list.length === 0 ? (
               <div style={{ fontSize: "13px", color: "var(--text-2)", padding: "8px 0 4px" }}>
-                まだオプションがありません。この商品はそのまま注文されます。
+                オプションなし
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -550,10 +548,7 @@ export default function MenuManagement() {
 
       {/* カテゴリ（追加・名前の変更・削除）。メニューの一覧より上に置く */}
       <div style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", padding: "20px 22px", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)" }}>
-        <div style={{ fontSize: "17px", fontWeight: 800, marginBottom: "4px" }}>カテゴリ</div>
-        <div style={{ fontSize: "12px", color: "var(--text-2)", marginBottom: "14px" }}>
-          名前を入れて「追加」。名前を変えるときは下のカテゴリ名を、消すときは ✕ を押します（消したカテゴリの品は「その他」へ移ります）。
-        </div>
+        <div style={{ fontSize: "17px", fontWeight: 800, marginBottom: "14px" }}>カテゴリ</div>
         <div style={{ display: "flex", gap: "10px", marginBottom: "14px" }}>
           <input
             placeholder="新しいカテゴリ名（例: 日本酒）"
@@ -680,18 +675,6 @@ export default function MenuManagement() {
         <div style={{ padding: "18px 22px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", flexWrap: "wrap" }}>
           <div>
             <div style={{ fontSize: "19px", fontWeight: 800 }}>メニュー管理</div>
-            <div style={{ fontSize: "12px", color: "var(--text-2)", marginTop: "2px" }}>
-              {showPrice && showStock
-                ? "価格は1円単位、在庫は増減できます。"
-                : showPrice
-                  ? "価格は1円単位です。"
-                  : showStock
-                    ? "在庫は増減できます。"
-                    : ""}
-              {s.deleteMode
-                ? "品名を書き換えられます。消したい品は、左の丸で選んで「選んだ品を削除」。"
-                : "行をドラッグ&ドロップで並び替え。品名の変更と削除は「メニューを編集」から。"}
-            </div>
           </div>
           {s.deleteMode ? (
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>

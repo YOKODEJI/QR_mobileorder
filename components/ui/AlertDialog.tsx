@@ -40,19 +40,21 @@ export default function AlertDialog() {
         }}
       >
         <div style={{ padding: "20px 18px 16px", textAlign: "center" }}>
-          <div style={{ fontSize: "19px", fontWeight: 700, marginBottom: "8px", color: "var(--text)" }}>
+          <div style={{ fontSize: "19px", fontWeight: 700, marginBottom: dialog.body ? "8px" : 0, color: "var(--text)" }}>
             {dialog.title}
           </div>
-          <div
-            style={{
-              fontSize: "17px",
-              color: "var(--text-2)",
-              lineHeight: 1.6,
-              whiteSpace: "pre-line",
-            }}
-          >
-            {dialog.body}
-          </div>
+          {dialog.body && (
+            <div
+              style={{
+                fontSize: "17px",
+                color: "var(--text-2)",
+                lineHeight: 1.6,
+                whiteSpace: "pre-line",
+              }}
+            >
+              {dialog.body}
+            </div>
+          )}
         </div>
         <div
           style={{

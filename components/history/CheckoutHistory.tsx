@@ -92,9 +92,6 @@ export default function CheckoutHistory() {
       <div style={{ background: "var(--glass)", backdropFilter: "blur(22px) saturate(180%)", WebkitBackdropFilter: "blur(22px) saturate(180%)", border: "1px solid var(--glass-edge)", borderRadius: "22px", padding: "20px 22px", boxShadow: "inset 0 1px 0 var(--glass-spec), var(--glass-shadow)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
         <div>
           <div style={{ fontSize: "19px", fontWeight: 800 }}>{handy ? "卓の履歴" : "会計履歴"}</div>
-          <div style={{ fontSize: "13px", color: "var(--text-2)", marginTop: "2px" }}>
-            {handy ? "閉じた卓の注文" : "会計済みの卓"}を、時刻つきで記録しています。日付・テーブルをタップで開閉できます。
-          </div>
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ fontSize: "13px", color: "var(--text-2)" }}>本日 {todayCount}件</div>

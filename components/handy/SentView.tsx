@@ -83,7 +83,7 @@ export default function SentView({
             続けて注文する
           </button>
           <button onClick={onTable} style={secondaryButton}>
-            この卓を見る
+            注文一覧
           </button>
         </div>
         <button onClick={onTables} style={primaryButton}>

@@ -39,7 +39,6 @@ export default function ReviewSheet({
   return (
     <Sheet
       title={`${s.tableName(tableId)} の注文内容`}
-      subtitle="数とチェックを確かめてから送信してください"
       onClose={() => !sending && onClose()}
       footer={
         <button onClick={onSend} disabled={off} style={{ ...primaryButton, ...disabledLook(off) }}>

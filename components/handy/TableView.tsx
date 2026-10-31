@@ -6,23 +6,12 @@ import { useAppStore } from "@/store/useAppStore";
 import { hm, useNow } from "@/lib/time";
 import { optionsLabel, splitCountOptions } from "@/lib/options";
 import { BellIcon } from "@/components/ui/Icon";
-import MoveTableSheet from "@/components/handy/MoveTableSheet";
 import BillSheet from "@/components/handy/BillSheet";
-import { bottomBar, card, itemName, primaryButton, secondaryButton, smallButton, statusTag, subText } from "@/components/handy/ui";
+import { bottomBar, card, itemName, primaryButton, smallButton, statusTag, subText } from "@/components/handy/ui";
 
-/** 卓画面。この卓のドリンクと提供状況を新しい順に出し、下のボタンから追加注文・卓移動・レジ用の一覧へ */
-export default function TableView({
-  tableId,
-  onOrder,
-  onMoved,
-  onClosedTable,
-}: {
-  tableId: string;
-  onOrder: () => void;
-  onMoved: (toId: string) => void;
-  onClosedTable: () => void;
-}) {
-  const [sheet, setSheet] = useState<"move" | "bill" | null>(null);
+/** 注文一覧（卓画面の「注文一覧」タブ）。この卓のドリンクと提供状況を新しい順に出し、下のボタンからレジ用の一覧へ */
+export default function TableView({ tableId, onClosedTable }: { tableId: string; onClosedTable: () => void }) {
+  const [billOpen, setBillOpen] = useState(false);
   // 注文の取消は、押し間違えないよう「取り消す」を押してからだけ出す
   const [cancelMode, setCancelMode] = useState(false);
   const s = useAppStore(
@@ -47,9 +36,7 @@ export default function TableView({
     const opts = optionsLabel(splitCountOptions(s.itemOptions[it.menuItemId], it.options).rest);
     s.openDialog({
       title: `${it.name}${opts ? `（${opts}）` : ""} を1つ取り消しますか？`,
-      body:
-        (order.status === "cooking" ? "" : "この品は提供済みになっています。\n\n") +
-        "この卓の注文から1つ減らします。厨房の伝票からも消えます。",
+      body: order.status === "cooking" ? "" : "提供済みの品です",
       confirmText: "取り消す",
       danger: true,
       onConfirm: () => {
@@ -61,7 +48,7 @@ export default function TableView({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-      <div style={{ flex: 1, padding: "12px 12px 190px", display: "flex", flexDirection: "column", gap: "10px" }}>
+      <div style={{ flex: 1, padding: "12px 12px 110px", display: "flex", flexDirection: "column", gap: "10px" }}>
         {calls.map((c) => (
           <div
             key={c.id}
@@ -98,10 +85,7 @@ export default function TableView({
         ))}
 
         {orders.length > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", minHeight: "40px" }}>
-            <span style={{ flex: 1, minWidth: 0, fontSize: "15px", fontWeight: 700, color: cancelling ? "var(--red-dark)" : "var(--text-2)" }}>
-              {cancelling ? "取り消す品の「取消」を押してください" : "この卓の注文"}
-            </span>
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <button
               onClick={() => setCancelMode(!cancelling)}
               style={{ ...smallButton, ...(cancelling ? { background: "var(--text)", color: "#fff", border: "1px solid var(--text)" } : { color: "var(--red-dark)" }) }}
@@ -194,35 +178,17 @@ export default function TableView({
       </div>
 
       <div style={bottomBar}>
-        <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
-          <button onClick={() => setSheet("move")} style={secondaryButton}>
-            卓移動
-          </button>
-          <button onClick={() => setSheet("bill")} style={secondaryButton}>
-            レジ用の一覧
-          </button>
-        </div>
-        <button onClick={onOrder} style={primaryButton}>
-          ＋ 追加注文
+        <button onClick={() => setBillOpen(true)} style={primaryButton}>
+          レジ用の一覧
         </button>
       </div>
 
-      {sheet === "move" && (
-        <MoveTableSheet
-          fromId={tableId}
-          onClose={() => setSheet(null)}
-          onMoved={(to) => {
-            setSheet(null);
-            onMoved(to);
-          }}
-        />
-      )}
-      {sheet === "bill" && (
+      {billOpen && (
         <BillSheet
           tableId={tableId}
-          onClose={() => setSheet(null)}
+          onClose={() => setBillOpen(false)}
           onClosedTable={() => {
-            setSheet(null);
+            setBillOpen(false);
             onClosedTable();
           }}
         />

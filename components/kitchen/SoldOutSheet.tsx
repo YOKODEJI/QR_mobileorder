@@ -29,7 +29,7 @@ export default function SoldOutSheet({ onClose }: { onClose: () => void }) {
   return (
     <Sheet
       title="売切の切替"
-      subtitle={`いま売切 ${soldOutCount}品。タップで切り替わり、スタッフのスマホにすぐ反映されます`}
+      subtitle={`売切 ${soldOutCount}品`}
       onClose={onClose}
       maxWidth="760px"
       tall

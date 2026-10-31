@@ -6,10 +6,20 @@ import { useAppStore, type TableRec } from "@/store/useAppStore";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { tableSummary } from "@/lib/handy";
 import Sheet from "@/components/handy/Sheet";
+import MoveTableSheet from "@/components/handy/MoveTableSheet";
 import { card, disabledLook, stepButton, textInput } from "@/components/handy/ui";
 
-/** 卓の編集（追加・名前変更・並び替え・削除）。オーナーとスタッフが使う。着席中の卓は削除できない */
-export default function TableEditSheet({ onClose }: { onClose: () => void }) {
+/** 卓の編集（卓移動・追加・名前変更・並び替え・削除）。着席中の卓は削除できない。
+ *  卓の追加・名前・並び・削除は店の決まり（lib/storeRules.ts）で許された役割だけ。卓移動は誰でもできる（着席中の卓だけ出す） */
+export default function TableEditSheet({
+  canEdit,
+  onClose,
+  onMoved,
+}: {
+  canEdit: boolean;
+  onClose: () => void;
+  onMoved: (fromId: string, toId: string) => void;
+}) {
   const s = useAppStore(
     useShallow((st) => ({
       tables: st.tables,
@@ -23,8 +33,12 @@ export default function TableEditSheet({ onClose }: { onClose: () => void }) {
   );
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [movingId, setMovingId] = useState<string | null>(null);
   const gated = isSupabaseConfigured();
   const canAdd = !busy && newName.trim() !== "";
+  const isOccupied = (t: TableRec) => (gated && !!t.openSince) || tableSummary(s.orders, t.id).orderCount > 0;
+  // 卓の編集ができない役割には、卓移動ができる着席中の卓だけを出す
+  const shown = canEdit ? s.tables : s.tables.filter(isOccupied);
 
   const add = async () => {
     if (!canAdd) return;
@@ -44,7 +58,7 @@ export default function TableEditSheet({ onClose }: { onClose: () => void }) {
   const remove = (t: TableRec) =>
     s.openDialog({
       title: `${t.name} を削除`,
-      body: `卓「${t.name}」を一覧から消します。あとから同じ名前で追加し直せます。`,
+      body: "",
       confirmText: "削除する",
       danger: true,
       onConfirm: async () => {
@@ -58,9 +72,9 @@ export default function TableEditSheet({ onClose }: { onClose: () => void }) {
   return (
     <Sheet
       title="卓の編集"
-      subtitle="名前は欄をタップして書き換え、↑↓で並び替え"
       onClose={onClose}
       footer={
+        !canEdit ? undefined : (
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -98,18 +112,19 @@ export default function TableEditSheet({ onClose }: { onClose: () => void }) {
             追加
           </button>
         </form>
+        )
       }
     >
-      {s.tables.length === 0 ? (
+      {shown.length === 0 ? (
         <div style={{ textAlign: "center", color: "var(--text-2)", padding: "30px 0" }}>
-          卓がありません。下の欄から追加してください。
+          {canEdit ? "卓がありません" : "着席中の卓がありません"}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          {s.tables.map((t, i) => {
-            const occupied = (gated && !!t.openSince) || tableSummary(s.orders, t.id).orderCount > 0;
+          {shown.map((t, i) => {
+            const occupied = isOccupied(t);
             const first = i === 0;
-            const last = i === s.tables.length - 1;
+            const last = i === shown.length - 1;
             return (
               <div
                 key={t.id}
@@ -121,29 +136,56 @@ export default function TableEditSheet({ onClose }: { onClose: () => void }) {
                   ...card,
                 }}
               >
-                <button
-                  onClick={() => shift(t.id, -1)}
-                  disabled={busy || first}
-                  aria-label={`${t.name} を前へ`}
-                  style={{ ...stepButton, width: "40px", fontSize: "18px", ...disabledLook(busy || first) }}
-                >
-                  ↑
-                </button>
-                <button
-                  onClick={() => shift(t.id, 1)}
-                  disabled={busy || last}
-                  aria-label={`${t.name} を後ろへ`}
-                  style={{ ...stepButton, width: "40px", fontSize: "18px", ...disabledLook(busy || last) }}
-                >
-                  ↓
-                </button>
+                {canEdit && (
+                  <>
+                    <button
+                      onClick={() => shift(t.id, -1)}
+                      disabled={busy || first}
+                      aria-label={`${t.name} を前へ`}
+                      style={{ ...stepButton, width: "40px", fontSize: "18px", ...disabledLook(busy || first) }}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      onClick={() => shift(t.id, 1)}
+                      disabled={busy || last}
+                      aria-label={`${t.name} を後ろへ`}
+                      style={{ ...stepButton, width: "40px", fontSize: "18px", ...disabledLook(busy || last) }}
+                    >
+                      ↓
+                    </button>
+                  </>
+                )}
                 {/* 名前が他の端末で変わったら入力欄も作り直す */}
-                <NameField key={t.name} table={t} />
-                {occupied ? (
-                  <span style={{ flexShrink: 0, width: "56px", textAlign: "center", fontSize: "14px", fontWeight: 700, color: "var(--text-2)" }}>
-                    着席中
-                  </span>
+                {canEdit ? (
+                  <NameField key={t.name} table={t} />
                 ) : (
+                  <span style={{ flex: 1, minWidth: 0, padding: "0 6px", fontSize: "20px", fontWeight: 700 }}>{t.name}</span>
+                )}
+                {occupied && (
+                  <button
+                    onClick={() => setMovingId(t.id)}
+                    disabled={busy}
+                    aria-label={`${t.name} を移動`}
+                    style={{
+                      flexShrink: 0,
+                      minHeight: "40px",
+                      padding: "0 14px",
+                      borderRadius: "10px",
+                      border: "1.5px solid var(--hairline-strong)",
+                      background: "var(--surface)",
+                      color: "var(--text)",
+                      fontFamily: "inherit",
+                      fontSize: "16px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      ...disabledLook(busy),
+                    }}
+                  >
+                    移動
+                  </button>
+                )}
+                {canEdit && !occupied && (
                   <button
                     onClick={() => remove(t)}
                     disabled={busy}
@@ -169,6 +211,17 @@ export default function TableEditSheet({ onClose }: { onClose: () => void }) {
             );
           })}
         </div>
+      )}
+      {movingId && (
+        <MoveTableSheet
+          fromId={movingId}
+          onClose={() => setMovingId(null)}
+          onMoved={(to) => {
+            const from = movingId;
+            setMovingId(null);
+            onMoved(from, to);
+          }}
+        />
       )}
     </Sheet>
   );

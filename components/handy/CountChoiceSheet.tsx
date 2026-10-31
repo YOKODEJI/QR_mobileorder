@@ -36,7 +36,6 @@ export default function CountChoiceSheet({
   return (
     <Sheet
       title={itemName}
-      subtitle={`本体の数と${title}を合わせてから追加してください`}
       onClose={onClose}
       footer={
         <button onClick={() => onAdd(selectedId, qty)} style={primaryButton}>

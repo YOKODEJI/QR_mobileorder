@@ -63,7 +63,7 @@ export default function TableGrid({
   const receive = (id: string, name: string) =>
     s.openDialog({
       title: `${name} の来店受付`,
-      body: "お客様を案内した卓を開いて、注文を入れられるようにします。",
+      body: "",
       confirmText: "受付して注文へ",
       danger: false,
       onConfirm: async () => {
@@ -78,7 +78,7 @@ export default function TableGrid({
     <div ref={wrap} style={{ flex: 1 }}>
       {s.tables.length === 0 ? (
         <div style={{ padding: "60px 20px", textAlign: "center", color: "var(--text-2)", fontSize: "16px" }}>
-          卓が登録されていません。右上の「卓の編集」から追加してください。
+          卓がありません
         </div>
       ) : (
         <div
